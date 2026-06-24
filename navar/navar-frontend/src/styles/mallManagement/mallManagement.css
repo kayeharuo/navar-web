@@ -1,0 +1,421 @@
+/* ─── Page title & subtitle ──────────────────────────────── */
+.mall-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.mall-subtitle {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: #9B9C9C;
+  margin: 0;
+}
+
+/* ─── Add Mall button ────────────────────────────────────── */
+.mall-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background-color: #2563EB;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.mall-add-btn:hover {
+  background-color: #1D4ED8;
+}
+
+/* ─── Tab navigation ─────────────────────────────────────── */
+.mall-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background-color: #F7F8FA;
+  border: 0.5px solid #979797;
+  border-radius: 5px;
+  width: fit-content;
+  flex-wrap: wrap;
+}
+
+.mall-tab-btn {
+  padding: 5px 16px;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background-color: transparent;
+  color: #000;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.mall-tab-btn--active {
+  background-color: #155DFC;
+  color: #ffffff;
+}
+
+.mall-tab-btn:not(.mall-tab-btn--active):hover {
+  background-color: #E8F0FE;
+}
+
+/* ─── Filter bar ─────────────────────────────────────────── */
+.mall-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mall-filters {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background-color: #F7F8FA;
+  border: 0.5px solid #979797;
+  border-radius: 5px;
+  padding: 5px 8px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mall-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 3px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: transparent;
+  color: #979797;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.mall-filter-btn--active {
+  color: #000;
+  background-color: #ffffff;
+  border: 0.1px solid #000;
+  font-weight: 600;
+}
+
+.mall-filter-btn:not(.mall-filter-btn--active):hover {
+  color: #333;
+}
+
+.mall-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+  background-color: #ECEFF2;
+  color: #979797;
+}
+
+.mall-filter-count--active {
+  background-color: #EFF4FF;
+  color: #2B63EB;
+}
+
+/* ─── Search input ───────────────────────────────────────── */
+.mall-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: #ffffff;
+  border: 0.5px solid #979797;
+  border-radius: 5px;
+  min-width: 160px;
+  flex: 0 0 auto;
+}
+
+.mall-search-icon {
+  color: #979797;
+  flex-shrink: 0;
+}
+
+.mall-search-input {
+  border: none;
+  outline: none;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  color: #333;
+  background: transparent;
+  width: 120px;
+}
+
+.mall-search-input::placeholder {
+  color: #979797;
+}
+
+/* ─── Table ──────────────────────────────────────────────── */
+.mall-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  font-size: 12px;
+}
+
+.mall-table thead {
+  position: sticky;
+  top: 0;
+  background-color: #F7F8FA;
+  z-index: 1;
+  border-bottom: 0.2px solid #979797;
+}
+
+.mall-table th {
+  text-align: left;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #979797;
+  padding: 10px 16px;
+  white-space: nowrap;
+  border-bottom: 0.2px solid #979797;
+}
+
+.mall-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid #F7F8FA;
+  color: #000;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+}
+
+.mall-table tbody tr.mall-table-row {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.mall-table tbody tr.mall-table-row:hover td {
+  background-color: #F0F6FF;
+}
+
+/* ─── Floors cell with inline pencil ─────────────────────── */
+.mall-floors-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mall-floors-cell-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 0.3px solid #C4C9D4;
+  background: #fff;
+  color: #7BAAC4;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.mall-floors-cell-edit:hover {
+  background-color: #EFF6FF;
+  color: #2563EB;
+  border-color: #2563EB;
+}
+
+/* ─── Mall name cell ─────────────────────────────────────── */
+.mall-name-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #000;
+  margin: 0;
+}
+
+.mall-name-text--grace    { color: #F97316; }
+.mall-name-text--suspended { color: #EF4444; }
+
+.mall-overdue-note {
+  font-size: 11px;
+  color: #F97316;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+
+/* ─── Date cell ──────────────────────────────────────────── */
+.mall-date-cell {
+  font-size: 12px;
+  white-space: nowrap;
+  color: #000;
+}
+
+/* ─── Agreement cell (status + tier stacked) ─────────────── */
+.mall-agreement-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mall-tier-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #979797;
+  font-style: italic;
+}
+
+/* ─── Status badges ──────────────────────────────────────── */
+.mall-status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mall-status-badge--active     { color: #000; }
+.mall-status-badge--approved   { color: #000; }
+.mall-status-badge--live       { color: #000; }
+.mall-status-badge--suspended  { color: #000; }
+.mall-status-badge--unpublished{ color: #000; }
+.mall-status-badge--grace      { color: #000; }
+.mall-status-badge--revision   { color: #000; }
+.mall-status-badge--setup      { color: #000; }
+.mall-status-badge--pending    { color: #000; }
+.mall-status-badge--default    { color: #94A3B8; }
+
+/* ─── Action buttons (always on one row) ─────────────────── */
+.mall-action-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.mall-action-btn {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 3px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: filter 0.15s ease;
+}
+
+.mall-action-btn:hover {
+  filter: brightness(0.88);
+}
+
+.mall-action-btn--units   { background-color: #FF9233; }
+.mall-action-btn--stores  { background-color: #2563EB; }
+.mall-action-btn--beacons { background-color: #6C1FCA; }
+.mall-action-btn--edit    { background-color: #347545; }
+
+/* ─── Empty tab placeholder ──────────────────────────────── */
+.mall-tab-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 0.3px solid #979797;
+  color: #9B9C9C;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .mall-title {
+    font-size: 24px;
+  }
+
+  .mall-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mall-search-wrap {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .mall-search-input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .mall-title {
+    font-size: 20px;
+  }
+
+  .mall-subtitle {
+    font-size: 11px;
+  }
+
+  .mall-tabs {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .mall-filters {
+    width: 100%;
+  }
+
+  .mall-add-btn {
+    font-size: 13px;
+    padding: 7px 14px;
+  }
+
+  .mall-table th,
+  .mall-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 479px) {
+  .mall-title {
+    font-size: 18px;
+  }
+
+  .mall-tab-btn {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+
+  .mall-filter-btn {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}

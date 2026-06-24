@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   LayoutDashboard, Building2, FileText, Layers,
   Users, CreditCard, BarChart2, Mail, Settings, ClipboardList,
@@ -19,12 +18,9 @@ const navItems = [
   { label: 'Audit Logs',             icon: ClipboardList },
 ]
 
-export default function Sidebar({ isOpen, onClose }) {
-  const [activeItem, setActiveItem] = useState('Dashboard')
-
+export default function Sidebar({ isOpen, onClose, activePage, onNavigate }) {
   return (
     <>
-      {/* Dim overlay — only rendered on tablet/mobile via CSS */}
       <div
         className={`sidebar-overlay${isOpen ? ' sidebar-overlay--visible' : ''}`}
         onClick={onClose}
@@ -39,14 +35,11 @@ export default function Sidebar({ isOpen, onClose }) {
           <p className="sidebar-menu-label">Menu</p>
           <ul className="sidebar-nav-list">
             {navItems.map(({ label, icon: Icon }) => {
-              const isActive = activeItem === label
+              const isActive = activePage === label
               return (
                 <li key={label}>
                   <button
-                    onClick={() => {
-                      setActiveItem(label)
-                      onClose()   // close drawer on mobile after selecting
-                    }}
+                    onClick={() => onNavigate(label)}
                     className={`sidebar-nav-btn${isActive ? ' sidebar-nav-btn--active' : ''}`}
                   >
                     <Icon
