@@ -2,15 +2,11 @@ import { useState } from 'react'
 import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
-<<<<<<< Updated upstream
-import './App.css'
-=======
 import MallManagement from './pages/MallManagement'
 import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import './App.css'
 import './styles/panels.css'
->>>>>>> Stashed changes
 
 function LogoutModal({ onCancel, onConfirm }) {
   return (
