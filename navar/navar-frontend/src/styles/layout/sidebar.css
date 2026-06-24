@@ -1,0 +1,135 @@
+/* ─── Sidebar base ────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #E1F3FF;
+  border-right: 1px solid #C8E4F8;
+  transition: transform 0.25s ease;
+  z-index: 200;
+}
+
+.sidebar-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid #C8E4F8;
+  flex-shrink: 0;
+}
+
+.sidebar-logo img {
+  height: 32px;
+  width: auto;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 12px;
+}
+
+.sidebar-menu-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #90BDD9;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0 12px;
+  margin-bottom: 12px;
+}
+
+.sidebar-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: transparent;
+  color: #5A7A96;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-nav-btn:hover {
+  background-color: #D0E9F8;
+  color: #1E4D6B;
+}
+
+.sidebar-nav-btn--active {
+  background-color: #ffffff;
+  color: #2563EB;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-nav-btn--active:hover {
+  background-color: #ffffff;
+  color: #2563EB;
+}
+
+.sidebar-nav-icon {
+  flex-shrink: 0;
+  color: #7BAAC4;
+}
+
+.sidebar-nav-btn--active .sidebar-nav-icon {
+  color: #2563EB;
+}
+
+/* ─── Overlay (mobile only, behind open drawer) ───────── */
+.sidebar-overlay {
+  display: none;
+}
+
+/* ─── Responsive: tablet & mobile drawer ─────────────── */
+@media (max-width: 1023px) {
+  /* Sidebar slides off-screen by default */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Open state — toggled via JS */
+  .sidebar--open {
+    transform: translateX(0);
+  }
+
+  /* Dim overlay behind the drawer */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.35);
+    z-index: 199;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .sidebar-overlay--visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+}

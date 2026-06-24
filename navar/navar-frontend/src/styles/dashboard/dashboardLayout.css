@@ -1,0 +1,157 @@
+/* ─── Dashboard page wrapper ───────────────────────────── */
+.dash-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1400px;
+  width: 100%;
+}
+
+/* ─── Top 3 summary cards — equal width columns ─────────── */
+.dash-top-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.dash-top-grid > * {
+  min-width: 0;
+}
+
+/* ─── Bottom section ─────────────────────────────────────
+   Desktop: mall table on left (takes remaining space),
+   AR Usage + Recent Activity stacked on the right (300px).
+   ──────────────────────────────────────────────────────── */
+.dash-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.dash-bottom-grid > * {
+  min-width: 0;
+}
+
+/* Right column: AR Usage + Recent Activity stacked */
+.dash-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dash-right-col > * {
+  min-width: 0;
+}
+
+/* ─── Tablet landscape (< 1200px): narrow right col ─────── */
+@media (max-width: 1199px) {
+  .dash-bottom-grid {
+    grid-template-columns: 1fr 260px;
+  }
+}
+
+/* ─── Tablet portrait (< 1024px) ────────────────────────── 
+   - Top cards: 2 equal cols, 3rd card full width below
+   - Bottom: mall table full width, then AR Usage + Recent
+     Activity side by side below it (2 equal cols)
+   ──────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .dash-top-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dash-top-grid > *:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  /* Stack bottom section vertically */
+  .dash-bottom-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  /* Table height goes auto — no longer next to right col */
+  .dash-card--table {
+    height: auto;
+  }
+
+  .dash-table-scroll {
+    max-height: 380px;
+  }
+
+  /* AR Usage + Recent Activity sit side by side below the table */
+  .dash-right-col {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .dash-right-col > * {
+    min-width: 0;
+  }
+}
+
+/* ─── Mobile (< 768px) ───────────────────────────────────
+   Everything single column.
+   Order: mall table → AR Usage Stats → Recent Activity
+   ──────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .dash-page {
+    gap: 16px;
+  }
+
+  /* All top cards single column, same width */
+  .dash-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-top-grid > *:nth-child(3) {
+    grid-column: auto;
+  }
+
+  .dash-bottom-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* AR Usage + Recent Activity stack vertically on mobile */
+  .dash-right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .dash-card--table {
+    height: auto;
+  }
+
+  .dash-table-scroll {
+    max-height: 320px;
+  }
+
+  .dash-card {
+    padding: 18px;
+    gap: 16px;
+  }
+}
+
+/* ─── Small mobile (< 480px) ─────────────────────────────── */
+@media (max-width: 479px) {
+  .dash-card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .dash-stat-value {
+    font-size: 22px;
+  }
+
+  .dash-usage-big-number {
+    font-size: 26px;
+  }
+
+  .dash-table-scroll {
+    max-height: 260px;
+  }
+}

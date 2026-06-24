@@ -1,0 +1,451 @@
+/* ─── Shared card shell ───────────────────────────────── */
+.dash-card {
+  background-color: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #E8ECF2;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ─── Card header row ─────────────────────────────────── */
+.dash-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dash-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-card-accent {
+  width: 4px;
+  height: 16px;
+  border-radius: 9999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dash-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dash-view-all {
+  font-size: 12px;
+  color: #3B82F6;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 0;
+}
+
+.dash-view-all:hover {
+  color: #1D4ED8;
+}
+
+/* ─── 2-column stat grid (used in all 3 top cards) ───── */
+.dash-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ─── Individual stat cell ────────────────────────────── */
+.dash-stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 18px 12px;
+  min-height: 88px;
+  text-align: center;
+  background-color: #F8FAFC;
+  border: 1px solid #E8ECF2;
+}
+
+.dash-stat-cell--highlight {
+  background-color: #FFF1F2;
+  border-color: #FECDD3;
+}
+
+.dash-stat-value {
+  font-family: 'Fira Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dash-stat-sublabel {
+  font-size: 11.5px;
+  color: #94A3B8;
+  margin-top: 6px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* ─── Section sublabel (e.g. "Expiring within 60 days") ─ */
+.dash-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* ─── Agreement: expiry row ───────────────────────────── */
+.dash-expiry-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748B;
+}
+
+/* ─── Alert banners ───────────────────────────────────── */
+.dash-alert-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 96px;   /* enough for exactly 2 banners */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+.dash-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.dash-alert--error {
+  border: 1px solid #FCA5A5;
+  border-left: 4px solid #EF4444;
+  background-color: #FEF2F2;
+  color: #991B1B;
+}
+
+.dash-alert--warning {
+  border: 1px solid #FCD34D;
+  border-left: 4px solid #F59E0B;
+  background-color: #FFFBEB;
+  color: #92400E;
+}
+
+.dash-alert-text {
+  margin: 0;
+}
+
+.dash-alert-title {
+  font-weight: 700;
+}
+
+/* ─── Pipeline breakdown ──────────────────────────────── */
+.dash-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-pipeline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-pipeline-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-pipeline-label {
+  font-size: 12px;
+  color: #64748B;
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.dash-pipeline-count {
+  font-family: 'Fira Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94A3B8;
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.dash-pipeline-track {
+  flex: 1;
+  background-color: #F1F5F9;
+  border-radius: 9999px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.dash-pipeline-fill {
+  height: 100%;
+  border-radius: 9999px;
+}
+
+/* ─── Mall table card ─────────────────────────────────── */
+
+/* Table variant: fixed height matching right column, scroll inside */
+.dash-card--table {
+  height: 697px;
+}
+
+.dash-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.dash-table-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-table-count {
+  font-size: 12px;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.dash-table-show-all {
+  font-size: 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: #475569;
+  background-color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.dash-table-show-all:hover {
+  background-color: #F8FAFC;
+}
+
+/* Scroll container takes all remaining card height */
+.dash-table-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+  font-size: 13px;
+}
+
+.dash-table thead {
+  position: sticky;
+  top: 0;
+  background-color: #ffffff;
+  z-index: 1;
+}
+
+.dash-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 16px 12px 0;
+  white-space: nowrap;
+  border-bottom: 1px solid #E8ECF2;
+}
+
+.dash-table th:last-child,
+.dash-table td:last-child {
+  padding-right: 0;
+}
+
+.dash-table td {
+  padding: 14px 16px 14px 0;
+  vertical-align: middle;
+  border-bottom: 1px solid #F8FAFC;
+  color: #475569;
+}
+
+.dash-table tbody tr:hover td {
+  background-color: #F8FAFC;
+}
+
+.dash-table-mall-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1E293B;
+}
+
+.dash-table-mall-name--grace    { color: #F97316; }
+.dash-table-mall-name--suspended { color: #EF4444; }
+
+.dash-table-mall-note {
+  font-size: 11px;
+  color: #F97316;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+
+.dash-table-wallet {
+  font-family: 'Fira Mono', monospace;
+  color: #334155;
+}
+
+/* ─── Badge ───────────────────────────────────────────── */
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dash-badge--active     { background-color: #F0FDF4; color: #15803D; }
+.dash-badge--approved   { background-color: #F0FDF4; color: #15803D; }
+.dash-badge--live       { background-color: #F0FDF4; color: #15803D; }
+.dash-badge--suspended  { background-color: #FEF2F2; color: #DC2626; }
+.dash-badge--unpublished{ background-color: #FEF2F2; color: #DC2626; }
+.dash-badge--grace      { background-color: #FFF7ED; color: #EA580C; }
+.dash-badge--revision   { background-color: #FFF7ED; color: #EA580C; }
+.dash-badge--setup      { background-color: #EFF6FF; color: #2563EB; }
+.dash-badge--pending    { background-color: #F8FAFC; color: #64748B; }
+.dash-badge--default    { background-color: transparent; color: #94A3B8; }
+
+/* ─── AR Usage Stats ──────────────────────────────────── */
+.dash-usage-big-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.dash-usage-big-number {
+  font-family: 'Fira Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: #F97316;
+  line-height: 1;
+  margin: 0;
+}
+
+.dash-usage-sublabel {
+  font-size: 11px;
+  color: #94A3B8;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.dash-top-malls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dash-top-mall-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dash-top-mall-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dash-top-mall-name {
+  font-size: 12px;
+  color: #475569;
+}
+
+.dash-top-mall-rank {
+  color: #94A3B8;
+}
+
+.dash-top-mall-count {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #F97316;
+}
+
+.dash-bar-track {
+  background-color: #F1F5F9;
+  border-radius: 9999px;
+  height: 5px;
+  overflow: hidden;
+}
+
+.dash-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background-color: #FB923C;
+}
+
+/* ─── Recent Activity ─────────────────────────────────── */
+.dash-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dash-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dash-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.dash-activity-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+  margin: 0;
+}
+
+.dash-activity-meta {
+  font-size: 11.5px;
+  color: #94A3B8;
+  margin: 3px 0 0;
+}
