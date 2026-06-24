@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import Sidebar from './components/layout/Sidebar'
+import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
-import './app.css'
+import './App.css'
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
