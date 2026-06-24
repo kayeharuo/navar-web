@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import Sidebar from './components/layout/Sidebar'
+import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
 <<<<<<< Updated upstream
-import './app.css'
+import './App.css'
 =======
 import MallManagement from './pages/MallManagement'
 import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
