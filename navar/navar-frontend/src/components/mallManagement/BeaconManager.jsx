@@ -231,11 +231,12 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                 <tr>
                   <th>BEACON CODE</th>
                   <th>FLOOR</th>
+                  <th>LOCATION</th>
                   <th>LABEL</th>
                   <th>MAJOR</th>
                   <th>MINOR</th>
                   <th>TX POWER(dBm)</th>
-                  <th>LINKED NODE</th>
+                  <th>NODES</th>
                   <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -249,11 +250,12 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                   <tr key={b.id} className="stores-table-row">
                     <td className="stores-td-name">{b.beaconCode}</td>
                     <td>{b.floorLabel || b.floorNo}</td>
+                    <td>{b.location || '—'}</td>
                     <td>{b.label}</td>
                     <td>{b.major}</td>
                     <td>{b.minor}</td>
                     <td>{b.txPower}</td>
-                    <td>{b.linkedNode || '—'}</td>
+                    <td>{b.nodeConfigDisplay || '—'}</td>
                     <td><StatusBadge status={b.status} /></td>
                     <td>
                       <div className="stores-action-row">

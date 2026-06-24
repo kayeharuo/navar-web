@@ -1,15 +1,126 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Pencil, ChevronDown } from 'lucide-react'
+
+// Mock AR development versions
+const AR_VERSIONS = [
+  { id: 'v1', name: 'Version 1' },
+  { id: 'v2', name: 'Version 2' },
+  { id: 'v3', name: 'Version 3' },
+  { id: 'v4', name: 'Version 4' },
+]
+
+function NodeSelectModal({ numNodes, mallNodes, selectedNodeConfig, onSave, onClose }) {
+  const [localConfig, setLocalConfig] = useState(selectedNodeConfig || [])
+  const [expandedVersion, setExpandedVersion] = useState(null)
+
+  function toggleNodeForVersion(versionId, nodeId) {
+    setLocalConfig(prev => {
+      const hasVersion = prev.find(n => n.versionId === versionId)
+      if (hasVersion && hasVersion.nodeId === nodeId) {
+        return prev.filter(n => n.versionId !== versionId)
+      }
+      if (hasVersion) {
+        return prev.map(n => n.versionId === versionId ? { versionId, nodeId } : n)
+      }
+      if (prev.length >= numNodes) return prev
+      return [...prev, { versionId, nodeId }]
+    })
+  }
+
+  const versionUsed = (versionId) => localConfig.some(n => n.versionId === versionId)
+  const selectedForVersion = (versionId) => localConfig.find(n => n.versionId === versionId)?.nodeId
+
+  return (
+    <>
+      <div className="unit-assign-overlay" />
+      <div className="unit-assign-modal" role="dialog" aria-modal="true">
+        <div className="mall-modal-header">
+          <h2 className="mall-modal-title">
+            Select Nodes ({localConfig.length}/{numNodes})
+          </h2>
+          <button className="mall-modal-close" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+        <div className="mall-modal-divider" />
+
+        <p className="node-select-hint">
+          Each node links this beacon to one AR version. Select one node per version — no duplicate versions.
+        </p>
+
+        <div className="unit-assign-list">
+          {AR_VERSIONS.map(ver => {
+            const versionNodes = mallNodes.filter(n => n.versionId === ver.id)
+            const isExpanded = expandedVersion === ver.id
+            const selectedNode = selectedForVersion(ver.id)
+            const hasSelection = !!selectedNode
+
+            return (
+              <div key={ver.id}>
+                <button
+                  className={`node-version-btn${hasSelection ? ' node-version-btn--selected' : ''}`}
+                  onClick={() => setExpandedVersion(isExpanded ? null : ver.id)}
+                >
+                  <span className="node-version-name">{ver.name}</span>
+                  {selectedNode && (
+                    <span className="node-version-selected">{selectedNode}</span>
+                  )}
+                  <ChevronDown size={16} className={`node-version-chevron${isExpanded ? ' node-version-chevron--open' : ''}`} />
+                </button>
+
+                {isExpanded && versionNodes.length > 0 && (
+                  <div className="node-list">
+                    {versionNodes.map(node => {
+                      const isSelected = selectedNode === node.nodeId
+                      return (
+                        <div
+                          key={node.nodeId}
+                          className={`unit-assign-item${isSelected ? ' unit-assign-item--selected' : ''}`}
+                          onClick={() => toggleNodeForVersion(ver.id, node.nodeId)}
+                        >
+                          <span className="unit-assign-no">{node.nodeId}</span>
+                          {isSelected && (
+                            <span className="unit-assign-badge unit-assign-badge--vacant">SELECTED</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mall-modal-divider" />
+        <div className="mall-modal-footer">
+          <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="mall-modal-save-btn" onClick={() => onSave(localConfig)}>
+            Save
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
 
 export default function AddBeaconModal({ mall, initialData = null, onClose, onSave, isEdit = false }) {
+  const initialNodeConfig = initialData?.nodeConfig || []
+
   const [form, setForm] = useState({
-    beaconCode:  initialData?.beaconCode  || '',
-    floorNo:     initialData?.floorNo     || '',
-    label:       initialData?.label       || '',
-    minor:       initialData?.minor       != null ? String(initialData.minor) : '',
-    txPower:     initialData?.txPower     != null ? String(initialData.txPower) : '-59',
-    linkedNode:  initialData?.linkedNode  || '',
+    beaconCode: initialData?.beaconCode  || '',
+    floorNo:    initialData?.floorNo     || '',
+    location:   initialData?.location    || '',
+    label:      initialData?.label       || '',
+    minor:      initialData?.minor       != null ? String(initialData.minor) : '',
+    txPower:    initialData?.txPower     != null ? String(initialData.txPower) : '-59',
+    numNodes:   initialData?.numNodes    != null ? String(initialData.numNodes) : '',
   })
+
+  const [nodeConfig, setNodeConfig] = useState(initialNodeConfig)
+  const [nodesSaved, setNodesSaved] = useState(initialNodeConfig.length > 0)
+  const [showNodeSelect, setShowNodeSelect] = useState(false)
+  const prevNumNodes = useRef(form.numNodes)
 
   const [errors, setErrors] = useState({})
   const floors = mall.floorDetails || []
@@ -18,6 +129,31 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
   function setField(key, val) {
     setForm(f => ({ ...f, [key]: val }))
     if (errors[key]) setErrors(e => ({ ...e, [key]: undefined }))
+  }
+
+  function handleNumNodesChange(val) {
+    setField('numNodes', val)
+    const next = parseInt(val) || 0
+    if (next !== nodeConfig.length) {
+      setNodeConfig([])
+      setNodesSaved(false)
+    }
+  }
+
+  function handleNumNodesBlur() {
+    const count = parseInt(form.numNodes) || 0
+    const prev = parseInt(prevNumNodes.current) || 0
+    if (count > 0 && (count !== prev || !nodesSaved)) {
+      prevNumNodes.current = form.numNodes
+      setNodesSaved(false)
+      setShowNodeSelect(true)
+    }
+  }
+
+  function handleNodeSave(config) {
+    setNodeConfig(config)
+    setNodesSaved(config.length > 0)
+    setShowNodeSelect(false)
   }
 
   function validate() {
@@ -34,17 +170,27 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     const floorDetail = floors.find(f => f.floorNo === form.floorNo)
+    const numNodes = parseInt(form.numNodes) || 0
+    const configDisplay = nodeConfig.map(nc => {
+      const ver = AR_VERSIONS.find(v => v.id === nc.versionId)
+      return `${ver?.name}: ${nc.nodeId}`
+    })
     onSave({
-      beaconCode:  form.beaconCode.trim(),
-      floorNo:     form.floorNo,
-      floorLabel:  floorDetail?.label || form.floorNo,
-      label:       form.label.trim(),
+      beaconCode:      form.beaconCode.trim(),
+      floorNo:         form.floorNo,
+      floorLabel:      floorDetail?.label || form.floorNo,
+      location:        form.location.trim(),
+      label:           form.label.trim(),
       major,
-      minor:       parseInt(form.minor) || 0,
-      txPower:     parseInt(form.txPower) || -59,
-      linkedNode:  form.linkedNode.trim(),
+      minor:           parseInt(form.minor) || 0,
+      txPower:         parseInt(form.txPower) || -59,
+      numNodes,
+      nodeConfig,
+      nodeConfigDisplay: configDisplay.join('; '),
     })
   }
+
+  const numNodes = parseInt(form.numNodes) || 0
 
   return (
     <>
@@ -90,6 +236,17 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 ))}
               </select>
               {errors.floorNo && <p className="mall-field-error">{errors.floorNo}</p>}
+            </div>
+
+            {/* Location */}
+            <div className="mall-field-group mall-field-group--full">
+              <label className="mall-field-label">LOCATION</label>
+              <input
+                className="mall-field-input"
+                value={form.location}
+                onChange={e => setField('location', e.target.value)}
+                placeholder="e.g. Near Zara entrance, North Wing"
+              />
             </div>
 
             {/* Label */}
@@ -148,15 +305,39 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               {errors.txPower && <p className="mall-field-error">{errors.txPower}</p>}
             </div>
 
-            {/* Linked Node */}
+            {/* No. of Nodes */}
             <div className="mall-field-group mall-field-group--full">
-              <label className="mall-field-label">LINKED NODE</label>
-              <input
-                className="mall-field-input"
-                value={form.linkedNode}
-                onChange={e => setField('linkedNode', e.target.value)}
-                placeholder="Enter linked node identifier"
-              />
+              <label className="mall-field-label">NO. OF NODES</label>
+              <div className="mall-floors-input-wrap">
+                <input
+                  type="number"
+                  min="0"
+                  className="mall-field-input"
+                  value={form.numNodes}
+                  onChange={e => handleNumNodesChange(e.target.value)}
+                  onBlur={handleNumNodesBlur}
+                  placeholder="0"
+                />
+                {numNodes > 0 && (
+                  <button
+                    type="button"
+                    className={`mall-floors-edit-btn${!nodesSaved ? ' mall-floors-edit-btn--mandatory' : ''}`}
+                    onClick={() => setShowNodeSelect(true)}
+                    title={nodesSaved ? 'Edit node assignments' : 'Node assignment required — click to assign'}
+                  >
+                    <Pencil size={13} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+              {nodesSaved && nodeConfig.length > 0 && (
+                <p className="mall-field-hint">
+                  {nodeConfig.map(nc => {
+                    const ver = AR_VERSIONS.find(v => v.id === nc.versionId)
+                    return `${ver?.name}: ${nc.nodeId}`
+                  }).join('; ')}
+                </p>
+              )}
+              <p className="mall-field-hint">Select one node per version. Can use nodes from any available version.</p>
             </div>
           </div>
         </div>
@@ -169,6 +350,16 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
           </button>
         </div>
       </div>
+
+      {showNodeSelect && numNodes > 0 && (
+        <NodeSelectModal
+          numNodes={numNodes}
+          mallNodes={mall.nodes || []}
+          selectedNodeConfig={nodeConfig}
+          onSave={handleNodeSave}
+          onClose={() => setShowNodeSelect(false)}
+        />
+      )}
     </>
   )
 }

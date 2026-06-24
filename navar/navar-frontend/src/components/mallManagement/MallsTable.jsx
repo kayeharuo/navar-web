@@ -1,11 +1,16 @@
 import { useState } from 'react'
-import { Search, Plus, } from 'lucide-react'
+// eslint-disable-next-line no-unused-vars
+import { Search, Plus, Pencil, ImageIcon } from 'lucide-react'
 import AddMallModal from './AddMallModal'
+import AddBrandModal from './AddBrandModal'
 import UnitsPanel from './UnitsPanel'
 import MallInfoPanel from './MallInfoPanel'
 import StoresPanel from './StoresPanel'
 import BeaconManager from './BeaconManager'
+import InquiriesTab from './InquiriesTab'
+import BeaconTicketsTab from './BeaconTicketsTab'
 import '../../styles/mallManagement/mallModal.css'
+import '../../styles/mallManagement/inquiries.css'
 
 const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets']
 
@@ -385,7 +390,16 @@ function ActionButtons({ onEdit, onUnits, onStores, onBeacons }) {
   )
 }
 
+const initialBrands = [
+  { id: 1, name: 'Jollibee',     category: 'Food & Beverages',  description: 'Bida ang saya',                logo: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23E31937%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%22 y=%2265%22 font-size=%2270%22 fill=%22%23FFF%22 text-anchor=%22middle%22%3EJ%3C/text%3E%3C/svg%3E', dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
+  { id: 2, name: 'Zara',         category: 'Fashion & Apparel', description: 'International fashion icon',   logo: null, dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
+  { id: 3, name: 'H & M',        category: 'Fashion & Apparel', description: 'Affordable and quality fashion', logo: null, dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
+  { id: 4, name: 'Starbucks',    category: 'Food & Beverages',  description: 'Sip the quality',              logo: null, dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
+  { id: 5, name: 'Uniqlo',       category: 'Fashion & Apparel', description: 'Genderless international fashion', logo: null, dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
+]
+
 let nextId = initialMalls.length + 1
+let nextBrandId = initialBrands.length + 1
 
 export default function MallsTable() {
   const [activeTab, setActiveTab] = useState('Malls')
@@ -399,6 +413,26 @@ export default function MallsTable() {
   const [storesMall, setStoresMall] = useState(null)
   const [beaconsMall, setBeaconsMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
+
+  const [brands, setBrands] = useState(initialBrands)
+  const [showBrandModal, setShowBrandModal] = useState(false)
+  const [editingBrand, setEditingBrand] = useState(null)
+  const [brandSearch, setBrandSearch] = useState('')
+  
+  function openBrandImage(brand) {
+    try {
+      if (brand.logo) {
+        window.open(brand.logo, '_blank', 'noopener,noreferrer')
+        return
+      }
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><rect fill="#E5E7EB" width="100%" height="100%"/><text x="50%" y="55%" font-size="360" fill="#9CA3AF" text-anchor="middle" dominant-baseline="middle" font-family="Poppins, sans-serif">${brand.name.charAt(0)}</text></svg>`
+      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      // fallback: do nothing
+    }
+  }
 
   function handleAddSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -477,6 +511,20 @@ export default function MallsTable() {
     setBeaconsMall(null)
   }
 
+  function handleBrandAddSave(data) {
+    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    setBrands(prev => [...prev, { id: nextBrandId++, ...data, dateAdded: now, lastUpdated: now }])
+    setShowBrandModal(false)
+  }
+
+  function handleBrandEditSave(data) {
+    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    setBrands(prev => prev.map(b =>
+      b.id === editingBrand.id ? { ...b, ...data, lastUpdated: now } : b
+    ))
+    setEditingBrand(null)
+  }
+
   function openUnitsFromInfo(mall) {
     setUnitsMall(mall)
   }
@@ -533,13 +581,26 @@ export default function MallsTable() {
         {/* Page header */}
         <div className="mall-header">
           <div className="mall-header-info">
-            <h1 className="mall-title">List of Malls</h1>
-            <p className="mall-subtitle">{malls.length} malls * Click any row to view full details</p>
+            <h1 className="mall-title">Mall Management</h1>
+            {activeTab === 'Brands' ? (
+              <p className="mall-subtitle">Brands List</p>
+            ) : activeTab === 'Beacon Tickets' ? (
+              <p className="mall-subtitle">Manage Tickets Filed after a beacon is found to be faulty by the system or the mall administrators.</p>
+            ) : (
+              <p className="mall-subtitle">{malls.length} malls · Click any row to view full details</p>
+            )}
           </div>
-          <button className="mall-add-btn" onClick={() => setShowAddModal(true)}>
-            <Plus size={16} strokeWidth={2.5} />
-            Add Mall
-          </button>
+          {activeTab === 'Brands' ? (
+            <button className="mall-add-btn" onClick={() => setShowBrandModal(true)}>
+              <Plus size={16} strokeWidth={2.5} />
+              Add Brand
+            </button>
+          ) : activeTab === 'Malls' ? (
+            <button className="mall-add-btn" onClick={() => setShowAddModal(true)}>
+              <Plus size={16} strokeWidth={2.5} />
+              Add Mall
+            </button>
+          ) : null}
         </div>
 
         {/* Tab navigation */}
@@ -555,8 +616,8 @@ export default function MallsTable() {
           ))}
         </div>
 
-        {/* Filter bar + search */}
-        <div className="mall-toolbar">
+        {/* Filter bar + search — Malls tab only */}
+        {activeTab === 'Malls' && <div className="mall-toolbar">
           <div className="mall-filters">
             {STATUS_FILTERS.map(({ label, count }) => (
               <button
@@ -582,10 +643,99 @@ export default function MallsTable() {
               className="mall-search-input"
             />
           </div>
-        </div>
+        </div>}
+
+        {/* Brands tab */}
+        {activeTab === 'Brands' && (() => {
+          const filteredBrands = brands.filter(b =>
+            !brandSearch ||
+            b.name.toLowerCase().includes(brandSearch.toLowerCase()) ||
+            b.category.toLowerCase().includes(brandSearch.toLowerCase())
+          )
+          return (
+            <>
+              <div className="brands-toolbar">
+                <span className="brands-count">{brands.length} brand{brands.length !== 1 ? 's' : ''}</span>
+                <div className="mall-search-wrap">
+                  <Search size={16} className="mall-search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search"
+                    value={brandSearch}
+                    onChange={e => setBrandSearch(e.target.value)}
+                    className="mall-search-input"
+                  />
+                </div>
+              </div>
+              <div className="mall-table-wrap">
+                <div className="mall-table-scroll">
+                  <table className="mall-table brands-table">
+                    <thead>
+                      <tr>
+                        <th>LOGO</th>
+                        <th>BRAND NAME</th>
+                        <th>CATEGORY</th>
+                        <th>DESCRIPTION</th>
+                        <th>DATE ADDED</th>
+                        <th>LAST UPDATED</th>
+                        <th>ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBrands.length === 0 ? (
+                        <tr><td colSpan={7} className="mall-table-empty">No brands found.</td></tr>
+                      ) : filteredBrands.map(brand => (
+                        <tr key={brand.id} className="mall-table-row">
+                          <td>
+                            {brand.logo ? (
+                              <img
+                                src={brand.logo}
+                                alt={brand.name}
+                                className="brand-table-logo brand-table-logo--clickable"
+                                onClick={() => openBrandImage(brand)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={e => e.key === 'Enter' && openBrandImage(brand)}
+                                title="Open image in new tab"
+                              />
+                            ) : (
+                              <div
+                                className="brand-table-logo-placeholder"
+                                onClick={() => openBrandImage(brand)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={e => e.key === 'Enter' && openBrandImage(brand)}
+                                title="Open placeholder in new tab"
+                              >
+                                <span className="brand-table-initial">{brand.name.charAt(0)}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="brand-table-name">{brand.name}</td>
+                          <td>{brand.category}</td>
+                          <td className="brand-table-desc">{brand.description || '—'}</td>
+                          <td className="mall-date-cell">{brand.dateAdded}</td>
+                          <td className="mall-date-cell">{brand.lastUpdated}</td>
+                          <td>
+                            <button
+                              className="mall-action-btn mall-action-btn--edit"
+                              onClick={() => setEditingBrand(brand)}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )
+        })()}
 
         {/* Table */}
-        {activeTab === 'Malls' ? (
+        {activeTab === 'Malls' && (
           <div className="mall-table-wrap">
             <div className="mall-table-scroll">
               <table className="mall-table">
@@ -637,7 +787,7 @@ export default function MallsTable() {
                           onEdit={() => setEditingMall(mall)}
                           onUnits={() => setUnitsMall(mall)}
                           onStores={() => setStoresMall(mall)}
-            onBeacons={() => setBeaconsMall(mall)}
+                          onBeacons={() => setBeaconsMall(mall)}
                         />
                       </td>
                     </tr>
@@ -646,10 +796,16 @@ export default function MallsTable() {
               </table>
             </div>
           </div>
-        ) : (
-          <div className="mall-tab-placeholder">
-            <p>{activeTab} — coming soon</p>
-          </div>
+        )}
+
+        {/* Inquiries tab */}
+        {activeTab === 'Inquiries' && (
+          <InquiriesTab />
+        )}
+
+        {/* Beacon Tickets tab */}
+        {activeTab === 'Beacon Tickets' && (
+          <BeaconTicketsTab />
         )}
       </div>
 
@@ -680,6 +836,26 @@ export default function MallsTable() {
           stackedOnInfoPanel={!!viewMall}
         />
       )}
+
+      {/* Add Brand modal */}
+      {showBrandModal && (
+        <AddBrandModal
+          onClose={() => setShowBrandModal(false)}
+          onSave={handleBrandAddSave}
+        />
+      )}
+
+      {/* Edit Brand modal */}
+      {editingBrand && (
+        <AddBrandModal
+          initialData={editingBrand}
+          onClose={() => setEditingBrand(null)}
+          onSave={handleBrandEditSave}
+        />
+      )}
+
+      {/* Brand Logo Lightbox */}
+      {/* Brand images now open in a new tab; inline lightbox removed */}
 
       {/* Mall Info Panel */}
       {viewMall && (

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { X, ImageIcon } from 'lucide-react'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -47,8 +48,10 @@ function InfoRow({ label, value }) {
 }
 
 export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeacons, onEdit }) {
+  const [showLogoLightbox, setShowLogoLightbox] = useState(false)
   const opHours = formatOperatingHours(mall.operatingHours)
   const cityProvince = [mall.city, mall.province].filter(Boolean).join(', ')
+  const logoFileName = mall.logoFileName || (mall.logoUrl ? mall.logoUrl.split('/').pop().split('?')[0] || 'logo.png' : null)
 
   return (
     <>
@@ -84,11 +87,14 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeac
             <span className="mall-info-label">Logo</span>
             <div className="mall-info-logo-wrap">
               {mall.logoUrl ? (
-                <img
-                  src={mall.logoUrl}
-                  alt={`${mall.name} logo`}
-                  className="mall-info-logo"
-                />
+                <button
+                  className="mall-info-logo-filename-btn"
+                  onClick={() => setShowLogoLightbox(true)}
+                  title="Click to preview logo"
+                >
+                  <ImageIcon size={13} />
+                  {logoFileName}
+                </button>
               ) : (
                 <div className="mall-info-logo-placeholder">
                   <ImageIcon size={20} className="mall-info-logo-icon" />
@@ -134,6 +140,15 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeac
           <button className="mall-action-btn mall-action-btn--edit" onClick={onEdit}>Edit</button>
         </div>
       </aside>
+
+      {showLogoLightbox && mall.logoUrl && (
+        <div className="logo-lightbox-overlay" onClick={() => setShowLogoLightbox(false)}>
+          <img src={mall.logoUrl} alt={`${mall.name} logo`} className="logo-lightbox-img" />
+          <button className="logo-lightbox-close" aria-label="Close preview">
+            <X size={20} />
+          </button>
+        </div>
+      )}
     </>
   )
 }

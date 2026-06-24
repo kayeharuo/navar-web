@@ -610,6 +610,15 @@
   transition: border-color 0.15s;
 }
 
+.profile-field-input[type='password']::-ms-reveal,
+.profile-field-input[type='password']::-ms-clear {
+  display: none;
+}
+
+.profile-field-input[type='password'] {
+  appearance: none;
+}
+
 .profile-field-input:focus {
   border-color: #2563EB;
   background: #FFF;

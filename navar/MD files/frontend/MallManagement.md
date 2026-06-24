@@ -271,10 +271,225 @@ This allows you to open Units or Edit from the info panel, and when you close th
 
 ---
 
+## Brands Tab
+
+### Overview
+The **Brands** tab (second tab in Mall Management) provides a global brand registry. Brands are separate from per-mall stores but serve as the selectable list in SelectBrandModal when adding a store.
+
+### Header Behavior (per active tab)
+- When **Malls** tab active: subtitle = "{N} malls · Click any row to view full details", button = "+ Add Mall"
+- When **Brands** tab active: subtitle = "Brands List", button = "+ Add Brand"
+- When **Inquiries** tab active: subtitle = "Manage Inquiries", no add button
+- The Malls status filter bar is **hidden** when Brands or Inquiries tab is active
+
+---
+
+## Inquiries Tab
+
+### Overview & Context
+The Inquiries tab handles inbound interest from mall operators who contact NavAR through the marketing website's contact form. In the real system, the inquirer sends a message via email on the marketing site, and the NavAR admin system receives it as a conversation. The admin can reply (which gets sent as an email to the inquirer). The UI models this as a messaging/chat interface, but actual email integration is a backend concern.
+
+**File:** `src/components/mallManagement/InquiriesTab.jsx`
+**Styles:** `src/styles/mallManagement/inquiries.css`
+
+### Layout
+Two-column layout:
+- **Left sidebar (~210px):** Inquiry list with search and status filters
+- **Right panel (flex: 1):** Chat thread view for the selected inquiry
+
+### Inquiry Status Flow
+```
+New → In Progress → Converted
+```
+- **New**: Initial state when inquiry arrives
+- **In Progress**: Automatically set when the admin sends the first reply
+- **Converted**: Set when "Convert to Mall" is clicked and the Add Mall modal is completed
+- The "Convert to Mall" button is hidden for Converted inquiries
+
+### Status Badge Colors
+| Status | Border | Background | Text |
+|--------|--------|------------|------|
+| New | #2563EB | #E1F3FF | #2563EB |
+| In Progress | #FF9233 | #FFF8F1 | #FF9233 |
+| Converted | #016630 | #E1FFEC | #016630 |
+
+### Left Sidebar
+- **Search bar**: Filters by mall name or contact person
+- **Filter tabs**: All (N), New (N), Activated/In Progress (N), Converted (N)
+- **Inquiry cards**: Each shows mall name, contact person, location, date, tier badge, status badge
+- Selected card highlighted with blue left border and light blue background
+
+### Right Thread Panel
+**When no inquiry selected:** "Select an Inquiry to view the thread" placeholder
+
+**When inquiry selected:**
+
+#### Thread Header
+- Mall name, contact person, email · phone
+- **View Details** (orange button): Opens a right-side drawer with full contact info
+- **Convert to Mall** (blue button): Opens AddMallModal pre-filled with inquiry data; on save, status → Converted and mall added to Malls list
+- **Status dropdown**: Manually change status
+
+#### Info Bar
+Gray bar showing: `{Location} · Interested: {Tier} — {Annual Fee}` (tier/fee in blue bold)
+
+#### Messages
+- **Mall messages** (left): White bubble, gray border, rounded 10px 10px 10px 0
+- **Admin replies** (right): Light blue bubble (#E5F3FF), rounded 10px 10px 0 10px, "Admin" badge shown next to "You"
+
+#### Reply Input
+- Textarea: "Reply to mall... Enter to send, Shift+Enter for new line"
+- Enter key sends; Shift+Enter adds new line
+- Sending a reply auto-changes status from New → In Progress
+- Send button (blue, right-aligned)
+
+### View Details Panel
+Right-side drawer with: Contact Person, Email, Phone, Location, Interested Tier, Annual Fee, Status, Date Inquired
+
+### Convert to Mall Flow
+1. Admin clicks "Convert to Mall"
+2. AddMallModal opens, pre-filled with: name, city, address, tier from inquiry
+3. Admin fills in remaining fields and saves
+4. Inquiry status → Converted
+5. New mall entry appears in the Malls tab with status "Setup"
+
+### Mock Data (3 inquiries)
+| Mall | Contact | Status |
+|------|---------|--------|
+| Ayala Malls Central Block | Maria Santos | New |
+| Gaisano Grand Fiesta Mall | Jose Reyes | In Progress |
+| Robinsons Dumaguete | Ana Villanueva | Converted |
+
+### Brands Table Columns
+| Column | Description |
+|--------|-------------|
+| LOGO | Brand logo image or initial letter placeholder |
+| BRAND NAME | Brand name (bold) |
+| CATEGORY | One of the 10 categories |
+| DESCRIPTION | Short brand description (truncated) |
+| DATE ADDED | Date string |
+| LAST UPDATED | Date string |
+| ACTIONS | **Edit** button only — no delete |
+
+### Initial Brand Data (mock)
+Jollibee, Zara, H & M, Starbucks, Uniqlo — pre-loaded with descriptions from Figma design.
+
+### AddBrandModal
+**File:** `src/components/mallManagement/AddBrandModal.jsx`
+
+Fields:
+- **BRAND NAME** (required text)
+- **CATEGORY** (required dropdown — full 10-category list)
+- **DESCRIPTION** (optional textarea)
+- **STORE LOGO** (optional file upload — PNG/JPG, max 2MB)
+
+Buttons: Cancel | Add Brand (or Save Changes in edit mode)
+
+### Category List (updated — 10 categories)
+```
+Fashion & Apparel
+Books & Hobby
+Health & Beauty
+Food & Beverages
+Electronics
+Sports & Fitness
+Services
+Retail & General
+Entertainment
+Others
+```
+
+This list is used in:
+- `AddBrandModal` — brand category dropdown
+- `AddStoreModal` — store category dropdown (for "Others" brand)
+- `StoresPanel` — category filter tabs (horizontally scrollable)
+
+### StoresPanel Category Filters — Horizontal Scroll
+The category filter row in StoresPanel (`stores-category-filters`) now uses `flex-wrap: nowrap` and the parent wrapper (`stores-filters-row`) uses `overflow-x: auto` with hidden scrollbars, so all 10+ categories scroll horizontally without wrapping.
+
+---
+
 ## Add Mall — Field Requirement Changes
 - **Logo** is now **required** — validation error shown if no file selected
 - **Agreement Type** is now **optional** — asterisk removed from label, no validation
 - Logo hint text updated to remove "Optional" prefix
+
+---
+
+## Recent Behavior Updates
+
+### Operating Hours — Day Conflict Prevention
+- Days already used in an existing schedule are **disabled** and cannot be selected for a new schedule entry.
+- Example: if Mon–Tue is already scheduled, those day buttons are grayed out and unclickable.
+- CSS class: `.op-hours-day-btn--used` (grayed out, `cursor: not-allowed`)
+
+### Mall Info Panel — Logo Filename Display
+- The **Logo** row in the info panel no longer shows the image directly.
+- Instead it shows the **filename** as a clickable link (blue, underlined, Fira Mono).
+- **Clicking the filename** opens a fullscreen lightbox overlay to preview the image.
+- Lightbox is dismissed by clicking anywhere on the overlay.
+- CSS classes: `.mall-info-logo-filename-btn`, `.logo-lightbox-overlay`, `.logo-lightbox-img`, `.logo-lightbox-close`
+
+### Floor Details — Mandatory Pencil Behavior
+- When **No. of Floors** is entered and the user tabs/clicks away (blur), the Floor Info sub-modal opens automatically (existing behavior).
+- The **pencil button** next to No. of Floors turns **red and shakes** (`mall-floors-edit-btn--mandatory`) when floor details have not been saved yet.
+- This is a visual mandatory indicator: users must fill in floor details before saving the mall.
+
+### Store Unit Assignment — Mandatory Pencil + Auto-Open + Vacant Only
+- In **AddStoreModal**, when the user enters a value in **No. of Unit/s** and tabs/clicks away (blur), the unit assignment sub-modal opens automatically if not yet assigned.
+- The **pencil button** is red and shakes when units have not been assigned yet (`mall-floors-edit-btn--mandatory`).
+- The **unit assignment modal** only shows **vacant** units — occupied units are excluded from the selectable list.
+
+### Add Beacon — Location Field
+- A new **LOCATION** field has been added after the **Floor** dropdown.
+- This is a free-text optional field (e.g. "Near Zara entrance, North Wing").
+- Shown in the beacon table as a **LOCATION** column.
+
+### Add Beacon — No. of Nodes (replaces Linked Node Identifier)
+- The old **LINKED NODE** text field is replaced with a **NO. OF NODES** number input.
+- **Nodes** (e.g., nd-234, nd-312) are mall resources that link a beacon to AR versions. A beacon can have multiple nodes, but **only one node per AR version**.
+  - Example: A beacon with 2 nodes picks nd-234 from Version 1 and nd-456 from Version 2.
+- When **No. of Nodes > 0**, a pencil button appears (red and shakes if not yet configured).
+- Tabbing/clicking away with a value > 0 auto-opens the **Node Select modal**.
+- The **NodeSelectModal**:
+  - Shows available AR versions (Version 1–4 as mock data, expandable/collapsible).
+  - Each version is clickable to expand and show available nodes for that version (e.g., nd-234, nd-312, nd-456).
+  - User selects one node per version until reaching the specified count.
+  - Constraint: **one node per version** — no duplicate versions in the same beacon.
+  - No version limits — nodes can come from any available version.
+- Saved node assignments display as: `Version 1: nd-234; Version 2: nd-456`
+- Beacon data shape additions:
+  ```javascript
+  {
+    numNodes: number,
+    nodeConfig: [
+      { versionId: 'v1', nodeId: 'nd-234' },
+      { versionId: 'v2', nodeId: 'nd-456' },
+    ],
+    nodeConfigDisplay: string,  // e.g. "Version 1: nd-234; Version 2: nd-456"
+    location: string,
+  }
+  ```
+- Mall must provide a `nodes` array:
+  ```javascript
+  mall.nodes = [
+    { nodeId: 'nd-234', versionId: 'v1' },
+    { nodeId: 'nd-312', versionId: 'v1' },
+    { nodeId: 'nd-456', versionId: 'v2' },
+    // ... more nodes
+  ]
+  ```
+- Beacon table column **LINKED NODE** renamed to **NODES**, showing the node config display (e.g. "Version 1: nd-234; Version 2: nd-456").
+
+### AR Versions (Mock Data)
+```javascript
+const AR_VERSIONS = [
+  { id: 'v1', name: 'Version 1' },
+  { id: 'v2', name: 'Version 2' },
+  { id: 'v3', name: 'Version 3' },
+  { id: 'v4', name: 'Version 4' },
+]
+```
 
 ---
 

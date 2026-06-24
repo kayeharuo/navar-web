@@ -5,9 +5,12 @@ const CATEGORIES = [
   'Fashion & Apparel',
   'Books & Hobby',
   'Health & Beauty',
-  'Food & Beverage',
+  'Food & Beverages',
   'Electronics',
+  'Sports & Fitness',
   'Services',
+  'Retail & General',
+  'Entertainment',
   'Others',
 ]
 
@@ -127,6 +130,13 @@ export default function AddStoreModal({
     }
   }
 
+  function handleNumUnitsBlur() {
+    const count = parseInt(form.numUnits) || 0
+    if (count > 0 && !unitsSaved) {
+      setShowUnitAssign(true)
+    }
+  }
+
   function handleUnitsSave(selected) {
     setUnitNos(selected)
     setUnitsSaved(selected.length > 0)
@@ -161,7 +171,7 @@ export default function AddStoreModal({
   }
 
   const numUnits = parseInt(form.numUnits) || 0
-  const mallUnits = mall?.units || []
+  const mallUnits = (mall?.units || []).filter(u => u.status === 'vacant')
 
   return (
     <>
@@ -221,14 +231,15 @@ export default function AddStoreModal({
                   className={`mall-field-input${errors.numUnits ? ' mall-field-input--error' : ''}`}
                   value={form.numUnits}
                   onChange={e => handleNumUnitsChange(e.target.value)}
+                  onBlur={handleNumUnitsBlur}
                   placeholder="0"
                 />
                 {numUnits > 0 && (
                   <button
                     type="button"
-                    className="mall-floors-edit-btn"
+                    className={`mall-floors-edit-btn${!unitsSaved ? ' mall-floors-edit-btn--mandatory' : ''}`}
                     onClick={() => setShowUnitAssign(true)}
-                    title="Assign specific units"
+                    title={unitsSaved ? 'Change unit assignment' : 'Unit assignment required — click to assign'}
                   >
                     <Pencil size={15} />
                   </button>

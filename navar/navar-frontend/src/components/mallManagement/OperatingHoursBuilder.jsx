@@ -40,7 +40,10 @@ export default function OperatingHoursBuilder({ value, onChange }) {
   const [current, setCurrent] = useState({ days: [], open: '09:00', close: '18:00' })
   const [error, setError] = useState('')
 
+  const usedDays = value.flatMap(s => s.days)
+
   function toggleDay(day) {
+    if (usedDays.includes(day)) return
     setCurrent(c => ({
       ...c,
       days: c.days.includes(day) ? c.days.filter(d => d !== day) : [...c.days, day],
@@ -69,16 +72,22 @@ export default function OperatingHoursBuilder({ value, onChange }) {
   return (
     <div className="op-hours-builder">
       <div className="op-hours-days">
-        {DAYS.map(day => (
-          <button
-            key={day}
-            type="button"
-            onClick={() => toggleDay(day)}
-            className={`op-hours-day-btn${current.days.includes(day) ? ' op-hours-day-btn--active' : ''}`}
-          >
-            {day}
-          </button>
-        ))}
+        {DAYS.map(day => {
+          const isActive = current.days.includes(day)
+          const isUsed = usedDays.includes(day)
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => toggleDay(day)}
+              disabled={isUsed}
+              title={isUsed ? 'Already scheduled' : undefined}
+              className={`op-hours-day-btn${isActive ? ' op-hours-day-btn--active' : ''}${isUsed ? ' op-hours-day-btn--used' : ''}`}
+            >
+              {day}
+            </button>
+          )
+        })}
       </div>
 
       <div className="op-hours-time-row">

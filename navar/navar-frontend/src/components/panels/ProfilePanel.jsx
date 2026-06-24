@@ -10,6 +10,8 @@ const INITIAL_PROFILE = {
 
 function PasswordField({ label, value, onChange, placeholder }) {
   const [show, setShow] = useState(false)
+  const Icon = show ? EyeOff : Eye
+
   return (
     <div className="profile-field">
       <label className="profile-field-label">{label}</label>
@@ -27,10 +29,12 @@ function PasswordField({ label, value, onChange, placeholder }) {
           onClick={() => setShow(s => !s)}
           style={{
             position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-            background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex',
+            background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           }}
+          aria-label={show ? 'Hide password' : 'Show password'}
         >
-          {show ? <EyeOff size={15} /> : <Eye size={15} />}
+          <Icon size={16} color="#9CA3AF" strokeWidth={2} />
         </button>
       </div>
     </div>

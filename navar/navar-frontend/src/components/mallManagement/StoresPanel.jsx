@@ -3,7 +3,19 @@ import { X, Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
 import AddStoreModal from './AddStoreModal'
 
-const CATEGORIES = ['All', 'Fashion & Apparel', 'Books & Hobby', 'Health & Beauty', 'Food & Beverage']
+const CATEGORIES = [
+  'All',
+  'Fashion & Apparel',
+  'Books & Hobby',
+  'Health & Beauty',
+  'Food & Beverages',
+  'Electronics',
+  'Sports & Fitness',
+  'Services',
+  'Retail & General',
+  'Entertainment',
+  'Others',
+]
 
 let nextStoreId = 500
 
@@ -169,19 +181,21 @@ export default function StoresPanel({ mall, onClose, onSave }) {
 
         {/* Filters + Add Store */}
         <div className="stores-page-toolbar">
-          <div className="stores-category-filters">
-            {CATEGORIES.map(cat => {
-              const isActive = categoryFilter === cat
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setCategoryFilter(cat)}
-                  className={`stores-cat-btn${isActive ? (cat === 'All' ? ' stores-cat-btn--all-active' : ' stores-cat-btn--active') : ''}`}
-                >
-                  {cat === 'All' ? `All (${activeCount})` : cat}
-                </button>
-              )
-            })}
+          <div className="stores-filters-row">
+            <div className="stores-category-filters">
+              {CATEGORIES.map(cat => {
+                const isActive = categoryFilter === cat
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat)}
+                    className={`stores-cat-btn${isActive ? (cat === 'All' ? ' stores-cat-btn--all-active' : ' stores-cat-btn--active') : ''}`}
+                  >
+                    {cat === 'All' ? `All (${activeCount})` : cat}
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <button className="stores-add-btn" onClick={handleAddStoreClick}>
             <Plus size={14} strokeWidth={2.5} />

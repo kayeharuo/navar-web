@@ -190,9 +190,9 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
                 {floorCount > 0 && (
                   <button
                     type="button"
-                    className="mall-floors-edit-btn"
+                    className={`mall-floors-edit-btn${!floorsSaved ? ' mall-floors-edit-btn--mandatory' : ''}`}
                     onClick={() => setShowFloorModal(true)}
-                    title="Edit floor details"
+                    title={floorsSaved ? 'Edit floor details' : 'Floor details required — click to fill in'}
                   >
                     <Pencil size={13} strokeWidth={2} />
                   </button>

@@ -1,5 +1,5 @@
 {
-    "builder.serverUrl": "http://localhost:5174/",
+    "builder.serverUrl": "http://localhost:5173/",
     "builder.command": "",
     "builder.runDevServer": false,
     "builder.autoDetectDevServer": true,
