@@ -1,0 +1,70 @@
+/* ─── Application Management page wrapper ──────────────────────── */
+.app-mgmt-page {
+  display: flex;
+  flex-direction: column;
+  max-width: 1400px;
+  width: 100%;
+  min-height: calc(100vh - 75px - 64px);
+}
+
+/* ─── Main content block ─────────────────────────────────── */
+.app-mgmt-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ─── Page header row ────────────────────────────────────── */
+.app-mgmt-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ─── Flows container ────────────────────────────────────── */
+.app-mgmt-flows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Toolbar (filters + search) ─────────────────────────── */
+.app-mgmt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ─── Table wrapper card ─────────────────────────────────── */
+.app-mgmt-table-wrap {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 0.5px solid #e8ecf2;
+  overflow: hidden;
+}
+
+.app-mgmt-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .app-mgmt-content {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-mgmt-content {
+    gap: 14px;
+  }
+
+  .app-mgmt-header {
+    gap: 12px;
+  }
+}

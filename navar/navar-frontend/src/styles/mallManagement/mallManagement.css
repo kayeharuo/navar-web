@@ -189,7 +189,7 @@
   top: 0;
   background-color: #F7F8FA;
   z-index: 1;
-  border-bottom: 0.2px solid #979797;
+  border-bottom: 0.5px solid #e8ecf2;
 }
 
 .mall-table th {
@@ -200,13 +200,13 @@
   color: #979797;
   padding: 10px 16px;
   white-space: nowrap;
-  border-bottom: 0.2px solid #979797;
+  border-bottom: 0.5px solid #e8ecf2;
 }
 
 .mall-table td {
   padding: 12px 16px;
   vertical-align: middle;
-  border-bottom: 1px solid #F7F8FA;
+  border-bottom: 0.5px solid #e8ecf2;
   color: #000;
   font-family: 'Poppins', sans-serif;
   font-weight: 500;

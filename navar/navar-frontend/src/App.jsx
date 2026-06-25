@@ -1,12 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
+import ApplicationManagement from './pages/ApplicationManagement'
+import ARDevelopment from './pages/ARDevelopment'
 import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import './App.css'
 import './styles/panels.css'
+
+const TIER_MAP = {
+  'SM Seaside City Cebu': 'Premium',
+  'Ayala Center Cebu': 'Premium',
+  'Pacific Mall Cebu': 'Standard',
+  'Gaisano Grand Liloan': 'Standard',
+  'Gaisano Grand Minglanilla': 'Basic',
+  'SM City Cebu': 'Premium',
+}
 
 function LogoutModal({ onCancel, onConfirm }) {
   return (
@@ -32,10 +43,17 @@ function LogoutModal({ onCancel, onConfirm }) {
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [activePage, setActivePage]     = useState('Dashboard')
+  const [activePage, setActivePage]     = useState(() => {
+    return localStorage.getItem('activePage') || 'Dashboard'
+  })
   const [activePanel, setActivePanel]   = useState(null)
   const [showLogout, setShowLogout]     = useState(false)
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
+  const [arIncomingProjects, setArIncomingProjects] = useState([])
+
+  useEffect(() => {
+    localStorage.setItem('activePage', activePage)
+  }, [activePage])
 
   function handleNavigate(page) {
     setActivePage(page)
@@ -43,10 +61,39 @@ export default function App() {
     setActivePanel(null)
   }
 
+  function handleAppApproved(app) {
+    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    setArIncomingProjects(prev => {
+      const alreadyExists = prev.some(p => p.id === app.id)
+      if (alreadyExists) return prev
+      return [...prev, {
+        id: app.id,
+        mallName: app.mallName,
+        tier: TIER_MAP[app.mallName] || 'Basic',
+        city: app.city,
+        adminName: app.adminName,
+        adminEmail: app.adminEmail,
+        version: app.version,
+        floors: app.floors,
+        agreement: app.agreement,
+        applicationStatus: 'Approved',
+        arStatus: 'Pending',
+        dateAdded: now,
+        lastUpdated: now,
+        thread: [],
+        testErrors: [],
+      }]
+    })
+  }
+
   function renderPage() {
     switch (activePage) {
       case 'Mall Management':
         return <MallManagement />
+      case 'Application Management':
+        return <ApplicationManagement onAppApproved={handleAppApproved} />
+      case 'AR Development':
+        return <ARDevelopment incomingProjects={arIncomingProjects} />
       default:
         return <Dashboard />
     }
