@@ -1,24 +1,9 @@
-import {
-  LayoutDashboard, Building2, FileText, Layers,
-  Users, CreditCard, BarChart2, Mail, Settings, ClipboardList,
-} from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import navarLogo from '../../images/navar-logo.png'
+import { NAV_ITEMS } from '../../config/navigation'
 import '../../styles/layout/sidebar.css'
 
-const navItems = [
-  { label: 'Dashboard',              icon: LayoutDashboard },
-  { label: 'Mall Management',        icon: Building2 },
-  { label: 'Application Management', icon: FileText },
-  { label: 'AR Development',         icon: Layers },
-  { label: 'Account Management',     icon: Users },
-  { label: 'License Management',     icon: CreditCard },
-  { label: 'Analytics',              icon: BarChart2 },
-  { label: 'Email Logs',             icon: Mail },
-  { label: 'System Settings',        icon: Settings },
-  { label: 'Audit Logs',             icon: ClipboardList },
-]
-
-export default function Sidebar({ isOpen, onClose, activePage, onNavigate }) {
+export default function Sidebar({ isOpen, onClose, onNavigate }) {
   return (
     <>
       <div
@@ -34,21 +19,26 @@ export default function Sidebar({ isOpen, onClose, activePage, onNavigate }) {
         <nav className="sidebar-nav">
           <p className="sidebar-menu-label">Menu</p>
           <ul className="sidebar-nav-list">
-            {navItems.map(({ label, icon: Icon }) => {
-              const isActive = activePage === label
+            {NAV_ITEMS.map(({ label, path, icon: Icon, exact }) => {
               return (
                 <li key={label}>
-                  <button
-                    onClick={() => onNavigate(label)}
-                    className={`sidebar-nav-btn${isActive ? ' sidebar-nav-btn--active' : ''}`}
+                  <NavLink
+                    to={path}
+                    end={exact}
+                    onClick={onNavigate}
+                    className={({ isActive }) => `sidebar-nav-btn${isActive ? ' sidebar-nav-btn--active' : ''}`}
                   >
-                    <Icon
-                      size={17}
-                      strokeWidth={isActive ? 2.2 : 1.8}
-                      className="sidebar-nav-icon"
-                    />
-                    {label}
-                  </button>
+                    {({ isActive }) => (
+                      <>
+                        <Icon
+                          size={17}
+                          strokeWidth={isActive ? 2.2 : 1.8}
+                          className="sidebar-nav-icon"
+                        />
+                        {label}
+                      </>
+                    )}
+                  </NavLink>
                 </li>
               )
             })}

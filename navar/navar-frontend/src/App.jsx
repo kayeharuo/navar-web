@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
 import ApplicationManagement from './pages/ApplicationManagement'
 import ARDevelopment from './pages/ARDevelopment'
+import AccountManagement from './pages/AccountManagement'
+import EmailLogs from './pages/EmailLogs'
+import AuditLogs from './pages/AuditLogs'
 import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
+import { NAV_ITEMS, getActiveNavItem } from './config/navigation'
 import './App.css'
 import './styles/panels.css'
 
@@ -41,25 +46,37 @@ function LogoutModal({ onCancel, onConfirm }) {
   )
 }
 
+function PlaceholderPage({ title }) {
+  return (
+    <div className="page-placeholder" style={{ padding: '24px 8px' }}>
+      <div style={{ maxWidth: 720 }}>
+        <p style={{ margin: 0, fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9CA3AF', fontFamily: 'Poppins' }}>
+          Section
+        </p>
+        <h2 style={{ margin: '10px 0 8px', fontSize: 28, lineHeight: 1.1, color: '#111827' }}>{title}</h2>
+        <p style={{ margin: 0, color: '#6B7280', fontSize: 15, lineHeight: 1.6, fontFamily: 'Poppins' }}>
+          This section now has its own route, so it behaves like a separate page in the browser.
+          The underlying feature view can be built out here next.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
+  const location = useLocation()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [activePage, setActivePage]     = useState(() => {
-    return localStorage.getItem('activePage') || 'Dashboard'
-  })
   const [activePanel, setActivePanel]   = useState(null)
   const [showLogout, setShowLogout]     = useState(false)
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
   const [arIncomingProjects, setArIncomingProjects] = useState([])
 
   useEffect(() => {
-    localStorage.setItem('activePage', activePage)
-  }, [activePage])
-
-  function handleNavigate(page) {
-    setActivePage(page)
     setSidebarOpen(false)
     setActivePanel(null)
-  }
+  }, [location.pathname])
+
+  const activePage = getActiveNavItem(location.pathname).label
 
   function handleAppApproved(app) {
     const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -86,30 +103,21 @@ export default function App() {
     })
   }
 
-  function renderPage() {
-    switch (activePage) {
-      case 'Mall Management':
-        return <MallManagement />
-      case 'Application Management':
-        return <ApplicationManagement onAppApproved={handleAppApproved} />
-      case 'AR Development':
-        return <ARDevelopment incomingProjects={arIncomingProjects} />
-      default:
-        return <Dashboard />
-    }
-  }
-
   function handleMarkAllRead() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+  }
+
+  function closeSidebar() {
+    setSidebarOpen(false)
+    setActivePanel(null)
   }
 
   return (
     <div className="app-shell">
       <Sidebar
-        activePage={activePage}
-        onNavigate={handleNavigate}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onNavigate={closeSidebar}
       />
 
       <div className="app-content">
@@ -123,7 +131,23 @@ export default function App() {
           onMarkAllRead={handleMarkAllRead}
         />
         <main className="app-main">
-          {renderPage()}
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/mall-management" element={<MallManagement />} />
+            <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} />} />
+            <Route path="/ar-development" element={<ARDevelopment incomingProjects={arIncomingProjects} />} />
+            <Route path="/account-management" element={<AccountManagement />} />
+            <Route path="/email-logs" element={<EmailLogs />} />
+            <Route path="/audit-logs" element={<AuditLogs />} />
+            {NAV_ITEMS.filter(item => !['/', '/mall-management', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs'].includes(item.path)).map(item => (
+              <Route
+                key={item.path}
+                path={item.path}
+                element={<PlaceholderPage title={item.label} />}
+              />
+            ))}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </main>
       </div>
 

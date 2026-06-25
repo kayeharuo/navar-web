@@ -1,0 +1,861 @@
+/* =====================================================
+   ACCOUNT MANAGEMENT — Page Styles
+   ===================================================== */
+
+.acct-mgmt-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1400px;
+  width: 100%;
+}
+
+/* ─── Header ─── */
+.acct-mgmt-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.acct-mgmt-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.acct-mgmt-title {
+  font-family: Poppins, sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.acct-mgmt-subtitle {
+  font-family: 'Fira Mono', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  color: #9B9C9C;
+  margin: 0;
+}
+
+.acct-mgmt-subtitle-alert {
+  color: #D51D1D;
+}
+
+.acct-mgmt-add-btn {
+  border-radius: 3px;
+  background: #9E5BF0;
+  color: #fff;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 18px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.acct-mgmt-add-btn:hover { opacity: 0.88; }
+
+/* ─── Stats Cards ─── */
+.acct-mgmt-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.acct-stat-card {
+  border-radius: 5px;
+  background: #fff;
+  border: 0.5px solid;
+  padding: 10px 14px 12px 70px;
+  position: relative;
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.acct-stat-card--super { border-color: #6C1FCA; }
+.acct-stat-card--mall { border-color: #2563EB; }
+.acct-stat-card--pending { border-color: #FF9233; }
+.acct-stat-card--deactivated { border-color: #D51D1D; }
+
+.acct-stat-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 5px;
+  background: #4C4C4C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.acct-stat-count {
+  font-family: Poppins, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.acct-stat-count--super { color: #6C1FCA; }
+.acct-stat-count--mall { color: #2563EB; }
+.acct-stat-count--pending { color: #FF9233; }
+.acct-stat-count--deactivated { color: #D51D1D; }
+
+.acct-stat-label {
+  font-family: Poppins, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.acct-stat-label--super { color: #6C1FCA; }
+.acct-stat-label--mall { color: #2563EB; }
+.acct-stat-label--pending { color: #FF9233; }
+.acct-stat-label--deactivated { color: #D51D1D; }
+
+/* ─── Toolbar (tabs + search) ─── */
+.acct-mgmt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.acct-mgmt-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-radius: 5px;
+  border: 0.5px solid #979797;
+  background: #F7F8FA;
+  padding: 6px 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.acct-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #979797;
+  padding: 2px 0;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.acct-tab-btn--active {
+  border-radius: 3px;
+  border: 0.1px solid #000;
+  background: #fff;
+  padding: 2px 8px;
+  color: #000;
+  font-weight: 600;
+}
+
+.acct-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+  background: #ECEFF2;
+  color: #979797;
+}
+
+.acct-tab-count--super-active { background: #E8D6FF; color: #6C1FCA; }
+.acct-tab-count--mall-active { background: #E8D6FF; color: #6C1FCA; }
+
+.acct-mgmt-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 5px;
+  border: 0.5px solid #979797;
+  background: #fff;
+  padding: 8px 14px;
+  min-width: 160px;
+}
+
+.acct-mgmt-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  color: #333;
+  width: 120px;
+}
+
+.acct-mgmt-search-input::placeholder { color: #979797; }
+
+/* ─── Table ─── */
+.acct-mgmt-table-wrap {
+  border-radius: 10px;
+  border: 0.5px solid #e8ecf2;
+  overflow: hidden;
+  background: #fff;
+}
+
+.acct-mgmt-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.acct-mgmt-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.acct-mgmt-table thead {
+  background: #F7F8FA;
+  border-radius: 10px 10px 0 0;
+}
+
+.acct-mgmt-table thead th {
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #979797;
+  text-align: left;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.acct-mgmt-table tbody tr {
+  border-top: 0.2px solid #e8ecf2;
+  transition: background 0.15s;
+}
+
+.acct-mgmt-table tbody tr:hover { background: #f5f8ff; }
+
+.acct-mgmt-table tbody tr.row--pending {
+  opacity: 0.5;
+}
+
+.acct-mgmt-table tbody tr.row--pending:hover {
+  background: #f5f8ff;
+  opacity: 0.65;
+}
+
+.acct-mgmt-table td {
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #000;
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.acct-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acct-name-label {
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #000;
+  white-space: nowrap;
+}
+
+.acct-pending-badge {
+  font-family: Poppins, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: #FF9233;
+}
+
+/* ─── Action Buttons ─── */
+.acct-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.acct-action-btn {
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-family: Poppins, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.acct-action-btn:hover { opacity: 0.85; }
+.acct-action-btn--edit { background: #2563EB; }
+.acct-action-btn--reset { background: #9E5BF0; }
+.acct-action-btn--deactivate { background: #D51D1D; }
+.acct-action-btn--resend { background: #FF9233; }
+.acct-action-btn--reactivate { background: #16A34A; }
+
+/* Primary badge */
+.acct-primary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-family: Poppins, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.acct-primary-badge--yes {
+  background: #D3E1FF;
+  color: #2563EB;
+}
+
+.acct-primary-badge--no {
+  background: #ECEFF2;
+  color: #979797;
+}
+
+/* ─── Empty state ─── */
+.acct-empty-row td {
+  text-align: center;
+  padding: 40px;
+  color: #9B9C9C;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* =====================================================
+   MODALS
+   ===================================================== */
+.acct-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.24);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* ─── Create Account Modal ─── */
+.acct-create-modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 655px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.acct-modal-header {
+  padding: 20px 24px 0;
+  flex-shrink: 0;
+}
+
+.acct-modal-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.acct-modal-title {
+  font-family: Poppins, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+}
+
+.acct-modal-close {
+  background: none;
+  border: none;
+  font-family: 'Fira Mono', monospace;
+  font-size: 22px;
+  color: #9B9C9C;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.acct-modal-close:hover { color: #555; }
+
+.acct-modal-subtitle {
+  font-family: 'Fira Mono', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  color: #9B9C9C;
+  margin: 4px 0 0;
+}
+
+.acct-modal-divider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 14px -24px 0;
+  flex-shrink: 0;
+}
+
+/* Role tab switcher */
+.acct-modal-role-tabs {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.acct-modal-role-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  font-family: Poppins, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #979797;
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.acct-modal-role-tab--active {
+  color: #2563EB;
+  border-bottom-color: #2563EB;
+}
+
+/* Form body */
+.acct-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acct-form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.acct-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.acct-form-label {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #919191;
+}
+
+.acct-form-label-required { color: #D51D1D; }
+
+.acct-form-input,
+.acct-form-select {
+  border-radius: 5px;
+  border: 0.3px solid #9B9C9C;
+  background: #fff;
+  padding: 8px 12px;
+  font-family: Poppins, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  color: #333;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.acct-form-input::placeholder { color: #979797; }
+.acct-form-input:focus,
+.acct-form-select:focus { border-color: #2563EB; }
+.acct-form-select { cursor: pointer; }
+
+.acct-form-input--error { border-color: #D51D1D; }
+
+.acct-form-error {
+  font-family: Poppins, sans-serif;
+  font-size: 11px;
+  color: #D51D1D;
+  margin-top: -2px;
+}
+
+/* Radio group for Is Primary */
+.acct-radio-group {
+  display: flex;
+  gap: 20px;
+  margin-top: 2px;
+}
+
+.acct-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.acct-radio-label input[type="radio"] {
+  accent-color: #2563EB;
+  width: 16px;
+  height: 16px;
+}
+
+.acct-primary-locked-note {
+  font-family: Poppins, sans-serif;
+  font-size: 11px;
+  color: #EA580C;
+  margin-top: 4px;
+}
+
+/* Modal footer */
+.acct-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.acct-modal-btn-cancel {
+  border-radius: 5px;
+  border: 0.5px solid #979797;
+  background: #fff;
+  color: #000;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.acct-modal-btn-cancel:hover { background: #f0f0f0; }
+
+.acct-modal-btn-primary {
+  border-radius: 5px;
+  background: #2563EB;
+  color: #fff;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 20px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.acct-modal-btn-primary:hover { opacity: 0.88; }
+
+.acct-modal-btn-full {
+  width: 100%;
+  border-radius: 5px;
+  background: #2563EB;
+  color: #fff;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.acct-modal-btn-full:hover { opacity: 0.88; }
+
+/* ─── Account Created Modal ─── */
+.acct-created-modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 512px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.acct-created-info-table {
+  border-radius: 5px;
+  border: 0.3px solid #9B9C9C;
+  background: #F7F8FA;
+  padding: 14px 18px;
+}
+
+.acct-created-info-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.acct-created-info-label {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 400;
+  color: #9B9C9C;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.acct-created-info-value {
+  font-family: Poppins, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #000;
+  text-align: right;
+}
+
+.acct-magic-link-box {
+  border-radius: 5px;
+  border: 0.3px solid #9B3D3D;
+  background: #FFEBB4;
+  padding: 12px 14px;
+}
+
+.acct-magic-link-title {
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #9B3D3D;
+  margin: 0 0 4px;
+}
+
+.acct-magic-link-text {
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #9B3D3D;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Confirm Modal (Reset / Deactivate / Reactivate) ─── */
+.acct-confirm-modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 540px;
+  max-width: 100%;
+  padding: 36px 36px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.acct-confirm-icon {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.acct-confirm-title {
+  font-family: Poppins, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 6px;
+}
+
+.acct-confirm-desc {
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.acct-confirm-warning {
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #EA580C;
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.acct-confirm-notice {
+  border-radius: 5px;
+  border: 0.5px solid #9B3D3D;
+  background: #FFF5D9;
+  padding: 8px 12px;
+  font-family: Poppins, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: #EA580C;
+}
+
+.acct-confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.acct-confirm-btn-deactivate {
+  border-radius: 5px;
+  background: #D51D1D;
+  color: #fff;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 20px;
+  border: 0.5px solid #D51D1D;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.acct-confirm-btn-deactivate:hover { opacity: 0.88; }
+
+.acct-confirm-btn-reactivate {
+  border-radius: 5px;
+  background: #16A34A;
+  color: #fff;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 20px;
+  border: 0.5px solid #16A34A;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.acct-confirm-btn-reactivate:hover { opacity: 0.88; }
+
+.acct-confirm-btn-proceed {
+  border-radius: 5px;
+  background: #2563EB;
+  color: #fff;
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 20px;
+  border: 0.5px solid #2563EB;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.acct-confirm-btn-proceed:hover { opacity: 0.88; }
+
+/* ─── Magic Link Sent Modal ─── */
+.acct-magic-sent-modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 540px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.acct-magic-sent-body {
+  padding: 28px 32px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acct-magic-sent-footer {
+  border-top: 1px solid #e0e0e0;
+  padding: 14px 32px;
+}
+
+/* ─── Edit Modal ─── */
+.acct-edit-modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 646px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .acct-mgmt-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .acct-mgmt-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acct-mgmt-tabs {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .acct-mgmt-search-wrap {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .acct-mgmt-page {
+    padding: 16px 12px 24px;
+  }
+
+  .acct-mgmt-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .acct-stat-card {
+    padding: 10px 10px 12px 60px;
+  }
+
+  .acct-mgmt-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acct-mgmt-add-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .acct-form-row {
+    flex-direction: column;
+  }
+
+  .acct-confirm-modal {
+    padding: 24px 20px 20px;
+  }
+}
