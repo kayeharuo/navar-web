@@ -333,6 +333,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
           </table>
         </div>
       </div>
+      <p className="app-mgmt-hint">Click any row to view full details.</p>
     </>
   )
 }

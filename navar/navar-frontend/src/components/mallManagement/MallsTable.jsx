@@ -736,66 +736,69 @@ export default function MallsTable() {
 
         {/* Table */}
         {activeTab === 'Malls' && (
-          <div className="mall-table-wrap">
-            <div className="mall-table-scroll">
-              <table className="mall-table">
-                <thead>
-                  <tr>
-                    <th>Mall Name</th>
-                    <th>City</th>
-                    <th>No. of Floors</th>
-                    <th>Agreement</th>
-                    <th>Application</th>
-                    <th>AR Development</th>
-                    <th>Date Added</th>
-                    <th>Last Updated</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMalls.map(mall => (
-                    <tr
-                      key={mall.id}
-                      className="mall-table-row"
-                      onClick={() => setViewMall(mall)}
-                    >
-                      <td>
-                        <p className={`mall-name-text${mall.agreementStatus === 'Grace Period' ? ' mall-name-text--grace' : mall.agreementStatus === 'Suspended' ? ' mall-name-text--suspended' : ''}`}>
-                          {mall.name}
-                        </p>
-                        {mall.note && <p className="mall-overdue-note">{mall.note}</p>}
-                      </td>
-                      <td>{mall.city}</td>
-                      <td>
-                        <div className="mall-floors-cell" onClick={e => e.stopPropagation()}>
-                          <span>{mall.floors ?? '—'}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <AgreementCell status={mall.agreementStatus} tier={mall.tier} />
-                      </td>
-                      <td>
-                        <StatusBadge value={mall.application} variantMap={applicationVariantMap} />
-                      </td>
-                      <td>
-                        <StatusBadge value={mall.arDevelopment} variantMap={arDevVariantMap} />
-                      </td>
-                      <td className="mall-date-cell">{mall.dateAdded}</td>
-                      <td className="mall-date-cell">{mall.lastUpdated}</td>
-                      <td>
-                        <ActionButtons
-                          onEdit={() => setEditingMall(mall)}
-                          onUnits={() => setUnitsMall(mall)}
-                          onStores={() => setStoresMall(mall)}
-                          onBeacons={() => setBeaconsMall(mall)}
-                        />
-                      </td>
+          <>
+            <div className="mall-table-wrap">
+              <div className="mall-table-scroll">
+                <table className="mall-table">
+                  <thead>
+                    <tr>
+                      <th>Mall Name</th>
+                      <th>City</th>
+                      <th>No. of Floors</th>
+                      <th>Agreement</th>
+                      <th>Application</th>
+                      <th>AR Development</th>
+                      <th>Date Added</th>
+                      <th>Last Updated</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredMalls.map(mall => (
+                      <tr
+                        key={mall.id}
+                        className="mall-table-row"
+                        onClick={() => setViewMall(mall)}
+                      >
+                        <td>
+                          <p className={`mall-name-text${mall.agreementStatus === 'Grace Period' ? ' mall-name-text--grace' : mall.agreementStatus === 'Suspended' ? ' mall-name-text--suspended' : ''}`}>
+                            {mall.name}
+                          </p>
+                          {mall.note && <p className="mall-overdue-note">{mall.note}</p>}
+                        </td>
+                        <td>{mall.city}</td>
+                        <td>
+                          <div className="mall-floors-cell" onClick={e => e.stopPropagation()}>
+                            <span>{mall.floors ?? '—'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <AgreementCell status={mall.agreementStatus} tier={mall.tier} />
+                        </td>
+                        <td>
+                          <StatusBadge value={mall.application} variantMap={applicationVariantMap} />
+                        </td>
+                        <td>
+                          <StatusBadge value={mall.arDevelopment} variantMap={arDevVariantMap} />
+                        </td>
+                        <td className="mall-date-cell">{mall.dateAdded}</td>
+                        <td className="mall-date-cell">{mall.lastUpdated}</td>
+                        <td>
+                          <ActionButtons
+                            onEdit={() => setEditingMall(mall)}
+                            onUnits={() => setUnitsMall(mall)}
+                            onStores={() => setStoresMall(mall)}
+                            onBeacons={() => setBeaconsMall(mall)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+            <p className="mall-table-hint">Click any row to view full details.</p>
+          </>
         )}
 
         {/* Inquiries tab */}

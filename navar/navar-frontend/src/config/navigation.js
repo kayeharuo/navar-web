@@ -17,7 +17,7 @@ export const NAV_ITEMS = [
   { label: 'Application Management', path: '/application-management', icon: FileText },
   { label: 'AR Development', path: '/ar-development', icon: Layers },
   { label: 'Account Management', path: '/account-management', icon: Users },
-  { label: 'License Management', path: '/license-management', icon: CreditCard },
+  { label: 'Subscription Management', path: '/subscription-management', icon: CreditCard },
   { label: 'Analytics', path: '/analytics', icon: BarChart2 },
   { label: 'Email Logs', path: '/email-logs', icon: Mail },
   { label: 'System Settings', path: '/system-settings', icon: Settings },

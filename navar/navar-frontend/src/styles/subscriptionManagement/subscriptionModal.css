@@ -1,0 +1,300 @@
+/* =====================================================
+   SUSPEND / LIFT SUSPENSION MODALS
+   ===================================================== */
+.sub-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.24);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.sub-modal-box {
+  background: #fff;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 496px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+}
+
+.sub-modal-box--sm {
+  max-width: 496px;
+}
+
+.sub-modal-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 24px 0;
+  flex-shrink: 0;
+}
+
+.sub-modal-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+}
+
+.sub-modal-subtext {
+  font-family: 'Fira Mono', monospace;
+  font-size: 12px;
+  color: #979797;
+  margin: 4px 24px 0;
+}
+
+.sub-modal-x {
+  background: none;
+  border: none;
+  font-family: 'Fira Mono', monospace;
+  font-size: 22px;
+  font-weight: 500;
+  color: #9B9C9C;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sub-modal-x:hover { color: #555; }
+
+.sub-modal-divider {
+  height: 1px;
+  background: #979797;
+  margin-top: 16px;
+  flex-shrink: 0;
+}
+
+.sub-modal-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+.sub-modal-warning {
+  padding: 10px 14px;
+  border-radius: 5px;
+  border: 0.5px solid #D51D1D;
+  background: #FFDEDE;
+  color: #D51D1D;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.sub-modal-section-label {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #919191;
+  margin: 0 0 10px;
+}
+
+/* ─── Reason radio cards ──────────────────────────────────── */
+.sub-reason-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sub-reason-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 5px;
+  border: 1px solid #979797;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.sub-reason-card--active {
+  border-width: 1px;
+}
+
+.sub-reason-radio {
+  margin-top: 3px;
+  accent-color: #2563EB;
+  flex-shrink: 0;
+}
+
+.sub-reason-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  margin: 0 0 3px;
+}
+
+.sub-reason-desc {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  color: #767474;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Fields ──────────────────────────────────────────────── */
+.sub-modal-field {
+  margin-bottom: 16px;
+}
+
+.sub-modal-field-label {
+  display: block;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: #4E4E4E;
+  margin-bottom: 6px;
+}
+
+.sub-modal-field-label--italic { font-style: italic; }
+
+.sub-modal-required { color: #D51D1D; font-weight: 500; }
+
+.sub-modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: 0.5px solid #979797;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #000;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.sub-modal-input:focus { border-color: #2563EB; }
+
+.sub-modal-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 5px;
+  border: 0.5px solid #979797;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #333;
+  outline: none;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.sub-modal-textarea:focus { border-color: #2563EB; }
+
+/* ─── Summary ─────────────────────────────────────────────── */
+.sub-modal-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.sub-modal-summary-labels,
+.sub-modal-summary-values {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sub-modal-summary-labels span {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  color: #4C4C4C;
+}
+
+.sub-modal-summary-values {
+  text-align: right;
+}
+
+.sub-modal-summary-values span {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #000;
+}
+
+/* ─── Footer ──────────────────────────────────────────────── */
+.sub-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px 24px;
+  flex-shrink: 0;
+}
+
+.sub-modal-btn-cancel {
+  padding: 8px 22px;
+  border-radius: 5px;
+  border: 0.5px solid #979797;
+  background: #fff;
+  color: #000;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.sub-modal-btn-cancel:hover { background-color: #f0f0f0; }
+
+.sub-modal-btn-confirm {
+  padding: 8px 22px;
+  border-radius: 5px;
+  border: none;
+  background: #D51D1D;
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.sub-modal-btn-confirm:hover { opacity: 0.88; }
+.sub-modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sub-modal-btn-lift {
+  padding: 8px 22px;
+  border-radius: 5px;
+  border: none;
+  background: #16A34A;
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.sub-modal-btn-lift:hover { opacity: 0.88; }
+
+.sub-lift-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #4C4C4C;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .sub-modal-box { max-width: 100%; }
+  .sub-modal-summary { flex-direction: column; gap: 4px; }
+  .sub-modal-summary-values { text-align: left; }
+}

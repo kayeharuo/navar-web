@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Building2 } from 'lucide-react'
 
 export const INITIAL_NOTIFICATIONS = [
-  { id: 1, mallName: 'Parkmall Cebu', text: 'submitted proof of payment. Please verify and confirm in License Management.', time: '2 minutes ago', group: 'today', read: false },
+  { id: 1, mallName: 'Parkmall Cebu', text: 'submitted proof of payment. Please verify and confirm in Subscription Management.', time: '2 minutes ago', group: 'today', read: false },
   { id: 2, mallName: 'SM City Consolacion Cebu', text: 'resubmitted their application after revision. Ready for your review.', time: '1 hour ago', group: 'today', read: false },
-  { id: 3, mallName: 'Robinsons Galleria Cebu', text: 'contract expires in 7 days. Consider following up on payment.', time: '3 hours ago', group: 'today', read: false },
+  { id: 3, mallName: 'Robinsons Galleria Cebu', text: 'subscription expires in 7 days. Consider following up on payment.', time: '3 hours ago', group: 'today', read: false },
   { id: 4, mallName: 'Gaisano Grand Mall', text: 'confirmed their AR map. You may now set the map to Live.', time: 'Yesterday, 2:14 PM', group: 'yesterday', read: true },
-  { id: 5, mallName: 'SM Seaside City Cebu', text: 'AR map was published and is now live. Contract period has started.', time: 'Yesterday, 9:00 AM', group: 'yesterday', read: true },
-  { id: 6, mallName: 'Ayala Center Cebu', text: 'submitted their Annual Renewal Contract. Please review when available.', time: 'Mar 10, 10:22 AM', group: 'earlier', read: true },
+  { id: 5, mallName: 'SM Seaside City Cebu', text: 'AR map was published and is now live. Subscription period has started.', time: 'Yesterday, 9:00 AM', group: 'yesterday', read: true },
+  { id: 6, mallName: 'Ayala Center Cebu', text: 'submitted their Annual Renewal request. Please review when available.', time: 'Mar 10, 10:22 AM', group: 'earlier', read: true },
 ]
 
 function NotifCard({ notif, onMark }) {

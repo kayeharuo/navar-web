@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import '../styles/auditLogs/auditLogs.css'
 
 const MODULE_COLORS = {
-  'License Management':     { bg: '#DBEAFE', color: '#1D4ED8' },
+  'Subscription Management': { bg: '#DBEAFE', color: '#1D4ED8' },
   'Application Management': { bg: '#EDE9FE', color: '#7C3AED' },
   'Account Management':     { bg: '#D1FAE5', color: '#065F46' },
   'Mall Management':        { bg: '#FEF3C7', color: '#92400E' },
@@ -14,10 +14,10 @@ const LOGS = [
     id: 1,
     timestamp: 'March 14, 2026 at 9:02 AM',
     admin: 'Juan dela Cruz',
-    module: 'License Management',
+    module: 'Subscription Management',
     action: 'Suspended Mall',
     target: 'Parkmall Cebu',
-    details: 'Reason: Non-payment. Grace period ended Feb 22, 2026. Reinstatement fee: ₱18,000.',
+    details: 'Reason: Non-Payment. Grace period ended Feb 22, 2026. Reinstatement fee: ₱18,000.',
   },
   {
     id: 2,
@@ -32,10 +32,10 @@ const LOGS = [
     id: 3,
     timestamp: 'February 20, 2026 at 8:05 AM',
     admin: 'System (automated)',
-    module: 'License Management',
+    module: 'Subscription Management',
     action: 'Entered grace period',
     target: 'Robinsons Galleria Cebu',
-    details: 'Contract expired Feb 20, 2026. 30-day grace period active until Mar 22, 2026.',
+    details: 'Subscription expired Feb 20, 2026. 30-day grace period active until Mar 22, 2026.',
   },
   {
     id: 4,
@@ -59,7 +59,7 @@ const LOGS = [
     id: 6,
     timestamp: 'February 10, 2026 at 9:00 AM',
     admin: 'System (automated)',
-    module: 'License Management',
+    module: 'Subscription Management',
     action: 'Payment reminder sent',
     target: 'Gaisano Grand Liloan',
     details: 'Automated payment reminder sent for overdue invoice #INV-2026-012.',
@@ -95,10 +95,10 @@ const LOGS = [
     id: 10,
     timestamp: 'January 10, 2026 at 8:00 AM',
     admin: 'System (automated)',
-    module: 'License Management',
-    action: 'License renewed',
+    module: 'Subscription Management',
+    action: 'Subscription renewed',
     target: 'SM City Cebu',
-    details: 'Annual license auto-renewed for SM City Cebu. Next renewal: January 10, 2027.',
+    details: 'Annual subscription auto-renewed for SM City Cebu. Next renewal: January 10, 2027.',
   },
 ]
 

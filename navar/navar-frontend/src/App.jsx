@@ -9,6 +9,8 @@ import ARDevelopment from './pages/ARDevelopment'
 import AccountManagement from './pages/AccountManagement'
 import EmailLogs from './pages/EmailLogs'
 import AuditLogs from './pages/AuditLogs'
+import SystemSettings from './pages/SystemSettings'
+import SubscriptionManagement from './pages/SubscriptionManagement'
 import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import { NAV_ITEMS, getActiveNavItem } from './config/navigation'
@@ -139,7 +141,9 @@ export default function App() {
             <Route path="/account-management" element={<AccountManagement />} />
             <Route path="/email-logs" element={<EmailLogs />} />
             <Route path="/audit-logs" element={<AuditLogs />} />
-            {NAV_ITEMS.filter(item => !['/', '/mall-management', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs'].includes(item.path)).map(item => (
+            <Route path="/system-settings" element={<SystemSettings />} />
+            <Route path="/subscription-management" element={<SubscriptionManagement />} />
+            {NAV_ITEMS.filter(item => !['/', '/mall-management', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs', '/system-settings', '/subscription-management'].includes(item.path)).map(item => (
               <Route
                 key={item.path}
                 path={item.path}

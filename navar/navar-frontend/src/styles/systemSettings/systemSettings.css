@@ -1,0 +1,459 @@
+/* ─── Page title & subtitle ──────────────────────────────── */
+.settings-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.settings-subtitle {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: #9B9C9C;
+  margin: 0;
+}
+
+/* ─── Tab navigation ─────────────────────────────────────── */
+.settings-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background-color: #F7F8FA;
+  border: 0.5px solid #979797;
+  border-radius: 5px;
+  width: fit-content;
+  flex-wrap: wrap;
+}
+
+.settings-tab-btn {
+  padding: 5px 16px;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background-color: transparent;
+  color: #000;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.settings-tab-btn--active {
+  background-color: #155DFC;
+  color: #ffffff;
+}
+
+.settings-tab-btn:not(.settings-tab-btn--active):hover {
+  background-color: #E8F0FE;
+}
+
+/* ─── Shared panel header ────────────────────────────────── */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-panel-header--spaced {
+  margin-top: 8px;
+}
+
+.settings-panel-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+}
+
+.settings-panel-title--sm {
+  font-size: 16px;
+}
+
+.settings-panel-desc {
+  font-family: 'Fira Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: #9B9C9C;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Warning banner ──────────────────────────────────────── */
+.settings-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #FFFBEB;
+  border: 0.5px solid #FDE68A;
+  border-radius: 6px;
+  color: #B45309;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.settings-warning-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #D97706;
+}
+
+/* ─── Tier table ──────────────────────────────────────────── */
+.tier-table-wrap {
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 0.5px solid #e8ecf2;
+  overflow: hidden;
+}
+
+.tier-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+.tier-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.tier-table thead {
+  position: sticky;
+  top: 0;
+  background-color: #F7F8FA;
+  z-index: 1;
+  border-bottom: 0.5px solid #e8ecf2;
+}
+
+.tier-table-feature-col {
+  min-width: 220px;
+}
+
+.tier-table th {
+  text-align: left;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #979797;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 16px;
+  white-space: nowrap;
+  border-bottom: 0.5px solid #e8ecf2;
+}
+
+.tier-table td {
+  padding: 10px 16px;
+  vertical-align: middle;
+  border-bottom: 0.5px solid #e8ecf2;
+  color: #000;
+}
+
+.tier-table-row:hover td {
+  background-color: #F8FAFC;
+}
+
+/* ─── Tier column badges ─────────────────────────────────── */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.tier-badge--basic {
+  background-color: #F1F5F9;
+  color: #475569;
+}
+
+.tier-badge--standard {
+  background-color: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.tier-badge--premium {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+}
+
+/* ─── Group section rows ─────────────────────────────────── */
+.tier-table-group-row td {
+  background-color: #F7F8FA;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 16px;
+  border-bottom: 0.5px solid #e8ecf2;
+}
+
+/* ─── Feature label cell ─────────────────────────────────── */
+.tier-row-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+  margin: 0;
+}
+
+.tier-row-sublabel {
+  font-family: 'Fira Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #9B9C9C;
+  margin: 2px 0 0;
+}
+
+/* ─── Editable tier value input ──────────────────────────── */
+.tier-input {
+  width: 100%;
+  min-width: 130px;
+  padding: 6px 10px;
+  border: 1px solid #D6DBE3;
+  border-radius: 5px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #000;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease;
+}
+
+.tier-input:focus {
+  outline: none;
+  border-color: #155DFC;
+}
+
+/* ─── Panel footer / save button ─────────────────────────── */
+.settings-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 22px;
+  background-color: #155DFC;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.settings-save-btn:hover {
+  background-color: #1D4ED8;
+}
+
+/* ─── Beacon UUID box ─────────────────────────────────────── */
+.beacon-uuid-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background-color: #F7F8FA;
+  border: 0.5px solid #e8ecf2;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.beacon-uuid-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #9B9C9C;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px;
+}
+
+.beacon-uuid-value {
+  font-family: 'Fira Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+  word-break: break-all;
+}
+
+.beacon-copy-btn {
+  padding: 8px 18px;
+  background-color: #ffffff;
+  color: #000;
+  border: 0.5px solid #979797;
+  border-radius: 5px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.beacon-copy-btn:hover {
+  background-color: #F1F5F9;
+}
+
+/* ─── Identifier structure cards ─────────────────────────── */
+.beacon-structure-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.beacon-structure-card {
+  padding: 16px;
+  border-radius: 8px;
+  border: 0.5px solid #e8ecf2;
+  background-color: #F7F8FA;
+}
+
+.beacon-structure-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.beacon-structure-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+}
+
+.beacon-structure-scope {
+  font-family: 'Fira Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+}
+
+.beacon-structure-desc {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748B;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.beacon-structure-card--uuid {
+  background-color: #F5F3FF;
+  border-color: #DDD6FE;
+}
+.beacon-structure-card--uuid .beacon-structure-icon,
+.beacon-structure-card--uuid .beacon-structure-scope {
+  color: #7C3AED;
+}
+
+.beacon-structure-card--major {
+  background-color: #EFF6FF;
+  border-color: #BFDBFE;
+}
+.beacon-structure-card--major .beacon-structure-icon,
+.beacon-structure-card--major .beacon-structure-scope {
+  color: #2563EB;
+}
+
+.beacon-structure-card--minor {
+  background-color: #ECFDF5;
+  border-color: #A7F3D0;
+}
+.beacon-structure-card--minor .beacon-structure-icon,
+.beacon-structure-card--minor .beacon-structure-scope {
+  color: #059669;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .settings-title {
+    font-size: 24px;
+  }
+
+  .beacon-structure-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-title {
+    font-size: 20px;
+  }
+
+  .settings-subtitle {
+    font-size: 11px;
+  }
+
+  .settings-tabs {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-panel-title {
+    font-size: 16px;
+  }
+
+  .beacon-uuid-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .beacon-copy-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .beacon-structure-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-table th,
+  .tier-table td {
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 479px) {
+  .settings-title {
+    font-size: 18px;
+  }
+
+  .settings-tab-btn {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+
+  .beacon-uuid-value {
+    font-size: 13px;
+  }
+}

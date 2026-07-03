@@ -10,7 +10,7 @@ const pageIconMap = {
   'Application Management': FileText,
   'AR Development':         Layers,
   'Account Management':     Users,
-  'License Management':     CreditCard,
+  'Subscription Management': CreditCard,
   'Analytics':              BarChart2,
   'Email Logs':             Mail,
   'System Settings':        Settings,
