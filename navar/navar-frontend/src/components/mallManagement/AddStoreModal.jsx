@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, ImageIcon } from 'lucide-react'
 
 const CATEGORIES = [
@@ -19,13 +19,50 @@ const MAX_LOGO_MB = 2
 function UnitAssignModal({ count, units, selected, onSave, onClose }) {
   const [localSelected, setLocalSelected] = useState(selected || [])
 
-  function toggleUnit(unitNo) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
+  function toggleUnit(unitNo, isOccupied = false) {
     setLocalSelected(prev => {
-      if (prev.includes(unitNo)) return prev.filter(u => u !== unitNo)
-      if (prev.length >= count) return prev
+      // If clicking an occupied unit, only allow deselect
+      if (isOccupied) {
+        if (prev.includes(unitNo)) return prev.filter(u => u !== unitNo)
+        return prev
+      }
+
+      // For vacant units
+      if (prev.includes(unitNo)) {
+        // If already selected, deselect it
+        return prev.filter(u => u !== unitNo)
+      }
+
+      if (prev.length >= count) {
+        // If at limit, replace the first selected with the new one
+        return [unitNo, ...prev.slice(1)]
+      }
+
+      // Otherwise add the new unit
       return [...prev, unitNo]
     })
   }
+
+  const isSaveDisabled = localSelected.length !== count
+
+  // Sort units: vacant first, then occupied
+  const sortedUnits = [...units].sort((a, b) => {
+    if (a.status === 'vacant' && b.status !== 'vacant') return -1
+    if (a.status !== 'vacant' && b.status === 'vacant') return 1
+    return 0
+  })
+
+  // Separate into vacant and occupied
+  const vacantUnits = sortedUnits.filter(u => u.status === 'vacant')
+  const occupiedUnits = sortedUnits.filter(u => u.status !== 'vacant')
 
   return (
     <>
@@ -44,25 +81,51 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
         <div className="unit-assign-list">
           {units.length === 0 ? (
             <p className="unit-assign-empty">No units available in this mall. Add units first via the Units button.</p>
-          ) : units.map(u => (
-            <div
-              key={u.id}
-              className={`unit-assign-item${localSelected.includes(u.unitNo) ? ' unit-assign-item--selected' : ''}`}
-              onClick={() => toggleUnit(u.unitNo)}
-            >
-              <span className="unit-assign-no">{u.unitNo}</span>
-              <span className="unit-assign-floor">{u.floorNo}</span>
-              <span className={`unit-assign-badge unit-assign-badge--${u.status}`}>
-                {u.status.toUpperCase()}
-              </span>
-            </div>
-          ))}
+          ) : (
+            <>
+              {vacantUnits.length > 0 && (
+                <>
+                  {vacantUnits.map(u => (
+                    <div
+                      key={u.id}
+                      className={`unit-assign-item${localSelected.includes(u.unitNo) ? ' unit-assign-item--selected' : ''}`}
+                      onClick={() => toggleUnit(u.unitNo, false)}
+                    >
+                      <span className="unit-assign-no">{u.unitNo}</span>
+                      <span className="unit-assign-floor">{u.floorNo}</span>
+                      <span className={`unit-assign-badge unit-assign-badge--${u.status}`}>
+                        {u.status.toUpperCase()}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {occupiedUnits.length > 0 && (
+                <>
+                  {occupiedUnits.map(u => (
+                    <div
+                      key={u.id}
+                      className={`unit-assign-item${localSelected.includes(u.unitNo) ? ' unit-assign-item--selected' : ' unit-assign-item--disabled'}`}
+                      onClick={() => toggleUnit(u.unitNo, true)}
+                      title={localSelected.includes(u.unitNo) ? 'Click to deselect' : 'Occupied - can only keep currently assigned'}
+                    >
+                      <span className="unit-assign-no">{u.unitNo}</span>
+                      <span className="unit-assign-floor">{u.floorNo}</span>
+                      <span className={`unit-assign-badge unit-assign-badge--${u.status}`}>
+                        {u.status.toUpperCase()}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
         </div>
 
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={() => onSave(localSelected)}>
+          <button className="mall-modal-save-btn" onClick={() => onSave(localSelected)} disabled={isSaveDisabled}>
             Save
           </button>
         </div>
@@ -97,12 +160,21 @@ export default function AddStoreModal({
   const [unitNos, setUnitNos]       = useState(initialData?.unitNos || [])
   const [unitsSaved, setUnitsSaved] = useState((initialData?.unitNos?.length || 0) > 0)
   const [showUnitAssign, setShowUnitAssign] = useState(false)
+  const [unitsChanged, setUnitsChanged] = useState(false)
 
   const [logo, setLogo]             = useState(null)
   const [logoPreview, setLogoPreview] = useState(initialData?.brandLogo || null)
   const fileInputRef = useRef(null)
 
   const [errors, setErrors] = useState({})
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   function setField(key, val) {
     setForm(f => ({ ...f, [key]: val }))
@@ -137,9 +209,17 @@ export default function AddStoreModal({
     }
   }
 
+  function handleEditUnits() {
+    const count = parseInt(form.numUnits) || 0
+    if (count > 0) {
+      setShowUnitAssign(true)
+    }
+  }
+
   function handleUnitsSave(selected) {
     setUnitNos(selected)
     setUnitsSaved(selected.length > 0)
+    setUnitsChanged(true)
     setShowUnitAssign(false)
   }
 
@@ -171,7 +251,7 @@ export default function AddStoreModal({
   }
 
   const numUnits = parseInt(form.numUnits) || 0
-  const mallUnits = (mall?.units || []).filter(u => u.status === 'vacant')
+  const mallUnits = (mall?.units || []).filter(u => u.isActive !== false)
 
   return (
     <>
@@ -237,8 +317,8 @@ export default function AddStoreModal({
                 {numUnits > 0 && (
                   <button
                     type="button"
-                    className={`mall-floors-edit-btn${!unitsSaved ? ' mall-floors-edit-btn--mandatory' : ''}`}
-                    onClick={() => setShowUnitAssign(true)}
+                    className={`mall-floors-edit-btn${!unitsSaved && !isEdit ? ' mall-floors-edit-btn--mandatory' : ''}`}
+                    onClick={handleEditUnits}
                     title={unitsSaved ? 'Change unit assignment' : 'Unit assignment required — click to assign'}
                   >
                     <Pencil size={15} />

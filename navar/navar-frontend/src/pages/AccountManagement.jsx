@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import '../styles/accountManagement/accountManagement.css'
 
 /* ─── SVG Icons ─── */
@@ -79,6 +79,14 @@ function formatDate(d) {
 function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, onSave }) {
   const isEdit = mode === 'edit'
   const [roleTab, setRoleTab] = useState(isEdit ? (account?.mall !== undefined ? 'mall-admin' : 'super-admin') : (createTabInit || 'super-admin'))
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   const emptyForm = {
     name: '', email: '', jobTitle: '', contact: '', mall: '', isPrimary: 'no',
@@ -197,6 +205,11 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
         )}
         {errors.isPrimary && <span className="acct-form-error">{errors.isPrimary}</span>}
       </div>
+      <div className="acct-form-divider" />
+      <div className="acct-form-group">
+        <label className="acct-form-label">ACCOUNT STATUS</label>
+        <div className="acct-form-status-display">Partial</div>
+      </div>
     </>
   )
 
@@ -236,6 +249,14 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
    MODAL: Account Created
 ──────────────────────────────────────── */
 function AccountCreatedModal({ account, onClose }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="acct-created-modal">
@@ -280,6 +301,14 @@ function AccountCreatedModal({ account, onClose }) {
    MODAL: Reset Password (confirm)
 ──────────────────────────────────────── */
 function ResetPasswordModal({ account, onClose, onConfirm }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="acct-confirm-modal">
@@ -302,6 +331,14 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
    MODAL: Magic Link Sent
 ──────────────────────────────────────── */
 function MagicLinkSentModal({ email, onClose }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="acct-magic-sent-modal">
@@ -329,6 +366,15 @@ function MagicLinkSentModal({ email, onClose }) {
 ──────────────────────────────────────── */
 function DeactivateModal({ account, onClose, onConfirm }) {
   const isPrimaryMallAdmin = account?.mall !== undefined && account?.isPrimary
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="acct-confirm-modal">
@@ -353,6 +399,14 @@ function DeactivateModal({ account, onClose, onConfirm }) {
    MODAL: Reactivate Account
 ──────────────────────────────────────── */
 function ReactivateModal({ account, onClose, onConfirm }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="acct-confirm-modal">
@@ -453,6 +507,7 @@ export default function AccountManagement() {
       lastUpdated: now,
       lastLogin: 'Never',
       status: 'pending',
+      accountStatus: 'partial',
     }
     if (role === 'super-admin') {
       setSuperAdmins(prev => [...prev, newAccount])
@@ -463,7 +518,6 @@ export default function AccountManagement() {
     setModal('created')
   }
 
-  // eslint-disable-next-line no-unused-vars
   function handleSaveEdit({ role, name, email, jobTitle, contact, mall, isPrimary }) {
     const now = formatDate(new Date())
     if (selectedAccount.mall !== undefined) {
@@ -583,31 +637,35 @@ export default function AccountManagement() {
       <div className="acct-mgmt-table-wrap">
         <div className="acct-mgmt-table-scroll">
           <table className="acct-mgmt-table">
-            <thead><tr><th>ACCOUNT</th><th>MALL</th><th>EMAIL</th><th>JOB TITLE</th><th>CONTACT</th><th>CREATED</th><th>LAST UPDATED</th><th>LAST LOGIN</th><th>IS PRIMARY</th><th>ACTIONS</th></tr></thead>
+            <thead><tr><th>ACCOUNT</th><th>MALL</th><th>EMAIL</th><th>JOB TITLE</th><th>CONTACT</th><th>CREATED</th><th>LAST UPDATED</th><th>LAST LOGIN</th><th>IS PRIMARY</th><th>ACCOUNT STATUS</th><th>ACTIONS</th></tr></thead>
             <tbody>
-              {mallList.length === 0 && <tr className="acct-empty-row"><td colSpan={10}>No accounts found.</td></tr>}
-              {mallList.map(a => (
-                <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
-                  <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Temp PW</span>}</div></td>
-                  <td>{a.mall}</td>
-                  <td>{a.email}</td>
-                  <td>{a.jobTitle || '-'}</td>
-                  <td>{a.contact}</td>
-                  <td>{a.created}</td>
-                  <td>{a.lastUpdated}</td>
-                  <td>{a.lastLogin}</td>
-                  <td><span className={`acct-primary-badge acct-primary-badge--${a.isPrimary ? 'yes' : 'no'}`}>{a.isPrimary ? 'Yes' : 'No'}</span></td>
-                  <td>
-                    <div className="acct-actions">
-                      <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
-                      {a.status === 'pending'
-                        ? <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend Link</button>
-                        : <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset PW</button>}
-                      <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {mallList.length === 0 && <tr className="acct-empty-row"><td colSpan={11}>No accounts found.</td></tr>}
+              {mallList.map(a => {
+                const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
+                return (
+                  <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
+                    <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Temp PW</span>}</div></td>
+                    <td>{a.mall}</td>
+                    <td>{a.email}</td>
+                    <td>{a.jobTitle || '-'}</td>
+                    <td>{a.contact}</td>
+                    <td>{a.created}</td>
+                    <td>{a.lastUpdated}</td>
+                    <td>{a.lastLogin}</td>
+                    <td><span className={`acct-primary-badge acct-primary-badge--${a.isPrimary ? 'yes' : 'no'}`}>{a.isPrimary ? 'Yes' : 'No'}</span></td>
+                    <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
+                    <td>
+                      <div className="acct-actions">
+                        <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
+                        {a.status === 'pending'
+                          ? <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend Link</button>
+                          : <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset PW</button>}
+                        <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -644,23 +702,27 @@ export default function AccountManagement() {
       <div className="acct-mgmt-table-wrap">
         <div className="acct-mgmt-table-scroll">
           <table className="acct-mgmt-table">
-            <thead><tr><th>ACCOUNT</th><th>MALL</th><th>EMAIL</th><th>JOB TITLE</th><th>CONTACT</th><th>CREATED</th><th>LAST UPDATED</th><th>LAST LOGIN</th><th>DEACTIVATED ON</th><th>ACTION</th></tr></thead>
+            <thead><tr><th>ACCOUNT</th><th>MALL</th><th>EMAIL</th><th>JOB TITLE</th><th>CONTACT</th><th>CREATED</th><th>LAST UPDATED</th><th>LAST LOGIN</th><th>DEACTIVATED ON</th><th>ACCOUNT STATUS</th><th>ACTION</th></tr></thead>
             <tbody>
-              {deactMallList.length === 0 && <tr className="acct-empty-row"><td colSpan={10}>No deactivated accounts.</td></tr>}
-              {deactMallList.map(a => (
-                <tr key={a.id}>
-                  <td><span className="acct-name-label">{a.name}</span></td>
-                  <td>{a.mall}</td>
-                  <td>{a.email}</td>
-                  <td>{a.jobTitle || '-'}</td>
-                  <td>{a.contact || '-'}</td>
-                  <td>{a.created}</td>
-                  <td>{a.lastUpdated}</td>
-                  <td>{a.lastLogin}</td>
-                  <td>{a.deactivatedOn}</td>
-                  <td><button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button></td>
-                </tr>
-              ))}
+              {deactMallList.length === 0 && <tr className="acct-empty-row"><td colSpan={11}>No deactivated accounts.</td></tr>}
+              {deactMallList.map(a => {
+                const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
+                return (
+                  <tr key={a.id}>
+                    <td><span className="acct-name-label">{a.name}</span></td>
+                    <td>{a.mall}</td>
+                    <td>{a.email}</td>
+                    <td>{a.jobTitle || '-'}</td>
+                    <td>{a.contact || '-'}</td>
+                    <td>{a.created}</td>
+                    <td>{a.lastUpdated}</td>
+                    <td>{a.lastLogin}</td>
+                    <td>{a.deactivatedOn}</td>
+                    <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
+                    <td><button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 // eslint-disable-next-line no-unused-vars
 import { Search, Plus, Pencil, ImageIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import AddMallModal from './AddMallModal'
 import AddBrandModal from './AddBrandModal'
 import UnitsPanel from './UnitsPanel'
 import MallInfoPanel from './MallInfoPanel'
-import StoresPanel from './StoresPanel'
 import BeaconManager from './BeaconManager'
 import InquiriesTab from './InquiriesTab'
 import BeaconTicketsTab from './BeaconTicketsTab'
@@ -383,7 +383,7 @@ function ActionButtons({ onEdit, onUnits, onStores, onBeacons }) {
   return (
     <div className="mall-action-row" onClick={e => e.stopPropagation()}>
       <button className="mall-action-btn mall-action-btn--units" onClick={stop(onUnits)}>Units</button>
-      <button className="mall-action-btn mall-action-btn--stores" onClick={stop(onStores)}>Stores</button>
+      <button className="mall-action-btn mall-action-btn--stores" onClick={stop(() => onStores())}>Stores</button>
       <button className="mall-action-btn mall-action-btn--beacons" onClick={stop(onBeacons)}>Beacons</button>
       <button className="mall-action-btn mall-action-btn--edit" onClick={stop(onEdit)}>Edit</button>
     </div>
@@ -402,6 +402,7 @@ let nextId = initialMalls.length + 1
 let nextBrandId = initialBrands.length + 1
 
 export default function MallsTable() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('Malls')
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
@@ -410,9 +411,12 @@ export default function MallsTable() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingMall, setEditingMall] = useState(null)
   const [unitsMall, setUnitsMall] = useState(null)
-  const [storesMall, setStoresMall] = useState(null)
   const [beaconsMall, setBeaconsMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
+
+  function handleStoresClick(mall) {
+    navigate(`/mall-management/stores/${mall.id}`)
+  }
 
   const [brands, setBrands] = useState(initialBrands)
   const [showBrandModal, setShowBrandModal] = useState(false)
@@ -489,17 +493,6 @@ export default function MallsTable() {
     setUnitsMall(null)
   }
 
-  function handleStoresSave(updatedStores) {
-    setMalls(prev =>
-      prev.map(m =>
-        m.id === storesMall.id
-          ? { ...m, stores: updatedStores, storesCount: updatedStores.filter(s => s.active).length }
-          : m
-      )
-    )
-    setStoresMall(null)
-  }
-
   function handleBeaconsSave(updatedBeacons) {
     setMalls(prev =>
       prev.map(m =>
@@ -552,17 +545,6 @@ export default function MallsTable() {
       mall.city.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesFilter && matchesSearch
   })
-
-  // Render Stores as full content replacement
-  if (storesMall) {
-    return (
-      <StoresPanel
-        mall={storesMall}
-        onClose={() => setStoresMall(null)}
-        onSave={handleStoresSave}
-      />
-    )
-  }
 
   // Render Beacons as full content replacement
   if (beaconsMall) {
@@ -787,7 +769,7 @@ export default function MallsTable() {
                           <ActionButtons
                             onEdit={() => setEditingMall(mall)}
                             onUnits={() => setUnitsMall(mall)}
-                            onStores={() => setStoresMall(mall)}
+                            onStores={() => handleStoresClick(mall)}
                             onBeacons={() => setBeaconsMall(mall)}
                           />
                         </td>

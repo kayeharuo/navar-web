@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { useEffect } from 'react'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const BRANDS = [
@@ -21,6 +22,14 @@ function BrandInitial({ name }) {
 }
 
 export default function SelectBrandModal({ mall, onSelect, onClose }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <>
       <div className="sbrand-overlay" onClick={onClose} />

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Plus, Search, TriangleAlert } from 'lucide-react'
 import AddBeaconModal from './AddBeaconModal'
 
 // Placeholder UUID — will be replaced by real value from backend
 const SYSTEM_UUID = 'F7826DA6-4FA2-4E98-8024-BC5B71E0893E'
 
-const STATUS_FILTERS = ['All', 'Placed', 'Faulty', 'Maintenance']
+const STATUS_FILTERS = ['All', 'Placed', 'Faulty']
 
 let nextBeaconId = 1000
 
@@ -20,12 +20,36 @@ function StatusBadge({ status }) {
 
 // ─── Faulty modal ──────────────────────────────────────────
 function FaultyModal({ onCancel, onConfirm }) {
+  const [issue, setIssue] = useState('')
+  const [issueErr, setIssueErr] = useState('')
   const [note, setNote] = useState('')
   const [noteErr, setNoteErr] = useState('')
 
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
+
+  const issueOptions = [
+    'No Signal / Not broadcasting',
+    'Battery dead',
+    'Weak / Inconsistent signal',
+    'Physical damage',
+    'Missing / Stolen',
+    'Calibration drift',
+    'Interference suspended',
+    'Other',
+  ]
+
   function handleConfirm() {
-    if (!note.trim()) { setNoteErr('Please enter the reason.'); return }
-    onConfirm(note.trim())
+    const errors = {}
+    if (!issue) { errors.issue = 'Please select an issue.' }
+    if (!note.trim()) { errors.note = 'Please enter notes.' }
+    if (Object.keys(errors).length) { setIssueErr(errors.issue || ''); setNoteErr(errors.note || ''); return }
+    onConfirm(issue, note.trim())
   }
 
   return (
@@ -39,14 +63,29 @@ function FaultyModal({ onCancel, onConfirm }) {
         </svg>
         <h3 className="bcn-modal-title">Set this Beacon Faulty?</h3>
         <p className="bcn-modal-desc">This beacon will not be recognized by NavAR until it's reactivated.</p>
-        <textarea
-          className={`bcn-modal-notes${noteErr ? ' bcn-modal-notes--error' : ''}`}
-          placeholder="Notes..."
-          value={note}
-          onChange={e => { setNote(e.target.value); setNoteErr('') }}
-          rows={5}
-        />
-        {noteErr && <p className="mall-field-error">{noteErr}</p>}
+        <div className="bcn-modal-field">
+          <label className="bcn-modal-label">ISSUE <span className="bcn-modal-label-required">*</span></label>
+          <select
+            className={`bcn-modal-select${issueErr ? ' bcn-modal-select--error' : ''}`}
+            value={issue}
+            onChange={e => { setIssue(e.target.value); setIssueErr('') }}
+          >
+            <option value="">-- Select an issue --</option>
+            {issueOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+          {issueErr && <p className="mall-field-error">{issueErr}</p>}
+        </div>
+        <div className="bcn-modal-field">
+          <label className="bcn-modal-label">NOTES <span className="bcn-modal-label-required">*</span></label>
+          <textarea
+            className={`bcn-modal-notes${noteErr ? ' bcn-modal-notes--error' : ''}`}
+            placeholder="Notes..."
+            value={note}
+            onChange={e => { setNote(e.target.value); setNoteErr('') }}
+            rows={5}
+          />
+          {noteErr && <p className="mall-field-error">{noteErr}</p>}
+        </div>
         <div className="bcn-modal-actions">
           <button className="bcn-modal-cancel" onClick={onCancel}>Cancel</button>
           <button className="bcn-modal-yes bcn-modal-yes--faulty" onClick={handleConfirm}>Yes</button>
@@ -56,30 +95,17 @@ function FaultyModal({ onCancel, onConfirm }) {
   )
 }
 
-// ─── Maintenance modal ─────────────────────────────────────
-function MaintenanceModal({ onCancel, onConfirm }) {
-  return (
-    <>
-      <div className="modal-overlay" />
-      <div className="bcn-status-modal" role="dialog">
-        <svg width="66" height="59" viewBox="0 0 66 59" fill="none" className="bcn-modal-icon">
-          <path d="M37.461 2.60086L65.1339 50.6535C67.0735 54.039 64.5676 58.2188 60.5745 58.2188H5.22873C1.23569 58.2188 -1.27025 54.039 0.669318 50.6535L28.3422 2.60086C30.3356-0.866953 35.4677-0.866953 37.461 2.60086Z" stroke="#FF9233" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M32.9023 35.4375V22.7812" stroke="#FF9233" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <circle cx="32.9023" cy="46.8281" r="3.797" fill="#FF9233"/>
-        </svg>
-        <h3 className="bcn-modal-title">Set this Beacon under Maintenance?</h3>
-        <p className="bcn-modal-desc">This beacon will undergo maintenance, and won't send signals in the Live AR.</p>
-        <div className="bcn-modal-actions">
-          <button className="bcn-modal-cancel" onClick={onCancel}>Cancel</button>
-          <button className="bcn-modal-yes bcn-modal-yes--maintenance" onClick={onConfirm}>Yes</button>
-        </div>
-      </div>
-    </>
-  )
-}
 
 // ─── Reactivate modal ──────────────────────────────────────
 function ReactivateModal({ onCancel, onConfirm }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
+
   return (
     <>
       <div className="modal-overlay" />
@@ -106,7 +132,6 @@ export default function BeaconManager({ mall, onClose, onSave }) {
   const [showAdd, setShowAdd]         = useState(false)
   const [editingBeacon, setEditing]   = useState(null)
   const [faultyTarget, setFaulty]     = useState(null)
-  const [maintTarget, setMaint]       = useState(null)
   const [reactTarget, setReact]       = useState(null)
 
   function handleAddSave(data) {
@@ -128,18 +153,11 @@ export default function BeaconManager({ mall, onClose, onSave }) {
     setEditing(null)
   }
 
-  function handleSetFaulty(note) {
+  function handleSetFaulty(issue, note) {
     setBeacons(prev => prev.map(b =>
-      b.id === faultyTarget.id ? { ...b, status: 'faulty', faultyNote: note } : b
+      b.id === faultyTarget.id ? { ...b, status: 'faulty', faultyIssue: issue, faultyNote: note } : b
     ))
     setFaulty(null)
-  }
-
-  function handleSetMaintenance() {
-    setBeacons(prev => prev.map(b =>
-      b.id === maintTarget.id ? { ...b, status: 'maintenance', faultyNote: '' } : b
-    ))
-    setMaint(null)
   }
 
   function handleReactivate() {
@@ -163,10 +181,9 @@ export default function BeaconManager({ mall, onClose, onSave }) {
   })
 
   const counts = {
-    all:         beacons.length,
-    placed:      beacons.filter(b => b.status === 'placed').length,
-    faulty:      beacons.filter(b => b.status === 'faulty').length,
-    maintenance: beacons.filter(b => b.status === 'maintenance').length,
+    all:    beacons.length,
+    placed: beacons.filter(b => b.status === 'placed').length,
+    faulty: beacons.filter(b => b.status === 'faulty').length,
   }
 
   return (
@@ -260,14 +277,9 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                     <td>
                       <div className="stores-action-row">
                         {b.status === 'placed' ? (
-                          <>
-                            <button className="stores-action-btn bcn-btn--faulty" onClick={() => setFaulty(b)}>
-                              Set Faulty
-                            </button>
-                            <button className="stores-action-btn bcn-btn--maintenance" onClick={() => setMaint(b)}>
-                              Maintenance
-                            </button>
-                          </>
+                          <button className="stores-action-btn bcn-btn--faulty" onClick={() => setFaulty(b)}>
+                            Faulty
+                          </button>
                         ) : (
                           <>
                             <button className="stores-action-btn bcn-btn--reactivate" onClick={() => setReact(b)}>
@@ -313,14 +325,6 @@ export default function BeaconManager({ mall, onClose, onSave }) {
         <FaultyModal
           onCancel={() => setFaulty(null)}
           onConfirm={handleSetFaulty}
-        />
-      )}
-
-      {/* Maintenance Modal */}
-      {maintTarget && (
-        <MaintenanceModal
-          onCancel={() => setMaint(null)}
-          onConfirm={handleSetMaintenance}
         />
       )}
 

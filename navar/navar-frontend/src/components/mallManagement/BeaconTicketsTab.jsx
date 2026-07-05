@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import '../../styles/mallManagement/beaconTickets.css'
 
-const STATUS_FILTERS = ['All', 'Faulty', 'Investigating', 'Resolved']
+const STATUS_FILTERS = ['All', 'Faulty', 'Investigating', 'Under Maintenance', 'Resolved']
 
 const initialTickets = [
   {
@@ -189,9 +189,10 @@ const initialTickets = [
 ]
 
 const STATUS_CONFIG = {
-  faulty:       { label: 'faulty',       color: '#EC5252', bg: '#FFF2F2', dotBg: '#FFF2F2', icon: '!' },
-  investigating:{ label: 'investigating', color: '#FF9233', bg: '#FFF8F1', dotBg: '#FFF8F1', icon: '!' },
-  resolved:     { label: 'resolved',      color: '#016630', bg: '#E1FFEC', dotBg: '#E1FFEC', icon: '✓' },
+  faulty:       { label: 'faulty',            color: '#EC5252', bg: '#FFF2F2', dotBg: '#FFF2F2', icon: '!' },
+  investigating:{ label: 'investigating',      color: '#FF9233', bg: '#FFF8F1', dotBg: '#FFF8F1', icon: '!' },
+  maintenance:  { label: 'under maintenance', color: '#5B5BFF', bg: '#F0F0FF', dotBg: '#F0F0FF', icon: '!' },
+  resolved:     { label: 'resolved',          color: '#016630', bg: '#E1FFEC', dotBg: '#E1FFEC', icon: '✓' },
 }
 
 const SOURCE_COLORS = {
@@ -267,7 +268,16 @@ function getTimelineStatus(action) {
 
 function TicketDetailPanel({ ticket, onClose, onAction }) {
   const canInvestigate = ticket.status === 'faulty' || ticket.status === 'resolved'
-  const canResolve = ticket.status === 'investigating' || ticket.status === 'faulty'
+  const canMaintenance = ticket.status === 'investigating'
+  const canResolve = ticket.status === 'investigating' || ticket.status === 'maintenance'
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   return (
     <div className="bkt-overlay" onClick={onClose}>
@@ -291,6 +301,20 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
             <span className="bkt-detail-label">FLOOR · LOCATION</span>
             <span className="bkt-detail-value">{ticket.floor} · {ticket.location}</span>
           </div>
+
+          {ticket.assignedTo && (
+            <div className="bkt-detail-section">
+              <span className="bkt-detail-label">ASSIGNED TO</span>
+              <span className="bkt-detail-value">{ticket.assignedTo}</span>
+            </div>
+          )}
+
+          {ticket.assignedBy && (
+            <div className="bkt-detail-section">
+              <span className="bkt-detail-label">ASSIGNED BY</span>
+              <span className="bkt-detail-value">{ticket.assignedBy}</span>
+            </div>
+          )}
 
           <div className="bkt-detail-divider" />
 
@@ -339,6 +363,14 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
               Mark as Investigating
             </button>
           )}
+          {canMaintenance && (
+            <button
+              className="bkt-action-btn bkt-action-btn--maintenance"
+              onClick={() => onAction('maintenance')}
+            >
+              Mark as Under Maintenance
+            </button>
+          )}
           {canResolve && (
             <button
               className="bkt-action-btn bkt-action-btn--resolve"
@@ -354,39 +386,84 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
 }
 
 function ActionModal({ type, onCancel, onConfirm }) {
+  const [assignedTo, setAssignedTo] = useState('')
+  const [assignedToErr, setAssignedToErr] = useState('')
   const [note, setNote] = useState('')
+  const [noteErr, setNoteErr] = useState('')
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
+
   const isReopen = type === 'investigating-reopen'
   const effectiveType = isReopen ? 'investigating' : type
+  const teamMembers = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams']
 
   const title = isReopen
     ? 'Reopen ticket as investigating?'
     : effectiveType === 'investigating'
     ? 'Mark ticket as investigating?'
+    : effectiveType === 'maintenance'
+    ? 'Mark ticket as under maintenance?'
     : 'Mark ticket as resolved?'
 
+  const showAssignmentFields = effectiveType === 'investigating'
   const placeholder = isReopen
     ? 'Notes... — Why are you reopening this ticket?'
     : effectiveType === 'investigating'
     ? 'Notes... — What are you investigating?'
+    : effectiveType === 'maintenance'
+    ? 'Notes... — Maintenance details...'
     : 'Notes... — What was done to resolve this?'
+
+  function handleConfirm() {
+    if (showAssignmentFields) {
+      if (!assignedTo) { setAssignedToErr('Please select who to assign.'); return }
+      setAssignedToErr('')
+    }
+    onConfirm(note.trim(), effectiveType, assignedTo)
+  }
 
   return (
     <div className="bkt-modal-overlay" onClick={onCancel}>
       <div className="bkt-modal" onClick={e => e.stopPropagation()}>
         <h3 className="bkt-modal-title">{title}</h3>
-        <textarea
-          className="bkt-modal-textarea"
-          placeholder={placeholder}
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          rows={5}
-          autoFocus
-        />
+        {showAssignmentFields && (
+          <>
+            <div className="bkt-modal-field">
+              <label className="bkt-modal-label">ASSIGN TO <span className="bkt-modal-label-required">*</span></label>
+              <select
+                className={`bkt-modal-select${assignedToErr ? ' bkt-modal-select--error' : ''}`}
+                value={assignedTo}
+                onChange={e => { setAssignedTo(e.target.value); setAssignedToErr('') }}
+              >
+                <option value="">-- Select team member --</option>
+                {teamMembers.map(member => <option key={member} value={member}>{member}</option>)}
+              </select>
+              {assignedToErr && <p className="bkt-modal-error">{assignedToErr}</p>}
+            </div>
+          </>
+        )}
+        <div className="bkt-modal-field">
+          <label className="bkt-modal-label">NOTES</label>
+          <textarea
+            className="bkt-modal-textarea"
+            placeholder={placeholder}
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={5}
+            autoFocus
+          />
+        </div>
         <div className="bkt-modal-actions">
           <button className="bkt-modal-cancel" onClick={onCancel}>Cancel</button>
           <button
             className="bkt-modal-confirm"
-            onClick={() => onConfirm(note.trim(), effectiveType)}
+            onClick={handleConfirm}
           >
             Yes
           </button>
@@ -419,6 +496,7 @@ export default function BeaconTicketsTab() {
   const counts = {
     faulty: tickets.filter(t => t.status === 'faulty').length,
     investigating: tickets.filter(t => t.status === 'investigating').length,
+    maintenance: tickets.filter(t => t.status === 'maintenance').length,
     resolved: tickets.filter(t => t.status === 'resolved').length,
     total: tickets.length,
   }
@@ -429,7 +507,7 @@ export default function BeaconTicketsTab() {
     setActionModal(isReopen ? 'investigating-reopen' : type)
   }
 
-  function handleConfirmAction(note, effectiveType) {
+  function handleConfirmAction(note, effectiveType, assignedTo) {
     if (!selectedTicket) return
     const now = new Date()
     const dateStr = now.toLocaleString('en-US', {
@@ -443,6 +521,8 @@ export default function BeaconTicketsTab() {
       ? 'Reopened — Marked as investigating'
       : effectiveType === 'investigating'
       ? 'Marked as investigating'
+      : effectiveType === 'maintenance'
+      ? 'Marked as under maintenance'
       : 'Marked as resolved'
 
     const newEntry = {
@@ -454,10 +534,20 @@ export default function BeaconTicketsTab() {
       note: note || null,
     }
 
+    const updatedTicket = {
+      ...selectedTicket,
+      status: effectiveType,
+      timeline: [...selectedTicket.timeline, newEntry],
+      timeAgo: 'just now',
+    }
+
+    if (effectiveType === 'investigating' && assignedTo) {
+      updatedTicket.assignedTo = assignedTo
+      updatedTicket.assignedBy = 'NavAR Admin'
+    }
+
     setTickets(prev => prev.map(t =>
-      t.id === selectedTicket.id
-        ? { ...t, status: effectiveType, timeline: [...t.timeline, newEntry], timeAgo: 'just now' }
-        : t
+      t.id === selectedTicket.id ? updatedTicket : t
     ))
     setActionModal(null)
   }
@@ -475,6 +565,10 @@ export default function BeaconTicketsTab() {
         <div className="bkt-stat-card">
           <span className="bkt-stat-num bkt-stat-num--investigating">{counts.investigating}</span>
           <span className="bkt-stat-label">Investigating</span>
+        </div>
+        <div className="bkt-stat-card">
+          <span className="bkt-stat-num bkt-stat-num--maintenance">{counts.maintenance}</span>
+          <span className="bkt-stat-label">Under Maintenance</span>
         </div>
         <div className="bkt-stat-card">
           <span className="bkt-stat-num bkt-stat-num--resolved">{counts.resolved}</span>

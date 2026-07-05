@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Plus } from 'lucide-react'
 
 let nextUnitId = 1000
@@ -21,7 +21,7 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
       return
     }
     const duplicate = units.find(
-      u => u.floorNo === addFloor && u.unitNo.trim().toLowerCase() === addUnitNo.trim().toLowerCase()
+      u => u.floorNo === addFloor && u.unitNo.trim().toLowerCase() === addUnitNo.trim().toLowerCase() && u.isActive !== false
     )
     if (duplicate) {
       setAddError('This unit number already exists on that floor.')
@@ -30,7 +30,7 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
     setAddError('')
     setUnits(prev => [
       ...prev,
-      { id: nextUnitId++, floorNo: addFloor, unitNo: addUnitNo.trim(), status: 'vacant' },
+      { id: nextUnitId++, floorNo: addFloor, unitNo: addUnitNo.trim(), status: 'vacant', isActive: true },
     ])
     setAddUnitNo('')
   }
@@ -45,8 +45,20 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
     )
   }
 
-  function handleRemove(unitId) {
-    setUnits(prev => prev.filter(u => u.id !== unitId))
+  function handleDeactivate(unitId) {
+    setUnits(prev =>
+      prev.map(u =>
+        u.id === unitId ? { ...u, isActive: false } : u
+      )
+    )
+  }
+
+  function handleReactivate(unitId) {
+    setUnits(prev =>
+      prev.map(u =>
+        u.id === unitId ? { ...u, isActive: true } : u
+      )
+    )
   }
 
   function handleSave() {
@@ -56,6 +68,14 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
   function handleKeyDown(e) {
     if (e.key === 'Enter') handleAddUnit()
   }
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   return (
     <>
@@ -91,17 +111,26 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
                   ) : (
                     <ul className="units-list">
                       {floorUnits.map(unit => (
-                        <li key={unit.id} className="units-card">
+                        <li key={unit.id} className={`units-card${unit.isActive === false ? ' units-card--inactive' : ''}`}>
                           <span className="units-card-number">{unit.unitNo}</span>
 
-                          {unit.status === 'occupied' ? (
+                          {unit.isActive === false ? (
+                            <span className="units-badge units-badge--inactive">DEACTIVATED</span>
+                          ) : unit.status === 'occupied' ? (
                             <span className="units-badge units-badge--occupied">OCCUPIED</span>
                           ) : (
                             <span className="units-badge units-badge--vacant">VACANT</span>
                           )}
 
                           <div className="units-card-actions">
-                            {unit.status === 'occupied' ? (
+                            {unit.isActive === false ? (
+                              <button
+                                className="units-action-btn units-action-btn--reactivate"
+                                onClick={() => handleReactivate(unit.id)}
+                              >
+                                Reactivate
+                              </button>
+                            ) : unit.status === 'occupied' ? (
                               <button
                                 className="units-action-btn units-action-btn--mark-vacant"
                                 onClick={() => handleToggleStatus(unit.id)}
@@ -117,10 +146,10 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
                                   Mark Occupied
                                 </button>
                                 <button
-                                  className="units-action-btn units-action-btn--remove"
-                                  onClick={() => handleRemove(unit.id)}
+                                  className="units-action-btn units-action-btn--deactivate"
+                                  onClick={() => handleDeactivate(unit.id)}
                                 >
-                                  Remove
+                                  Deactivate
                                 </button>
                               </>
                             )}

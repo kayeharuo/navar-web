@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
 import AddStoreModal from './AddStoreModal'
@@ -21,6 +21,15 @@ let nextStoreId = 500
 
 function ConfirmModal({ type, onCancel, onConfirm }) {
   const isDe = type === 'deactivate'
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
+
   return (
     <>
       <div className="confirm-modal-overlay" />
@@ -60,6 +69,7 @@ function getFloorLabel(unitNos, mall) {
 
 export default function StoresPanel({ mall, onClose, onSave }) {
   const [stores, setStores] = useState(mall.stores ? [...mall.stores] : [])
+  const [mallState, setMallState] = useState(mall)
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [searchQuery, setSearchQuery]       = useState('')
 
@@ -69,6 +79,16 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   const [editingStore, setEditingStore]       = useState(null)
   const [deactivating, setDeactivating]       = useState(null)
   const [reactivating, setReactivating]       = useState(null)
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape' && !showSelectBrand && !showAddStore && !deactivating && !reactivating) {
+        handleClose()
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [showSelectBrand, showAddStore, deactivating, reactivating])
 
   function handleAddStoreClick() { setShowSelectBrand(true) }
 
@@ -90,7 +110,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       id:            nextStoreId++,
       storeName:     data.storeName,
       unitNos:       data.unitNos || [],
-      floorLabel:    getFloorLabel(data.unitNos, mall),
+      floorLabel:    getFloorLabel(data.unitNos, mallState),
       brand:         data.brand,
       brandLogo:     data.brandLogo || null,
       category:      data.category,
@@ -109,12 +129,16 @@ export default function StoresPanel({ mall, onClose, onSave }) {
 
   function handleEditSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    const oldUnitNos = editingStore?.unitNos || []
+    const newUnitNos = data.unitNos || []
+
+    // Update stores
     setStores(prev => prev.map(s =>
       s.id === editingStore.id ? {
         ...s,
         storeName:     data.storeName,
-        unitNos:       data.unitNos || [],
-        floorLabel:    getFloorLabel(data.unitNos, mall),
+        unitNos:       newUnitNos,
+        floorLabel:    getFloorLabel(newUnitNos, mallState),
         brand:         data.brand,
         brandLogo:     data.brandLogo || null,
         category:      data.category,
@@ -126,6 +150,21 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         lastUpdated:   now,
       } : s
     ))
+
+    // Update unit statuses immediately so pencil button shows correct statuses
+    if (mallState.units) {
+      const updatedUnits = mallState.units.map(u => {
+        if (oldUnitNos.includes(u.unitNo) && !newUnitNos.includes(u.unitNo)) {
+          return { ...u, status: 'vacant' }
+        }
+        if (newUnitNos.includes(u.unitNo) && !oldUnitNos.includes(u.unitNo)) {
+          return { ...u, status: 'occupied' }
+        }
+        return u
+      })
+      setMallState(prev => ({ ...prev, units: updatedUnits }))
+    }
+
     setEditingStore(null)
   }
 
@@ -146,7 +185,24 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   }
 
   function handleClose() {
-    onSave(stores)
+    // Update unit statuses based on current store assignments
+    let updatedUnits = [...(mallState.units || [])]
+
+    // First mark all as vacant
+    updatedUnits = updatedUnits.map(u => ({ ...u, status: 'vacant' }))
+
+    // Then mark assigned ones as occupied
+    stores.forEach(store => {
+      if (store.active && store.unitNos && store.unitNos.length > 0) {
+        store.unitNos.forEach(unitNo => {
+          updatedUnits = updatedUnits.map(u =>
+            u.unitNo === unitNo ? { ...u, status: 'occupied' } : u
+          )
+        })
+      }
+    })
+
+    onSave(stores, updatedUnits)
     onClose()
   }
 
@@ -296,7 +352,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       {/* Sub-modals (overlays on top of the page content) */}
       {showSelectBrand && (
         <SelectBrandModal
-          mall={mall}
+          mall={mallState}
           onSelect={handleBrandSelect}
           onClose={() => setShowSelectBrand(false)}
         />
@@ -305,7 +361,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       {showAddStore && (
         <AddStoreModal
           brand={selectedBrand}
-          mall={mall}
+          mall={mallState}
           onClose={() => { setShowAddStore(false); setSelectedBrand(null) }}
           onSave={handleAddSave}
           onChangeBrand={handleBrandChange}
@@ -315,7 +371,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       {editingStore && (
         <AddStoreModal
           brand={editingBrand}
-          mall={mall}
+          mall={mallState}
           initialData={editingStore}
           onClose={() => setEditingStore(null)}
           onSave={handleEditSave}

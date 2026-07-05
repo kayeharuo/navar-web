@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, ImageIcon } from 'lucide-react'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -48,7 +49,12 @@ function InfoRow({ label, value }) {
 }
 
 export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeacons, onEdit }) {
+  const navigate = useNavigate()
   const [showLogoLightbox, setShowLogoLightbox] = useState(false)
+
+  function handleStoresClick() {
+    navigate(`/mall-management/stores/${mall.id}`)
+  }
   const opHours = formatOperatingHours(mall.operatingHours)
   const cityProvince = [mall.city, mall.province].filter(Boolean).join(', ')
   const logoFileName = mall.logoFileName || (mall.logoUrl ? mall.logoUrl.split('/').pop().split('?')[0] || 'logo.png' : null)
@@ -135,7 +141,7 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeac
         {/* Footer action buttons */}
         <div className="mall-info-footer">
           <button className="mall-action-btn mall-action-btn--units" onClick={onUnits}>Units</button>
-          <button className="mall-action-btn mall-action-btn--stores" onClick={onStores}>Stores</button>
+          <button className="mall-action-btn mall-action-btn--stores" onClick={handleStoresClick}>Stores</button>
           <button className="mall-action-btn mall-action-btn--beacons" onClick={onBeacons}>Beacons</button>
           <button className="mall-action-btn mall-action-btn--edit" onClick={onEdit}>Edit</button>
         </div>

@@ -4,6 +4,7 @@ import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
+import StoresPage from './pages/StoresPage'
 import ApplicationManagement from './pages/ApplicationManagement'
 import ARDevelopment from './pages/ARDevelopment'
 import AccountManagement from './pages/AccountManagement'
@@ -136,6 +137,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/mall-management" element={<MallManagement />} />
+            <Route path="/mall-management/stores/:mallId" element={<StoresPage />} />
             <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} />} />
             <Route path="/ar-development" element={<ARDevelopment incomingProjects={arIncomingProjects} />} />
             <Route path="/account-management" element={<AccountManagement />} />
@@ -143,7 +145,7 @@ export default function App() {
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/subscription-management" element={<SubscriptionManagement />} />
-            {NAV_ITEMS.filter(item => !['/', '/mall-management', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs', '/system-settings', '/subscription-management'].includes(item.path)).map(item => (
+            {NAV_ITEMS.filter(item => !['/', '/mall-management', '/mall-management/stores/:mallId', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs', '/system-settings', '/subscription-management'].includes(item.path)).map(item => (
               <Route
                 key={item.path}
                 path={item.path}
