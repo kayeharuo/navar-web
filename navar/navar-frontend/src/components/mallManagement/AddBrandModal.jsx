@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, ImageIcon } from 'lucide-react'
 
 const BRAND_CATEGORIES = [
@@ -29,6 +29,14 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   const [logoPreview, setLogoPreview] = useState(initialData?.logo || null)
   const [errors, setErrors]           = useState({})
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   function setField(key, val) {
     setForm(f => ({ ...f, [key]: val }))

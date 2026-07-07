@@ -5,8 +5,10 @@ import TopBar from './components/layout/TopBar'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
 import StoresPage from './pages/StoresPage'
+import BeaconsPage from './pages/BeaconsPage'
 import ApplicationManagement from './pages/ApplicationManagement'
 import ARDevelopment from './pages/ARDevelopment'
+import Analytics from './pages/Analytics'
 import AccountManagement from './pages/AccountManagement'
 import EmailLogs from './pages/EmailLogs'
 import AuditLogs from './pages/AuditLogs'
@@ -138,8 +140,10 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/mall-management" element={<MallManagement />} />
             <Route path="/mall-management/stores/:mallId" element={<StoresPage />} />
+            <Route path="/mall-management/beacons/:mallId" element={<BeaconsPage />} />
             <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} />} />
             <Route path="/ar-development" element={<ARDevelopment incomingProjects={arIncomingProjects} />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/account-management" element={<AccountManagement />} />
             <Route path="/email-logs" element={<EmailLogs />} />
             <Route path="/audit-logs" element={<AuditLogs />} />

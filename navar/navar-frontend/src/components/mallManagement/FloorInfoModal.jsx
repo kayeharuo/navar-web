@@ -16,6 +16,14 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
 
   const [errors, setErrors] = useState([])
 
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   function handleChange(index, field, value) {
     setDetails(prev => prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)))
     setErrors(prev => prev.filter(e => !(e.index === index && e.field === field)))

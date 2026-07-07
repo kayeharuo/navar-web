@@ -12,6 +12,7 @@ const initialTickets = [
     floor: 'Floor 2',
     location: 'Near Food Court entrance',
     status: 'faulty',
+    reason: 'Signal Drop',
     timeAgo: '2h ago',
     timeline: [
       {
@@ -31,7 +32,10 @@ const initialTickets = [
     floor: 'Floor 2',
     location: 'Near entrance elevator',
     status: 'investigating',
+    reason: 'Hardware Malfunction',
     timeAgo: '1d ago',
+    assignedTo: 'John Doe',
+    assignedBy: 'NavAR Admin',
     timeline: [
       {
         id: 1,
@@ -58,7 +62,10 @@ const initialTickets = [
     floor: 'Floor 1',
     location: 'Main lobby pillar',
     status: 'resolved',
+    reason: 'Battery Drain',
     timeAgo: '3d ago',
+    assignedTo: 'Sarah Williams',
+    assignedBy: 'NavAR Admin',
     timeline: [
       {
         id: 1,
@@ -93,7 +100,10 @@ const initialTickets = [
     floor: 'Ground Floor',
     location: 'Zara Entrance',
     status: 'investigating',
+    reason: 'Signal Interference',
     timeAgo: '4h ago',
+    assignedTo: 'Jane Smith',
+    assignedBy: 'NavAR Admin',
     timeline: [
       {
         id: 1,
@@ -120,6 +130,7 @@ const initialTickets = [
     floor: 'Ground Floor',
     location: 'Food court area',
     status: 'faulty',
+    reason: 'No Signal Response',
     timeAgo: '6h ago',
     timeline: [
       {
@@ -139,7 +150,10 @@ const initialTickets = [
     floor: 'Floor 3',
     location: 'Near Cinemas',
     status: 'investigating',
+    reason: 'Physical Placement Issue',
     timeAgo: '2d ago',
+    assignedTo: 'Mike Johnson',
+    assignedBy: 'NavAR Admin',
     timeline: [
       {
         id: 1,
@@ -166,7 +180,10 @@ const initialTickets = [
     floor: '2nd Floor',
     location: 'Starbucks Entrance',
     status: 'resolved',
+    reason: 'Network Connectivity',
     timeAgo: '5d ago',
+    assignedTo: 'John Doe',
+    assignedBy: 'NavAR Admin',
     timeline: [
       {
         id: 1,
@@ -301,6 +318,12 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
             <span className="bkt-detail-label">FLOOR · LOCATION</span>
             <span className="bkt-detail-value">{ticket.floor} · {ticket.location}</span>
           </div>
+          {ticket.reason && (
+            <div className="bkt-detail-section">
+              <span className="bkt-detail-label">REASON</span>
+              <span className="bkt-detail-value">{ticket.reason}</span>
+            </div>
+          )}
 
           {ticket.assignedTo && (
             <div className="bkt-detail-section">
@@ -444,6 +467,7 @@ function ActionModal({ type, onCancel, onConfirm }) {
                 <option value="">-- Select team member --</option>
                 {teamMembers.map(member => <option key={member} value={member}>{member}</option>)}
               </select>
+              {assignedToErr && <p className="bkt-modal-error">{assignedToErr}</p>}
               {assignedToErr && <p className="bkt-modal-error">{assignedToErr}</p>}
             </div>
           </>

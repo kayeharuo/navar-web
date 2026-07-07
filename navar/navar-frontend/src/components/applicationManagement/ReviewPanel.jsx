@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SubmissionTab from './SubmissionTab'
 import ThreadTab from './ThreadTab'
 import RequestRevisionModal from './RequestRevisionModal'
 import ApproveModal from './ApproveModal'
 import Stepper from './Stepper'
 
-export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove, onSendNote }) {
+export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove, onSendNote, isStallApplication = false }) {
   const [activeTab, setActiveTab] = useState('submission')
   const [showRevisionModal, setShowRevisionModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   function handleRevisionSubmit(notes) {
     setShowRevisionModal(false)
@@ -17,6 +25,35 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
   }
 
   function handleApproveConfirm() {
+    if (isStallApplication) {
+      // Check if all stalls have been added to store list
+      const allStallsAdded = app.stalls && app.stalls.every(stall => stall.status === 'added_to_store_list')
+      if (!allStallsAdded) {
+        alert('Please add all stalls to the store list before approving.')
+        return
+      }
+
+      // Check wallet sufficiency
+      const SUBSCRIPTION_TIERS = {
+        'Basic': { maxTenants: 50 },
+        'Standard': { maxTenants: 100 },
+        'Premium': { maxTenants: 200 },
+      }
+      const STALL_PRICE = 3500
+      const tier = SUBSCRIPTION_TIERS[app.tier]
+      if (tier) {
+        const totalAfter = app.currentStores + app.submittedStalls
+        const exceedsBy = Math.max(0, totalAfter - tier.maxTenants)
+        const cost = exceedsBy * STALL_PRICE
+
+        // In a real app, check wallet balance from database
+        // For now, we'll just note this in the approval
+        if (cost > 0) {
+          alert(`Additional cost: ₱${cost.toLocaleString('en-US')} for ${exceedsBy} extra stalls. Ensure wallet has sufficient balance.`)
+        }
+      }
+    }
+
     setShowApproveModal(false)
     onApprove(app.id)
   }
@@ -69,7 +106,7 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
 
           <div className="review-panel-body">
             {activeTab === 'submission'
-              ? <SubmissionTab app={app} />
+              ? <SubmissionTab app={app} isStallApplication={isStallApplication} />
               : <ThreadTab app={app} onSendNote={(note) => onSendNote(app.id, note)} />
             }
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function formatPeso(amount) {
   return `₱${amount.toLocaleString('en-US')}.00`
@@ -31,6 +31,14 @@ export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm }) {
   const [reason, setReason] = useState('Non-Payment')
   const [notes, setNotes] = useState('')
   const [penalty, setPenalty] = useState('')
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
 
   const requiresNotes = reason === 'Breach of Contract' || reason === 'Other'
   const requiresPenalty = reason === 'Breach of Contract'

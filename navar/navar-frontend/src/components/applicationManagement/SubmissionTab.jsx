@@ -7,7 +7,132 @@ function FileIcon() {
   )
 }
 
-export default function SubmissionTab({ app }) {
+export default function SubmissionTab({ app, isStallApplication = false }) {
+  const SUBSCRIPTION_TIERS = {
+    'Basic': { maxTenants: 50 },
+    'Standard': { maxTenants: 100 },
+    'Premium': { maxTenants: 200 },
+  }
+  const STALL_PRICE = 3500
+
+  const checkAllStallsAdded = () => {
+    if (!app.stalls) return false
+    return app.stalls.every(stall => stall.status === 'added_to_store_list')
+  }
+
+  if (isStallApplication) {
+    const tier = SUBSCRIPTION_TIERS[app.tier]
+    const totalAfter = app.currentStores + app.submittedStalls
+    const exceedsBy = Math.max(0, totalAfter - (tier?.maxTenants || 0))
+    const cost = exceedsBy * STALL_PRICE
+    const allAdded = checkAllStallsAdded()
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Stall Application Details */}
+        <div className="review-section-header">
+          <div className="review-section-accent accent--green" />
+          <span className="review-section-title">Stall Application Details</span>
+        </div>
+        <div className="review-info-table">
+          <div className="review-info-row">
+            <span className="review-info-label">Subscription Tier</span>
+            <span className="review-info-value">{app.tier}</span>
+          </div>
+          <div className="review-info-row">
+            <span className="review-info-label">Max Tenants (Subscription)</span>
+            <span className="review-info-value">{tier?.maxTenants || '—'}</span>
+          </div>
+          <div className="review-info-row">
+            <span className="review-info-label">Current Stores</span>
+            <span className="review-info-value">{app.currentStores}</span>
+          </div>
+          <div className="review-info-row">
+            <span className="review-info-label">Submitted New Stalls</span>
+            <span className="review-info-value">{app.submittedStalls}</span>
+          </div>
+          <div className="review-info-row">
+            <span className="review-info-label">Total After Approval</span>
+            <span className="review-info-value" style={{ fontWeight: '700', color: '#000' }}>{totalAfter}</span>
+          </div>
+          {exceedsBy > 0 && (
+            <>
+              <div className="review-info-row">
+                <span className="review-info-label">Exceeds Limit By</span>
+                <span className="review-info-value" style={{ color: '#EA580C', fontWeight: '700' }}>{exceedsBy} stalls</span>
+              </div>
+              <div className="review-info-row">
+                <span className="review-info-label">Cost (₱{STALL_PRICE}/stall)</span>
+                <span className="review-info-value" style={{ color: '#EA580C', fontWeight: '700' }}>₱{cost.toLocaleString('en-US')}</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {!allAdded && (
+          <div className="review-callout review-callout--red" style={{ background: '#FFF2F2', borderColor: '#EC5252', color: '#EC5252', marginTop: '12px' }}>
+            ⚠️ {app.mallName} hasn't added the new stalls yet. Request revision to have them add the stalls to the store list first.
+          </div>
+        )}
+
+        {/* Floor Plans */}
+        <div className="review-section-header" style={{ marginTop: '16px' }}>
+          <div className="review-section-accent accent--grey" />
+          <span className="review-section-title">Floor Plans</span>
+        </div>
+        {app.floorPlans.length === 0 ? (
+          <p style={{ color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>No floor plans uploaded yet.</p>
+        ) : (
+          <div className="review-floor-plans">
+            {app.floorPlans.map((fp, i) => (
+              <div key={i} className="review-floor-card">
+                <div className="review-floor-card-icon"><FileIcon /></div>
+                <div className="review-floor-card-info">
+                  <div className="review-floor-card-name">{fp.floor}</div>
+                  <div className="review-floor-card-file">{fp.filename} · {fp.size}</div>
+                </div>
+                <button className="review-download-btn">Download</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Submitted Stalls */}
+        <div className="review-section-header" style={{ marginTop: '16px' }}>
+          <div className="review-section-accent accent--blue" />
+          <span className="review-section-title">Submitted Stalls ({app.submittedStalls})</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {app.stalls?.map((stall) => (
+            <div key={stall.id} style={{
+              padding: '12px',
+              border: '0.5px solid #E2E8F0',
+              borderRadius: '5px',
+              background: stall.status === 'added_to_store_list' ? '#E1FFEC' : '#fff',
+            }}>
+              <div style={{ fontWeight: '700', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{stall.stallNumber}</span>
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  background: stall.status === 'added_to_store_list' ? '#016630' : '#FF9233',
+                  color: '#fff',
+                  fontWeight: '500',
+                }}>
+                  {stall.status === 'added_to_store_list' ? '✓ Added' : 'Pending'}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#9B9C9C', marginBottom: '4px' }}>Floor: {stall.floor}</div>
+              <div style={{ fontSize: '12px', color: '#4E4E4E', lineHeight: '1.4' }}>{stall.description}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Original new application view
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Mall Profile */}

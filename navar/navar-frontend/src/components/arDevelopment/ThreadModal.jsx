@@ -1,7 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function ThreadModal({ project, onClose, onSendNote, onPublish }) {
   const [note, setNote] = useState('')
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   const isApproved = project.thread && project.thread.some(msg => msg.sender === 'mall')
 
@@ -22,7 +30,7 @@ export default function ThreadModal({ project, onClose, onSendNote, onPublish })
             <h3 className="ar-thread-title">{project.mallName}</h3>
             <p className="ar-thread-subtitle">Mall Admin Confirmation</p>
           </div>
-          <button className="ar-thread-close" onClick={onClose}>×</button>
+          <button className="ar-thread-close" onClick={onClose}>X</button>
         </div>
 
         {/* Approval banner */}

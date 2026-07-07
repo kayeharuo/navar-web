@@ -147,6 +147,7 @@ export default function AddStoreModal({
 
   const [form, setForm] = useState({
     storeName:     initialData?.storeName     || '',
+    storeType:     initialData?.storeType     || 'store', // 'store' or 'stall'
     numUnits:      initialData?.unitNos?.length ? String(initialData.unitNos.length) : '',
     contactPerson: initialData?.contactPerson || '',
     contactNo:     initialData?.contactNo     || '',
@@ -226,7 +227,8 @@ export default function AddStoreModal({
   function validate() {
     const errs = {}
     if (!form.storeName.trim()) errs.storeName = 'Store name is required.'
-    if (form.numUnits === '' || parseInt(form.numUnits) < 0) errs.numUnits = 'Enter a valid number of units (0 or more).'
+    // Only validate units for store type
+    if (form.storeType === 'store' && (form.numUnits === '' || parseInt(form.numUnits) < 0)) errs.numUnits = 'Enter a valid number of units (0 or more).'
     if (!form.status) errs.status = 'Status is required.'
     if (isOthers && !form.category) errs.category = 'Category is required.'
     if (isOthers && !logo && !logoPreview) errs.logo = 'Logo is required for unlisted brands.'
@@ -238,7 +240,8 @@ export default function AddStoreModal({
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     onSave({
       storeName:     form.storeName.trim(),
-      unitNos,
+      storeType:     form.storeType,
+      unitNos:       form.storeType === 'stall' ? [] : unitNos,
       contactPerson: form.contactPerson.trim(),
       contactNo:     form.contactNo.trim(),
       email:         form.email.trim(),
@@ -299,7 +302,21 @@ export default function AddStoreModal({
               {errors.storeName && <p className="mall-field-error">{errors.storeName}</p>}
             </div>
 
-            {/* No. of Units */}
+            {/* Store Type */}
+            <div className="mall-field-group">
+              <label className="mall-field-label">TYPE</label>
+              <select
+                className="mall-field-input"
+                value={form.storeType}
+                onChange={e => setField('storeType', e.target.value)}
+              >
+                <option value="store">Store</option>
+                <option value="stall">Stall</option>
+              </select>
+            </div>
+
+            {/* No. of Units - Only for Store type */}
+            {form.storeType === 'store' && (
             <div className="mall-field-group">
               <label className="mall-field-label">
                 NO. OF UNIT/S <span className="mall-field-required">*</span>
@@ -330,6 +347,7 @@ export default function AddStoreModal({
               )}
               {errors.numUnits && <p className="mall-field-error">{errors.numUnits}</p>}
             </div>
+            )}
 
             {/* Contact Person */}
             <div className="mall-field-group">

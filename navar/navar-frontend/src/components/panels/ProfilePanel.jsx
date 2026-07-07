@@ -50,6 +50,14 @@ export default function ProfilePanel({ onClose }) {
   const [pwErrors, setPwErrors] = useState({})
   const [pwSuccess, setPwSuccess] = useState(false)
 
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   function startEdit() {
     setDraft({ ...profile })
     setEditing(true)

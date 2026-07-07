@@ -43,6 +43,14 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     }
   }, [form.floors])
 
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   function setField(key, value) {
     setForm(f => ({ ...f, [key]: value }))
     if (errors[key]) setErrors(e => ({ ...e, [key]: undefined }))

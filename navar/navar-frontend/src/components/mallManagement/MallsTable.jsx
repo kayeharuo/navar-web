@@ -6,13 +6,13 @@ import AddMallModal from './AddMallModal'
 import AddBrandModal from './AddBrandModal'
 import UnitsPanel from './UnitsPanel'
 import MallInfoPanel from './MallInfoPanel'
-import BeaconManager from './BeaconManager'
 import InquiriesTab from './InquiriesTab'
 import BeaconTicketsTab from './BeaconTicketsTab'
+import GeneralTicketsTab from './GeneralTicketsTab'
 import '../../styles/mallManagement/mallModal.css'
 import '../../styles/mallManagement/inquiries.css'
 
-const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets']
+const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets', 'General Tickets']
 
 const STATUS_FILTERS = [
   { label: 'All',          count: 17 },
@@ -411,11 +411,14 @@ export default function MallsTable() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingMall, setEditingMall] = useState(null)
   const [unitsMall, setUnitsMall] = useState(null)
-  const [beaconsMall, setBeaconsMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
 
   function handleStoresClick(mall) {
     navigate(`/mall-management/stores/${mall.id}`)
+  }
+
+  function handleBeaconsClick(mall) {
+    navigate(`/mall-management/beacons/${mall.id}`)
   }
 
   const [brands, setBrands] = useState(initialBrands)
@@ -493,17 +496,6 @@ export default function MallsTable() {
     setUnitsMall(null)
   }
 
-  function handleBeaconsSave(updatedBeacons) {
-    setMalls(prev =>
-      prev.map(m =>
-        m.id === beaconsMall.id
-          ? { ...m, beacons: updatedBeacons, beaconCount: updatedBeacons.length }
-          : m
-      )
-    )
-    setBeaconsMall(null)
-  }
-
   function handleBrandAddSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     setBrands(prev => [...prev, { id: nextBrandId++, ...data, dateAdded: now, lastUpdated: now }])
@@ -528,12 +520,7 @@ export default function MallsTable() {
 
   function openStoresFromInfo(mall) {
     setViewMall(null)
-    setStoresMall(mall)
-  }
-
-  function openBeaconsFromInfo(mall) {
-    setViewMall(null)
-    setBeaconsMall(mall)
+    handleStoresClick(mall)
   }
 
   const filteredMalls = malls.filter(mall => {
@@ -546,17 +533,6 @@ export default function MallsTable() {
     return matchesFilter && matchesSearch
   })
 
-  // Render Beacons as full content replacement
-  if (beaconsMall) {
-    return (
-      <BeaconManager
-        mall={beaconsMall}
-        onClose={() => setBeaconsMall(null)}
-        onSave={handleBeaconsSave}
-      />
-    )
-  }
-
   return (
     <>
       <div className="mall-content">
@@ -568,6 +544,8 @@ export default function MallsTable() {
               <p className="mall-subtitle">Brands List</p>
             ) : activeTab === 'Beacon Tickets' ? (
               <p className="mall-subtitle">Manage Tickets Filed after a beacon is found to be faulty by the system or the mall administrators.</p>
+            ) : activeTab === 'General Tickets' ? (
+              <p className="mall-subtitle">Manage General Support Tickets from users and customers.</p>
             ) : (
               <p className="mall-subtitle">{malls.length} malls · Click any row to view full details</p>
             )}
@@ -770,7 +748,7 @@ export default function MallsTable() {
                             onEdit={() => setEditingMall(mall)}
                             onUnits={() => setUnitsMall(mall)}
                             onStores={() => handleStoresClick(mall)}
-                            onBeacons={() => setBeaconsMall(mall)}
+                            onBeacons={() => handleBeaconsClick(mall)}
                           />
                         </td>
                       </tr>
@@ -791,6 +769,11 @@ export default function MallsTable() {
         {/* Beacon Tickets tab */}
         {activeTab === 'Beacon Tickets' && (
           <BeaconTicketsTab />
+        )}
+
+        {/* General Tickets tab */}
+        {activeTab === 'General Tickets' && (
+          <GeneralTicketsTab />
         )}
       </div>
 
@@ -849,7 +832,7 @@ export default function MallsTable() {
           onClose={() => setViewMall(null)}
           onUnits={() => openUnitsFromInfo(viewMall)}
           onStores={() => openStoresFromInfo(viewMall)}
-          onBeacons={() => openBeaconsFromInfo(viewMall)}
+          onBeacons={() => { setViewMall(null); handleBeaconsClick(viewMall) }}
           onEdit={() => openEditFromInfo(viewMall)}
         />
       )}

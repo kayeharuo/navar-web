@@ -13,7 +13,7 @@ const TIER_GROUPS = [
     rows: [
       { key: 'maxCoverage', label: 'Max Coverage Area (GFA)', values: { basic: 'up to 15,000 sqm', standard: 'up to 50,000 sqm', premium: 'up to 150,000 sqm' } },
       { key: 'maxFloors', label: 'Max Floors', values: { basic: '2', standard: '4', premium: '6' } },
-      { key: 'tenantNodes', label: 'Included Tenant Nodes', sublabel: 'Stores + stalls combined', values: { basic: '75', standard: '260', premium: '650' } },
+      { key: 'tenantNodes', label: 'Included No. of Tennats', sublabel: 'Stores + stalls combined', values: { basic: '75', standard: '260', premium: '650' } },
       { key: 'beaconAllocation', label: 'Beacon Allocation (included)', values: { basic: '200', standard: '570', premium: '1,650' } },
     ],
   },
@@ -24,7 +24,7 @@ const TIER_GROUPS = [
       { key: 'onboardingFee', label: 'Onboarding & AR Dev Fee (₱)', sublabel: 'One-time implementation fee', values: { basic: '187500', standard: '594600', premium: '1585000' } },
       { key: 'gracePeriod', label: 'Grace Period (days)', sublabel: 'After contract expiry before suspension', values: { basic: '15', standard: '30', premium: '45' } },
       { key: 'reinstatementRate', label: 'Reinstatement Fee (%)', sublabel: 'Added on top of annual fee to lift non-payment suspension', values: { basic: '20', standard: '15', premium: '10' } },
-      { key: 'stallFee', label: 'Additional Stall Fee (₱/stall)', sublabel: 'Charged beyond the included tenant node pool', values: { basic: '3500', standard: '3500', premium: '3500' } },
+      { key: 'stallFee', label: 'Additional Stall Fee (₱/stall)', sublabel: 'Charged beyond the included tenant pool', values: { basic: '3500', standard: '3500', premium: '3500' } },
     ],
   },
   {
@@ -40,7 +40,7 @@ const TIER_GROUPS = [
     title: 'Maintenance & Hardware',
     rows: [
       { key: 'remoteResponse', label: 'Maintenance — Remote Response', values: { basic: 'Within 5 business days', standard: 'Within 2 business days', premium: 'Next business day' } },
-      { key: 'onsiteDispatch', label: 'Maintenance — On-site Dispatch', sublabel: 'Cebu City + rest of Visayas', values: { basic: 'Within 6 business days', standard: 'Within 4 business days', premium: 'Within 48 hrs' } },
+      { key: 'onsiteDispatch', label: 'Maintenance — On-site Dispatch', values: { basic: 'Within 6 business days', standard: 'Within 4 business days', premium: 'Within 48 hrs' } },
       { key: 'diagnosisReplacement', label: 'Diagnosis, Replacement & Recalibration', values: { basic: 'Yes', standard: 'Yes', premium: 'Yes' } },
       { key: 'replacementCost', label: 'Replacement Unit Cost', values: { basic: 'Mall pays cost price', standard: 'Included, no charge', premium: 'Included, no charge' } },
       { key: 'spareUnits', label: 'Spare Units On-Site', values: { basic: 'No', standard: 'No', premium: 'Yes — pre-stocked' } },

@@ -1,8 +1,18 @@
+import { useEffect } from 'react'
+
 function formatPeso(amount) {
   return `₱${amount.toLocaleString('en-US')}.00`
 }
 
 export default function LiftSuspensionModal({ mall, tierInfo, onCancel, onConfirm }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
+
   const reason = mall.suspension?.reason
   const isOperational = reason === 'Operational'
   const penalty = mall.suspension?.penalty || 0

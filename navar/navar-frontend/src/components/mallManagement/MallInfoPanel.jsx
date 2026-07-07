@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ImageIcon } from 'lucide-react'
 
@@ -51,6 +51,14 @@ function InfoRow({ label, value }) {
 export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeacons, onEdit }) {
   const navigate = useNavigate()
   const [showLogoLightbox, setShowLogoLightbox] = useState(false)
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   function handleStoresClick() {
     navigate(`/mall-management/stores/${mall.id}`)

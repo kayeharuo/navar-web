@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import '../styles/emailLogs/emailLogs.css'
 
 const INIT_LOGS = [
@@ -140,6 +140,14 @@ function SearchIcon() {
 
 function DetailModal({ log, onResend, onClose }) {
   const [resent, setResent] = useState(false)
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   function handleResend() {
     onResend(log.id)

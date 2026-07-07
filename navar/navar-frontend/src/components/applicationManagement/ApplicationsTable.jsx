@@ -222,16 +222,14 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
 
   return (
     <>
-      {/* Header */}
-      <div className="app-mgmt-header">
-        <h1 className="app-mgmt-title">Application Management</h1>
-        <p className="app-mgmt-subtitle">
-          Review mall submissions before AR development begins.{' '}
-          {pendingCount > 0 && (
+      {/* Pending count message */}
+      {pendingCount > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <p className="app-mgmt-subtitle" style={{ margin: 0 }}>
             <span className="app-mgmt-subtitle-alert">{pendingCount} submissions awaiting review.</span>
-          )}
-        </p>
-      </div>
+          </p>
+        </div>
+      )}
 
       {/* Flow diagrams */}
       <FlowDiagrams />

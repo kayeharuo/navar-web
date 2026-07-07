@@ -1,4 +1,5 @@
 import { X, AlertTriangle } from 'lucide-react'
+import { useEffect } from 'react'
 
 function formatPeso(amount) {
   return `₱${amount.toLocaleString('en-US')}.00`
@@ -29,6 +30,14 @@ function SectionHeader({ title }) {
 
 export default function SubscriptionInfoPanel({ mall, tierInfo, onClose, onSuspend, onLift }) {
   const reason = mall.suspension?.reason
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   return (
     <>

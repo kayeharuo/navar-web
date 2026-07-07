@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import '../styles/auditLogs/auditLogs.css'
 
 const MODULE_COLORS = {
@@ -119,6 +119,14 @@ function ModuleBadge({ module }) {
 }
 
 function DetailModal({ log, onClose }) {
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="audit-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="audit-detail-modal">

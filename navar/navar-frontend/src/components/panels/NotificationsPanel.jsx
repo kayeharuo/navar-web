@@ -37,6 +37,14 @@ function NotifCard({ notif, onMark }) {
 export default function NotificationsPanel({ notifications, onClose, onUpdate }) {
   const [tab, setTab] = useState('all')
 
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   const unreadCount = notifications.filter(n => !n.read).length
 
   function markAll() {

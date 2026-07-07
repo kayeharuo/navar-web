@@ -278,6 +278,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
               <thead>
                 <tr>
                   <th>STORE NAME</th>
+                  <th>TYPE</th>
                   <th>UNIT NO.</th>
                   <th>FLOOR</th>
                   <th>BRAND</th>
@@ -293,7 +294,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
               <tbody>
                 {filteredStores.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="stores-empty">No stores found.</td>
+                    <td colSpan={12} className="stores-empty">No stores found.</td>
                   </tr>
                 ) : filteredStores.map(store => (
                   <tr
@@ -301,6 +302,18 @@ export default function StoresPanel({ mall, onClose, onSave }) {
                     className={`stores-table-row${!store.active ? ' stores-table-row--inactive' : ''}`}
                   >
                     <td className="stores-td-name">{store.storeName}</td>
+                    <td>
+                      <span style={{
+                        fontSize: '12px',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: store.storeType === 'stall' ? '#E8F3FF' : '#F0F0F0',
+                        color: store.storeType === 'stall' ? '#0066CC' : '#666',
+                        fontWeight: '500'
+                      }}>
+                        {store.storeType === 'stall' ? 'Stall' : 'Store'}
+                      </span>
+                    </td>
                     <td>{store.unitNos?.join(', ') || '—'}</td>
                     <td>{store.floorLabel || '—'}</td>
                     <td>{store.brand || '—'}</td>

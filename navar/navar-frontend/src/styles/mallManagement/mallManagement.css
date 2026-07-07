@@ -429,3 +429,27 @@
     padding: 4px 8px;
   }
 }
+
+/* ─── Beacon modal styles ────────────────────────────────── */
+.bcn-modal-select {
+  width: 100%;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #000;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+
+.bcn-modal-select:focus {
+  border-color: #016630;
+}
+
+.bcn-modal-select--error {
+  border-color: #EC5252;
+}

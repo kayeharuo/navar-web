@@ -126,6 +126,14 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
   const floors = mall.floorDetails || []
   const major = mall.major || 1
 
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   function setField(key, val) {
     setForm(f => ({ ...f, [key]: val }))
     if (errors[key]) setErrors(e => ({ ...e, [key]: undefined }))

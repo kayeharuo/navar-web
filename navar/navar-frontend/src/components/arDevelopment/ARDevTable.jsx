@@ -3,6 +3,7 @@ import ARDevFlowDiagrams from './ARDevFlowDiagrams'
 import TestingModal from './TestingModal'
 import ThreadModal from './ThreadModal'
 import PublishModal from './PublishModal'
+import ARDevDetail from './ARDevDetail'
 
 const TIER_ORDER = { Premium: 0, Standard: 1, Basic: 2 }
 
@@ -35,6 +36,11 @@ const INITIAL_PROJECTS = [
       },
     ],
     testErrors: [],
+    stallAdditions: [
+      { id: 1, stallNumber: 'G-101A', floor: 'Ground', description: 'New stall near main entrance', status: 'pending' },
+      { id: 2, stallNumber: 'G-101B', floor: 'Ground', description: 'Stall in food court area', status: 'pending' },
+      { id: 3, stallNumber: '2-205', floor: '2nd Floor', description: 'Kiosk by escalator', status: 'pending' },
+    ],
   },
   {
     id: 2,
@@ -173,6 +179,7 @@ export default function ARDevTable({ incomingProjects }) {
   const [testingProject, setTestingProject] = useState(null)
   const [threadProject, setThreadProject] = useState(null)
   const [publishProject, setPublishProject] = useState(null)
+  const [detailProject, setDetailProject] = useState(null)
 
   useEffect(() => {
     if (!incomingProjects || incomingProjects.length === 0) return
@@ -262,6 +269,27 @@ export default function ARDevTable({ incomingProjects }) {
 
   function handleReactivate(id) {
     updateItem(id, { arStatus: 'Ready for activation' })
+  }
+
+  function handleStallStatusChange(projectId, stallId, newStatus) {
+    setItems(prev => prev.map(p => {
+      if (p.id !== projectId) return p
+      return {
+        ...p,
+        stallAdditions: (p.stallAdditions || []).map(s =>
+          s.id === stallId ? { ...s, status: newStatus } : s
+        ),
+      }
+    }))
+    // Update detail project if it's open
+    if (detailProject && detailProject.id === projectId) {
+      setDetailProject(prev => ({
+        ...prev,
+        stallAdditions: (prev.stallAdditions || []).map(s =>
+          s.id === stallId ? { ...s, status: newStatus } : s
+        ),
+      }))
+    }
   }
 
   function getFilterCount(filter) {
@@ -385,6 +413,16 @@ export default function ARDevTable({ incomingProjects }) {
                         Edit Map
                       </button>
 
+                      {project.stallAdditions && project.stallAdditions.length > 0 && (
+                        <button
+                          className="ar-dev-action-btn ar-dev-action-btn--stall-additions"
+                          onClick={() => setDetailProject(project)}
+                          title="To Be Added Stalls"
+                        >
+                          To Be Added Stalls ({project.stallAdditions.filter(s => s.status === 'pending').length})
+                        </button>
+                      )}
+
                       {project.arStatus === 'Pending' && (
                         <button
                           className="ar-dev-action-btn ar-dev-action-btn--start"
@@ -495,6 +533,14 @@ export default function ARDevTable({ incomingProjects }) {
           mallName={publishProject.mallName}
           onCancel={() => setPublishProject(null)}
           onConfirm={handlePublishConfirm}
+        />
+      )}
+
+      {detailProject && (
+        <ARDevDetail
+          project={detailProject}
+          onClose={() => setDetailProject(null)}
+          onStallStatusChange={handleStallStatusChange}
         />
       )}
     </>
