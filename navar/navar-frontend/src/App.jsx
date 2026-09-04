@@ -108,6 +108,15 @@ export default function App() {
     })
   }
 
+  function handleStallAppApproved(stallApp) {
+    // Unpublish the AR for this mall
+    setArIncomingProjects(prev => prev.map(p =>
+      p.mallName === stallApp.mallName && p.arStatus === 'Live'
+        ? { ...p, arStatus: 'Unpublished' }
+        : p
+    ))
+  }
+
   function handleMarkAllRead() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }
@@ -141,7 +150,7 @@ export default function App() {
             <Route path="/mall-management" element={<MallManagement />} />
             <Route path="/mall-management/stores/:mallId" element={<StoresPage />} />
             <Route path="/mall-management/beacons/:mallId" element={<BeaconsPage />} />
-            <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} />} />
+            <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} arProjects={arIncomingProjects} onStallAppApproved={handleStallAppApproved} />} />
             <Route path="/ar-development" element={<ARDevelopment incomingProjects={arIncomingProjects} />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/account-management" element={<AccountManagement />} />

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import '../../styles/mallManagement/beaconTickets.css'
@@ -251,6 +252,10 @@ function StatusBadge({ status }) {
   )
 }
 
+function getTicketId(ticket) {
+  return ticket.ticketId || `TKT-${String(ticket.id).padStart(4, '0')}`
+}
+
 function TicketItem({ ticket, isSelected, onClick }) {
   return (
     <button
@@ -261,8 +266,8 @@ function TicketItem({ ticket, isSelected, onClick }) {
         <StatusIcon status={ticket.status} />
       </div>
       <div className="bkt-item-info">
-        <p className="bkt-item-code">{ticket.beaconCode}</p>
-        <p className="bkt-item-sub">{ticket.mall} · {ticket.floor}</p>
+        <p className="bkt-item-code">{ticket.title || ticket.reason || 'Beacon Ticket'}</p>
+        <p className="bkt-item-sub">{getTicketId(ticket)} · {ticket.beaconCode} · {ticket.mall} · {ticket.floor}</p>
       </div>
       <div className="bkt-item-right">
         <StatusBadge status={ticket.status} />
@@ -300,7 +305,10 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
     <div className="bkt-overlay" onClick={onClose}>
       <div className="bkt-detail-panel" onClick={e => e.stopPropagation()}>
         <div className="bkt-detail-header">
-          <h2 className="bkt-detail-title">{ticket.beaconCode}</h2>
+          <div>
+            <h2 className="bkt-detail-title">{ticket.title || ticket.reason || 'Beacon Ticket'}</h2>
+            <p className="bkt-detail-subtitle">{getTicketId(ticket)} · Beacon {ticket.beaconCode}</p>
+          </div>
           <button className="bkt-detail-close" onClick={onClose}>X</button>
         </div>
         <div className="bkt-detail-divider" />
@@ -346,7 +354,7 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
           </div>
 
           <div className="bkt-timeline">
-            {ticket.timeline.map((entry, idx) => {
+            {[...ticket.timeline].reverse().map((entry, idx) => {
               const dotStatus = getTimelineStatus(entry.action)
               const srcCfg = SOURCE_COLORS[entry.source] || { bg: '#F1F1F1', color: '#4E4E4E' }
               return (

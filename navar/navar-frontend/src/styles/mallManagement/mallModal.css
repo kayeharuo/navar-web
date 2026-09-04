@@ -2172,6 +2172,113 @@ select.mall-field-input {
 .bcn-btn--faulty      { background: #D51D1D; }
 .bcn-btn--maintenance { background: #FF9233; }
 .bcn-btn--reactivate  { background: #16A34A; }
+.bcn-btn--history     { background: #6C1FCA; }
+.bcn-btn--battery     { background: #2563EB; }
+
+.bcn-history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Beacon history modals */
+.bcn-history-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 430;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.47);
+}
+
+.bcn-history-modal {
+  width: min(680px, 95vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+}
+
+.bcn-history-subtitle {
+  margin: 4px 0 0;
+  color: #9B9C9C;
+  font-family: 'Fira Mono', monospace;
+  font-size: 12px;
+}
+
+.bcn-history-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.bcn-history-card {
+  padding: 14px;
+  border: 1px solid #E8ECF2;
+  border-radius: 8px;
+  background: #FAFCFF;
+}
+
+.bcn-history-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #111827;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+}
+
+.bcn-history-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.7fr) 1fr;
+  gap: 6px 14px;
+  margin-bottom: 12px;
+  color: #9B9C9C;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+}
+
+.bcn-history-grid strong {
+  color: #333;
+  font-weight: 500;
+}
+
+.bcn-battery-status {
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-family: 'Fira Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.bcn-battery-status--current {
+  color: #016630;
+  background: #E1FFEC;
+}
+
+.bcn-battery-status--replaced {
+  color: #9B9C9C;
+  background: #F1F1F1;
+}
+
+@media (max-width: 767px) {
+  .bcn-history-modal-overlay {
+    padding: 12px;
+  }
+
+  .bcn-history-grid {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
 
 /* Status change modals */
 .bcn-status-modal {

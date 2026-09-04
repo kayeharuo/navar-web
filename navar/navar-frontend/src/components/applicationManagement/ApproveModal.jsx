@@ -6,18 +6,23 @@ function ApproveIcon() {
   )
 }
 
-export default function ApproveModal({ mallName, onCancel, onConfirm }) {
+export default function ApproveModal({ mallName, onCancel, onConfirm, isStallApplication = false }) {
   return (
     <div className="app-modal-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
       <div className="app-modal-box">
         <div className="app-modal-icon"><ApproveIcon /></div>
         <h2 className="app-modal-title">Approve {mallName}?</h2>
         <p className="app-modal-desc">
-          This marks the application as Approved and sets AR development status to Pending, which means it enters the AR team&apos;s work queue. The mall admin will be notified.
+          {isStallApplication
+            ? 'This marks the stall addition as Approved. The current published AR will be unpublished to incorporate the new stalls. The mall admin will be notified.'
+            : 'This marks the application as Approved and sets AR development status to Pending, which means it enters the AR team\'s work queue. The mall admin will be notified.'
+          }
         </p>
         <div className="app-modal-actions">
           <button className="app-modal-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className="app-modal-btn-approve" onClick={onConfirm}>Approve Application</button>
+          <button className="app-modal-btn-approve" onClick={onConfirm}>
+            {isStallApplication ? 'Approve Stall Addition' : 'Approve Application'}
+          </button>
         </div>
       </div>
     </div>

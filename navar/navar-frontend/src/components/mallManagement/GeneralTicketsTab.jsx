@@ -269,7 +269,7 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
           </div>
 
           <div className="gt-timeline">
-            {ticket.timeline.map((entry, idx) => {
+            {[...ticket.timeline].reverse().map((entry, idx) => {
               const dotStatus = getTimelineStatus(entry.action)
               const srcCfg = SOURCE_COLORS[entry.source] || { bg: '#F1F1F1', color: '#4E4E4E' }
               return (

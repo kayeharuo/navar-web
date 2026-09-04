@@ -623,7 +623,8 @@
   gap: 10px;
 }
 
-.ar-thread-msg-row--system { flex-direction: row-reverse; }
+.ar-thread-msg-row--system,
+.ar-thread-msg-row--admin { flex-direction: row-reverse; }
 
 .ar-thread-msg-avatar {
   width: 38px;
@@ -638,7 +639,8 @@
   flex-shrink: 0;
 }
 
-.ar-thread-msg-avatar--system {
+.ar-thread-msg-avatar--system,
+.ar-thread-msg-avatar--admin {
   background: #EFF4FF;
   border: 1px solid #DBEAFE;
   color: #2563EB;
@@ -657,7 +659,8 @@
   max-width: 88%;
 }
 
-.ar-thread-msg-bubble--system {
+.ar-thread-msg-bubble--system,
+.ar-thread-msg-bubble--admin {
   background: #EFF4FF;
   border: 1px solid #DBEAFE;
   border-radius: 10px 0 10px 10px;

@@ -1,7 +1,7 @@
 # AR Development Page
 
 ## Overview
-The AR Development page is the admin interface for managing the complete AR map creation and deployment workflow. Admins track projects through distinct stages (mapping, testing, activation) and manage communication with mall admins via threaded discussions.
+The AR Development page is the admin interface for managing the complete AR map creation and deployment workflow. Admins track projects through distinct stages (mapping, testing, activation), handle stall additions, and manage communication with mall admins via threaded discussions.
 
 **Location:** `navar-frontend/src/pages/ARDevelopment.jsx`
 
@@ -15,33 +15,12 @@ The page uses a responsive flex layout with:
 2. **Flow Diagram** — Visual representation of the AR development pipeline
 3. **Toolbar** — Status filter tabs + search input
 4. **Table** — Complete AR project data table with stage-appropriate actions
-5. **Modals** — Testing error display, thread discussion, and publish confirmation
+5. **Modals** — Testing error display, thread discussion, publish confirmation, stall details
 
 ### Responsive Breakpoints:
 - **Desktop (>1023px):** Full layout, wide table
 - **Tablet (768-1023px):** Tighter spacing, responsive toolbar
 - **Mobile (<768px):** Stacked layout, compact spacing
-
----
-
-## Components
-
-### 1. **Page Header**
-**File:** `ARDevTable.jsx` (lines 251-259)
-
-**Purpose:** Displays page title and development progress status.
-
-**Key Features:**
-- Title: "AR Development" (Poppins 28px bold)
-- Subtitle: "Track and manage AR map development for approved mall partners."
-- Status count: Shows number of malls awaiting AR development completion (not yet Live)
-- Dynamic count in red alert style when malls are in development
-
-**Example:**
-```
-AR Development
-Track and manage AR map development for approved mall partners. 3 malls awaiting AR development completion.
-```
 
 ---
 
@@ -90,9 +69,54 @@ The AR Development workflow progresses through distinct, ordered stages:
 - **Publish to Unpublished:**
   - **Action:** "Unpublish" button (shown when Live)
   - **Handler:** Updates status to "Unpublished"
+  - **Trigger:** When a stall application is approved in Application Management
 - **Unpublished to Live:**
   - **Action:** "Reactivate" button (shown when Unpublished)
   - **Handler:** Updates status back to "Live"
+
+---
+
+## Stall Addition Workflow
+
+### Integration with Stall Applications
+
+When a stall application is approved in Application Management:
+
+1. **Approval Trigger:** Admin clicks "Approve Stall Addition" in Stall Application review
+2. **AR Update:** Current Live AR for that mall becomes **Unpublished**
+3. **AR Development Display:** Project shows "Unpublished" status
+4. **New Button Appears:** "To Be Added Stalls" button with count of pending stalls
+5. **Development Work:** AR Development team reviews stalls and adds them to map
+6. **Republish:** Once stalls are incorporated, AR is republished as Live
+7. **Read-only Review:** The AR Development stall modal shows the same stall submission details as Application Management, including floor plans and stall metadata, but it omits thread messages and revision actions
+
+### To Be Added Stalls Button
+
+**Visibility:** Shows when:
+- Project has `stallAdditions` array with items
+- Coming from approved stall applications
+
+**Behavior:**
+- Click button → Opens read-only modal with stall details
+- Shows:
+  - Mall name + city + admin info (header)
+  - List of stalls to be added
+  - Each stall shows: number, floor, description
+  - Count of pending stalls
+- No edit capability (unlike ARDevDetail which can mark stalls as published)
+- Purpose: Review and understand what stalls need to be incorporated before republishing
+- Uses the approved stall application data attached from Application Management
+
+**Data Flow:**
+```
+StallApplication (Approved)
+  → onStallAppApproved() callback
+  → App.jsx: handleStallAppApproved()
+  → Sets arStatus to 'Unpublished' for matching mall
+  → ARDevTable receives updated items
+  → stallAdditions array populated from stall application data
+  → "To Be Added Stalls" button appears
+```
 
 ---
 
@@ -128,6 +152,8 @@ Premium/Standard/Basic (Live or Unpublished, by date)
 
 ## Integration with Application Management
 
+### New Application Approval
+
 When an application is approved in Application Management:
 
 1. **Approval Trigger:** User clicks "Approve" in ApplicationManagement component
@@ -139,6 +165,18 @@ When an application is approved in Application Management:
    - **Thread:** Empty array (no discussion yet)
 4. **Queue Placement:** Appended to end of its tier in non-live section
 5. **Display:** Immediately visible in AR Development table
+
+### Stall Application Approval
+
+When a stall application is approved in Application Management:
+
+1. **Approval Trigger:** User clicks "Approve Stall Addition"
+2. **Data Handoff:** `onStallAppApproved()` callback with stall app data
+3. **AR Update:** Finds matching Live AR for that mall
+4. **Status Change:** Sets `arStatus` to "Unpublished"
+5. **Stall Data:** `stallAdditions` array populated with stall details
+6. **Button Appears:** "To Be Added Stalls" button now visible on that project
+7. **Development Queue:** Project remains in queue for team to incorporate stalls
 
 ---
 
@@ -153,13 +191,14 @@ When an application is approved in Application Management:
 
 #### State Management
 ```javascript
-const [projects, setProjects] = useState([...initialProjects, ...incomingProjects])
-const [filteredProjects, setFilteredProjects] = useState([])
+const [items, setItems] = useState([...initialProjects, ...incomingProjects])
 const [activeFilter, setActiveFilter] = useState('All')
 const [searchQuery, setSearchQuery] = useState('')
 const [testingProject, setTestingProject] = useState(null)
-const [thread, setThread] = useState(null)
+const [threadProject, setThreadProject] = useState(null)
 const [publishProject, setPublishProject] = useState(null)
+const [detailProject, setDetailProject] = useState(null)
+const [stallsModalProject, setStallsModalProject] = useState(null)  // NEW
 ```
 
 #### Workflow Handlers
@@ -169,49 +208,87 @@ const [publishProject, setPublishProject] = useState(null)
 - **`handleMarkAsReady(id)`** — Updates status to "Ready for activation"
 - **`handleViewThread(project)`** — Opens thread modal for discussion
 - **`handlePublishConfirm()`** — Publishes project (Live) after admin approval
+- **`handleUnpublish(id)`** — Sets status to "Unpublished" (stall additions)
+- **`handleReactivate(id)`** — Sets status back to "Live"
+- **`handleStallStatusChange(projectId, stallId, newStatus)`** — Updates individual stall status (for ARDevDetail)
 - **`updateItem(id, updates)`** — Generic updater for status changes
-- **`handleSendNote(text)`** — Adds user message to thread
+- **`handleSendNote(id, note)`** — Adds user message to thread
 
 #### Filtering & Search
-- **Status filters:** All, Pending, Node Mapping, Navigation Testing, Ready, Live, Unpublished
+- **Status filters:** All, Pending, Node Mapping, Navigation Testing, Ready for activation, Live
 - **Dynamic counts:** Shows count in each filter tab
 - **Search:** Real-time matching across mall name, city, admin name
 
 #### Table Columns
-- **Mall Name** — Mall name with tier subtitle (Premium/Standard/Basic)
-- **Admin** — Admin name with email
-- **AR Status** — Color-coded status badge
-- **Actions** — Context-specific buttons (Start, Submit, Mark Ready, View Thread, Publish, etc.)
+| Column | Type | Notes |
+|--------|------|-------|
+| MALL NAME | string | Name with tier subtitle |
+| CITY | string | Location |
+| ADMIN | string | Name with email |
+| VERSION | number | Project version |
+| NO. OF FLOORS | number | Floor count |
+| AGREEMENT | string | Contract status |
+| APPLICATION | badge | "Approved" |
+| AR DEVELOPMENT | badge | Current stage |
+| DATE ADDED | date | When approved |
+| LAST UPDATED | date | Latest change |
+| ACTIONS | buttons | Context-specific |
 
-**Key Logic:**
+#### Action Buttons (Context-Sensitive)
 
-Publish button gating (lines 386-397):
-```javascript
-{project.arStatus === 'Ready for activation' && (
-  <>
-    <button className="ar-dev-action-btn ar-dev-action-btn--view-thread" 
-            onClick={() => handleViewThread(project)}>
-      View Thread
-    </button>
-    {(() => {
-      const isApproved = project.thread && project.thread.some(msg => msg.isAdmin)
-      return (
-        <button
-          className={`ar-dev-action-btn ar-dev-action-btn--publish${!isApproved ? ' ar-dev-action-btn--publish-disabled' : ''}`}
-          onClick={() => isApproved && setPublishProject(project)}
-          disabled={!isApproved}
-        >
-          Publish
-        </button>
-      )
-    })()}
-  </>
-)}
-```
+**Pending:** "Start Mapping"
+
+**Node Mapping:** "Submit for Testing"
+
+**Navigation Testing:** "Mark as Ready"
+
+**Ready for activation:**
+- "View Thread"
+- "Publish" (enabled only if thread has mall admin message)
+
+**Live:**
+- "To Be Added Stalls" (if `stallAdditions` array exists)
+- "Unpublish"
+
+**Unpublished:**
+- "To Be Added Stalls" (if `stallAdditions` array exists)
+- "Reactivate"
 
 ---
 
-### 2. **TestingModal**
+### 2. **ToBeAddedStallsModal** (NEW)
+**File:** `src/components/arDevelopment/ToBeAddedStallsModal.jsx`
+
+**Purpose:** Read-only display of stalls from approved stall applications.
+
+**Props:**
+```javascript
+{
+  stallAdditions: Array,      // Array of stall objects
+  mallName: string,           // Mall name for header
+  city: string,               // City for subheader
+  adminName: string,          // Admin name for subheader
+  onClose: Function,          // Close modal callback
+}
+```
+
+**Key Features:**
+- **Header:** Mall name, city · admin name, "Stalls to Be Added" badge
+- **Content:** Displays each stall with:
+  - Stall Number (bold)
+  - Floor (gray text, 12px)
+  - Description (body text)
+- **Info Banner:** Shows count of stalls to be added
+- **Read-Only:** No buttons to modify stall status (unlike ARDevDetail)
+- **Purpose:** Allows team to review stalls before incorporating into AR map
+
+**Modal Styling:**
+- Uses `.review-panel` and `.review-overlay` classes (same as review panels)
+- Same visual style as ApplicationManagement review panels for consistency
+
+---
+
+### 3. **TestingModal**
 **File:** `src/components/arDevelopment/TestingModal.jsx`
 
 **Purpose:** Display testing results and allow user to proceed or abort.
@@ -219,10 +296,10 @@ Publish button gating (lines 386-397):
 **Props:**
 ```javascript
 {
-  project: ProjectObject,              // The project being tested
-  errors: ErrorArray,                  // Array of test errors found
-  onClose: Function,                   // Callback to close modal
-  onProceed: Function,                 // Callback when "Proceed" clicked
+  mallName: string,           // Mall name for title
+  errors: Array,              // Array of test errors
+  onCancel: Function,         // Close modal callback
+  onProceed: Function,        // Advance to testing status
 }
 ```
 
@@ -232,17 +309,9 @@ Publish button gating (lines 386-397):
 - **Actions:** "Cancel" and "Proceed" buttons
 - **Proceed Gate:** Only clickable if no errors
 
-**Error Item Format:**
-```javascript
-{
-  id: string,
-  message: string,  // e.g., "Node 5 has invalid coordinates"
-}
-```
-
 ---
 
-### 3. **ThreadModal**
+### 4. **ThreadModal**
 **File:** `src/components/arDevelopment/ThreadModal.jsx`
 
 **Purpose:** Threaded discussion between admin and mall admin about AR project.
@@ -250,47 +319,43 @@ Publish button gating (lines 386-397):
 **Props:**
 ```javascript
 {
-  project: ProjectObject,              // The project with thread data
-  onClose: Function,                   // Close modal callback
-  onSendNote: Function,                // Send message callback
+  project: ProjectObject,    // The project with thread data
+  onClose: Function,         // Close modal callback
+  onSendNote: Function,      // Send message callback
+  onPublish: Function,       // Publish callback (optional)
 }
 ```
 
 **Key Features:**
 
 #### Approval State Detection
-- Checks if any message in thread has `isAdmin: true`
-- If admin message exists: banner shows "Mall Admin confirmed. Ready to Activate or Publish."
-- If no admin message: banner shows "Awaiting mall admin confirmation for activation"
+- Checks if any message in thread has `sender: 'mall'`
+- If mall message exists: banner shows "Mall Admin confirmed. Ready to Activate."
+- If no mall message: banner shows "Awaiting mall admin confirmation for activation"
 
 #### Thread Message Format
 ```javascript
 {
-  sender: 'admin' | 'mall',           // Who sent the message
-  senderName: string,                 // Display name
-  message: string,                    // Message text
-  timestamp: string,                  // Date string
-  isAdmin: boolean,                   // Whether sender is mall admin (approval gate)
+  id: number,
+  sender: 'admin' | 'mall',
+  name: string,
+  date: string,
+  message: string,
+  isAdmin: boolean,  // Approval gate flag
 }
 ```
 
 #### UI Elements
-- **Header:** Project title, subtitle showing approval state
-- **Approval Banner:** Blue (waiting) or green (approved) banner with status text
-- **Messages:** Chat-like display with avatars, names, timestamps
-- **Admin Badge:** Blue label on admin messages for visual distinction
-- **Input Area:** Textarea for typing new messages
+- **Header:** Project title, subtitle
+- **Approval Banner:** Blue (waiting) or green (approved)
+- **Messages:** Chat-like display with names, timestamps
+- **Admin Badge:** Blue label on admin messages
+- **Input Area:** Textarea for new messages
 - **Send Button:** Disabled if empty
-
-#### Styling
-- Admin messages: Blue background (#EFF4FF), reversed alignment
-- Mall messages: White background, normal alignment
-- Banner waiting: Blue theme (#E1F3FF background, #2563EB text)
-- Banner approved: Green theme (#DCF3E8 background, #16A34A text)
 
 ---
 
-### 4. **PublishModal**
+### 5. **PublishModal**
 **File:** `src/components/arDevelopment/PublishModal.jsx`
 
 **Purpose:** Confirmation modal before publishing AR map to production.
@@ -298,21 +363,161 @@ Publish button gating (lines 386-397):
 **Props:**
 ```javascript
 {
-  project: ProjectObject,              // The project to publish
-  onCancel: Function,                  // Cancel callback
-  onConfirm: Function,                 // Publish callback
+  mallName: string,          // Mall name for title
+  onCancel: Function,        // Cancel callback
+  onConfirm: Function,       // Publish callback
 }
 ```
 
 **Features:**
-- **Icon:** Checkmark or similar visual confirmation symbol
-- **Title:** "Publish AR Map"
-- **Description:** "This will make the AR map live for mall visitors."
-- **Actions:** "Cancel" and "Confirm" buttons
+- **Icon:** Green checkmark for confirmation
+- **Title:** "Publish [MallName]?"
+- **Description:** Confirms AR map will be made live
+- **Actions:** "Cancel" and "Publish" buttons
 
 ---
 
-## Styles
+### 6. **ARDevDetail** (Existing)
+**File:** `src/components/arDevelopment/ARDevDetail.jsx`
+
+**Purpose:** Detailed view and editing of AR project stall additions.
+
+**Use Case:**
+- When development team needs to track which stalls have been published to the main AR
+- Allows marking individual stalls as published
+- Shows stall list with edit capabilities
+
+**Relationship to ToBeAddedStallsModal:**
+- **ToBeAddedStallsModal:** Read-only view of stalls to be added (from approved stall app)
+- **ARDevDetail:** Full detail view with edit capability for publishing stalls
+
+---
+
+## Data Structure
+
+### Project Object (Extended)
+```javascript
+{
+  id: number,
+  mallName: string,
+  tier: string,               // 'Premium' | 'Standard' | 'Basic'
+  city: string,
+  adminName: string,
+  adminEmail: string,
+  version: number,
+  floors: number,
+  nodes: number,
+  edges: number,
+  agreement: string,
+  applicationStatus: 'Approved',
+  arStatus: 'Pending' | 'Node Mapping' | 'Navigation Testing' | 'Ready for activation' | 'Live' | 'Unpublished',
+  dateAdded: string,
+  lastUpdated: string,
+  thread: ThreadMessage[],
+  testErrors: string[],
+  stallAdditions: StallObject[],    // NEW: From approved stall applications
+}
+```
+
+### Stall Object
+```javascript
+{
+  id: number,
+  stallNumber: string,
+  floor: string,
+  description: string,
+  status: 'pending' | 'added_to_store_list',  // Initially 'pending' from stall app
+}
+```
+
+### Thread Message
+```javascript
+{
+  id: number,
+  sender: 'admin' | 'system' | 'mall',
+  name: string,
+  date: string,
+  message: string,
+  isAdmin: boolean,  // Approval gate flag (for old data)
+}
+```
+
+---
+
+## State Management
+
+### App-Level (App.jsx)
+- `arIncomingProjects` — Approved apps ready for AR development
+- `handleAppApproved()` — Adds new AR projects
+- `handleStallAppApproved()` — Unpublishes AR, adds stall data
+
+### Page-Level (ARDevelopment.jsx)
+- Passes `incomingProjects` to ARDevTable
+
+### Component-Level (ARDevTable.jsx)
+- `items` — All projects (initial + incoming)
+- `activeFilter`, `searchQuery` — Filtering/search state
+- `testingProject`, `threadProject`, `publishProject` — Active modals
+- `detailProject` — ARDevDetail modal state
+- `stallsModalProject` — ToBeAddedStallsModal state (NEW)
+
+---
+
+## Event Handlers
+
+### handleStartMapping(id)
+```javascript
+updateItem(id, { arStatus: 'Node Mapping' })
+```
+
+### handleSubmitForTesting(project)
+```javascript
+setTestingProject(project)  // Opens TestingModal
+```
+
+### handleTestingProceed()
+```javascript
+updateItem(testingProject.id, { arStatus: 'Navigation Testing' })
+setTestingProject(null)
+```
+
+### handleMarkAsReady(id)
+```javascript
+// Creates system message with project summary
+// Sets arStatus to 'Ready for activation'
+// Adds message to thread
+```
+
+### handleViewThread(project)
+```javascript
+setThreadProject(project)  // Opens ThreadModal
+```
+
+### handlePublishConfirm()
+```javascript
+updateItem(publishProject.id, { arStatus: 'Live' })
+setPublishProject(null)
+```
+
+### handleUnpublish(id)
+```javascript
+updateItem(id, { arStatus: 'Unpublished' })
+```
+
+### handleReactivate(id)
+```javascript
+updateItem(id, { arStatus: 'Ready for activation' })
+```
+
+### handleStallStatusChange(projectId, stallId, newStatus)
+```javascript
+// Updates individual stall status in stallAdditions array
+// Used by ARDevDetail for marking stalls as published
+```
+
+---
+
+## Styling
 
 ### Global AR Development Files
 - **`arDevelopmentLayout.css`** — Page wrapper, content spacing, responsive layout
@@ -321,198 +526,65 @@ Publish button gating (lines 386-397):
 ### Key CSS Classes
 
 #### Layout
-- `.ar-dev-page` — Main container, flex column, max-width 1400px, NO padding (inherited from parent)
-- `.ar-dev-content` — Inner content wrapper, flex column, 20px gap
+- `.ar-dev-page` — Main container, flex column
+- `.ar-dev-content` — Inner content wrapper, flex column
 
 #### Page Header
 - `.ar-dev-header` — Title + subtitle container
 - `.ar-dev-title` — "AR Development" heading (Poppins 28px bold)
-- `.ar-dev-subtitle` — Descriptive text with status count
-- `.ar-dev-subtitle-alert` — Red alert styling for count when malls in development
-
-#### Flow Diagram
-- `.ar-dev-flows` — Flow card container
-- `.ar-dev-flow-card` — Individual flow stage card
-- `.ar-dev-flow-label` — Flow label (monospace, 12px, uppercase)
-- `.ar-dev-flow-steps` — Step badges container
-- `.ar-dev-flow-step` — Individual step
-- `.ar-dev-flow-step-badge` — Step color-coded badge
-- `.flow-step--{color}` — Color variants (grey, blue, green, orange, purple, yellow, red)
+- `.ar-dev-subtitle` — Descriptive text
+- `.ar-dev-subtitle-alert` — Red alert styling
 
 #### Toolbar
-- `.ar-dev-toolbar` — Filter tabs + search container
-- `.ar-dev-filters` — Filter tab container with border
-- `.ar-dev-filter-btn` — Individual tab button
-- `.ar-dev-filter-btn--active` — Active tab styling (white bg, black text)
-- `.ar-dev-filter-count` — Badge with count number
-- `.ar-dev-filter-count--active` — Active count badge (blue)
+- `.ar-dev-toolbar` — Filter tabs + search
+- `.ar-dev-filters` — Filter tab container
+- `.ar-dev-filter-btn` — Individual filter button
+- `.ar-dev-filter-btn--active` — Active filter (white bg, blue underline)
 - `.ar-dev-search-wrap` — Search input wrapper
-- `.ar-dev-search-input` — Search field
+- `.ar-dev-search-input` — Search input field
 
 #### Table
-- `.ar-dev-table-wrap` — Table card container (white, bordered, rounded)
-- `.ar-dev-table-scroll` — Scrollable table wrapper
+- `.ar-dev-table-wrap` — Table card container
 - `.ar-dev-table` — Table element
-- `.ar-dev-table thead th` — Header cells (sticky, gray background)
-- `.ar-dev-table tbody tr` — Data rows (hover effect, border-bottom)
-- `.ar-dev-table tbody tr.row--live` — Live/unpublished row styling (faded, gray bg)
-- `.ar-dev-table td` — Data cells
-- `.ar-dev-mall-name` — Mall name cell
-- `.ar-dev-mall-tier` — Tier subtitle under mall name
-- `.ar-dev-admin-name` — Admin name cell
-- `.ar-dev-admin-email` — Admin email under name
+- `.ar-dev-table thead` — Sticky header
+- `.ar-dev-table tbody tr` — Data rows
+- `.row--live` — Live/unpublished row styling (faded)
+- `.ar-dev-action-cell` — Action buttons cell
+- `.ar-dev-action-btn` — Individual action button
+- `.ar-dev-action-btn--{type}` — Button variants (start, test, publish, unpublish, etc.)
+- `.ar-dev-action-btn--stall-additions` — To Be Added Stalls button
 
 #### Status Badges
-- `.ar-status-badge` — Base badge styling (Poppins 13px 500)
-- `.ar-status-badge--pending` — Orange
-- `.ar-status-badge--node-mapping` — Blue
-- `.ar-status-badge--nav-testing` — Purple
-- `.ar-status-badge--ready` — Yellow
-- `.ar-status-badge--live` — Green
-- `.ar-status-badge--unpublished` — Red
+- `.ar-status-badge` — Base badge
+- `.ar-status-badge--{variant}` — Color variants (pending, node-mapping, nav-testing, ready, live, unpublished)
 
-#### Action Buttons
-- `.ar-dev-action-btn` — Base button styling (Poppins 12px 500, inline-block)
-- `.ar-dev-action-btn--start` — Cyan background, Start Mapping
-- `.ar-dev-action-btn--test` — Yellow background, Submit for Testing
-- `.ar-dev-action-btn--mark-ready` — Purple background, Mark as Ready
-- `.ar-dev-action-btn--view-thread` — Orange background, View Thread
-- `.ar-dev-action-btn--publish` — Green background, Publish
-- `.ar-dev-action-btn--publish-disabled` — Green 45% opacity, not-allowed cursor
-- `.ar-dev-action-btn--unpublish` — Red background, Unpublish
-- `.ar-dev-action-btn--reactivate` — Green background, Reactivate
-
-#### Modals (Testing, Thread, Publish)
-- `.ar-modal-overlay` — Full-screen dark backdrop (z-index 500)
-- `.ar-modal-box` — Modal container (white, rounded, shadowed)
-- `.ar-modal-title` — Modal heading (Poppins 20px 700)
-- `.ar-modal-subtitle` — Modal subtext
-- `.ar-modal-errors-label` — "Errors Found" label (red, monospace)
-- `.ar-modal-errors-list` — Error list container
-- `.ar-modal-error-item` — Individual error with icon
-- `.ar-modal-success` — Success banner (green theme)
-- `.ar-modal-actions` — Button container (flex, right-aligned)
-
-#### Thread Modal Specific
-- `.ar-thread-overlay` — Full-screen backdrop
-- `.ar-thread-box` — Thread modal container
-- `.ar-thread-header` — Title + close button
-- `.ar-thread-title` — "View Thread" heading
-- `.ar-thread-subtitle` — Approval state text (monospace)
-- `.ar-thread-close` — Close button (×)
-- `.ar-thread-approval-banner` — Approval state banner
-- `.ar-thread-approval-banner--waiting` — Blue (awaiting)
-- `.ar-thread-approval-banner--approved` — Green (confirmed)
-- `.ar-thread-messages` — Scrollable message container
-- `.ar-thread-msg-row` — Individual message row
-- `.ar-thread-msg-row--admin` — Admin message (flex-direction: row-reverse)
-- `.ar-thread-msg-avatar` — Avatar circle (36px, initials)
-- `.ar-thread-msg-avatar--admin` — Blue theme
-- `.ar-thread-msg-avatar--mall` — Gray theme
-- `.ar-thread-msg-bubble` — Message content box
-- `.ar-thread-msg-bubble--admin` — Blue border + background
-- `.ar-thread-msg-bubble--mall` — Gray border, white background
-- `.ar-thread-msg-admin-badge` — Small "ADMIN" label
-- `.ar-thread-textarea` — Message input field
-- `.ar-thread-send-btn` — Send button (blue)
+#### Modals
+- `.ar-detail-overlay` — Full-screen backdrop
+- `.ar-detail-panel` — Modal container
+- `.ar-detail-header` — Modal header
+- `.ar-detail-tabs` — Tab buttons
+- `.ar-detail-body` — Content area
+- `.review-panel` — (Used for ToBeAddedStallsModal)
+- `.review-overlay` — (Used for ToBeAddedStallsModal)
 
 ---
 
-## Data Flow
+## Recent Changes (Stall Application Integration)
 
-### Initial Projects
-Each project in the queue has this structure:
-```javascript
-{
-  id: string,                         // Unique identifier
-  mallName: string,                   // Mall name (e.g., "SM Seaside City Cebu")
-  tier: 'Premium' | 'Standard' | 'Basic',
-  city: string,
-  adminName: string,
-  adminEmail: string,
-  version: string,
-  floors: number,
-  agreement: string,
-  applicationStatus: 'Approved',
-  arStatus: 'Pending' | 'Node Mapping' | 'Navigation Testing' | 'Ready for activation' | 'Live' | 'Unpublished',
-  dateAdded: string,                  // Date string (e.g., "November 1, 2024")
-  lastUpdated: string,
-  thread: [
-    {
-      sender: 'admin' | 'mall',
-      senderName: string,
-      message: string,
-      timestamp: string,
-      isAdmin: boolean,               // Flags admin approval
-    }
-  ],
-  testErrors: [                       // Errors from testing phase
-    {
-      id: string,
-      message: string,
-    }
-  ],
-}
-```
-
-### State Lifting in App.jsx
-```javascript
-const [arIncomingProjects, setArIncomingProjects] = useState([])
-
-function handleAppApproved(app) {
-  const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  setArIncomingProjects(prev => {
-    const alreadyExists = prev.some(p => p.id === app.id)
-    if (alreadyExists) return prev
-    return [...prev, {
-      id: app.id,
-      mallName: app.mallName,
-      tier: TIER_MAP[app.mallName] || 'Basic',
-      // ... other fields
-      arStatus: 'Pending',
-      dateAdded: now,
-      thread: [],
-      testErrors: [],
-    }]
-  })
-}
-```
+1. **To Be Added Stalls Modal:** New `ToBeAddedStallsModal` component displays stalls from approved stall applications (read-only)
+2. **AR Unpublish on Stall Approval:** When stall application approved, matching Live AR becomes Unpublished
+3. **Stall Data Integration:** `stallAdditions` array populated from stall application data when AR unpublished
+4. **Button Appearance:** "To Be Added Stalls" button appears when stallAdditions exist
+5. **App.jsx Integration:** `handleStallAppApproved()` callback manages AR status updates
 
 ---
 
-## Color Palette
+## Future Enhancements
 
-| Status | Color | Hex |
-|--------|-------|-----|
-| Pending | Orange | #EA580C |
-| Node Mapping | Blue | #2563EB |
-| Navigation Testing | Purple | #9E5BF0 |
-| Ready for activation | Yellow | #D3A62B |
-| Live | Green | #16A34A |
-| Unpublished | Red | #D51D1D |
-| Admin Text | Blue | #2563EB |
-| Mall Text | Gray | #979797 |
-
----
-
-## Key Implementation Details
-
-1. **Publish Button Gating:** Button is disabled (opacity 0.45) until thread contains admin message
-2. **Live Row Styling:** Rows with Live or Unpublished status appear faded (opacity 0.7) and grouped at table bottom
-3. **Queue Stability:** New approved applications append to end of their tier, not inserted in date order
-4. **Modal State Sync:** Thread updates sync both table state and open modal state
-5. **No Edit Map Yet:** "Edit Map" button not implemented; restricted to workflow actions only
-6. **Approval Detection:** Thread approval is client-side flag (`isAdmin: true`); actual backend approval TBD
-
----
-
-## Future Enhancement Opportunities
-
-- Implement real map editing interface for Node Mapping stage
-- Add automated testing engine instead of hardcoded errors
-- Integrate actual backend approval mechanism for mall admins
-- Add batch operations (publish multiple, bulk status change)
-- Implement time-tracking and SLA monitoring
-- Add activity audit log per project
-- Create drill-down detailed project view
-- Implement real-time notifications for status changes
+- Automatic email notifications to mall admin at each stage transition
+- Stall publishing workflow (mark stalls as added, auto-update main AR)
+- Real-time map preview in modal
+- Testing error auto-assignment to team members
+- SLA tracking for development timeline
+- Bulk operations for same-tier projects
+- Advanced reporting on AR development metrics

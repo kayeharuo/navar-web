@@ -88,14 +88,14 @@ export default function ThreadModal({ project, onClose, onSendNote, onPublish })
                 project.thread.map(msg => (
                   <div
                     key={msg.id}
-                    className={`ar-thread-msg-row${msg.sender === 'system' ? ' ar-thread-msg-row--system' : ''}`}
+                    className={`ar-thread-msg-row${msg.sender !== 'mall' ? ' ar-thread-msg-row--admin' : ''}`}
                   >
-                    <div className={`ar-thread-msg-avatar ar-thread-msg-avatar--${msg.sender === 'system' ? 'system' : 'mall'}`}>
+                    <div className={`ar-thread-msg-avatar ar-thread-msg-avatar--${msg.sender === 'mall' ? 'mall' : 'admin'}`}>
                       {msg.sender === 'system' ? 'N' : msg.name.charAt(0).toUpperCase()}
                     </div>
-                    <div className={`ar-thread-msg-bubble ar-thread-msg-bubble--${msg.sender === 'system' ? 'system' : 'mall'}`}>
+                    <div className={`ar-thread-msg-bubble ar-thread-msg-bubble--${msg.sender === 'mall' ? 'mall' : 'admin'}`}>
                       <div className="ar-thread-msg-meta">
-                        <span className={`ar-thread-msg-name${msg.sender !== 'system' ? ' ar-thread-msg-name--mall' : ''}`}>
+                        <span className={`ar-thread-msg-name${msg.sender === 'mall' ? ' ar-thread-msg-name--mall' : ''}`}>
                           {msg.name}
                         </span>
                         <span className="ar-thread-msg-date">{msg.date}</span>

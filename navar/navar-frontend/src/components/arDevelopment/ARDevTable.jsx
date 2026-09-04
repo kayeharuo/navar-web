@@ -4,6 +4,8 @@ import TestingModal from './TestingModal'
 import ThreadModal from './ThreadModal'
 import PublishModal from './PublishModal'
 import ARDevDetail from './ARDevDetail'
+import ToBeAddedStallsModal from './ToBeAddedStallsModal'
+import { useSearchParams } from 'react-router-dom'
 
 const TIER_ORDER = { Premium: 0, Standard: 1, Basic: 2 }
 
@@ -172,7 +174,7 @@ function sortProjects(projects) {
   return [...active.sort(sortByTierDate), ...live.sort(sortByTierDate)]
 }
 
-export default function ARDevTable({ incomingProjects }) {
+export default function ARDevTable({ incomingProjects, stallApplications = [] }) {
   const [items, setItems] = useState(INITIAL_PROJECTS)
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
@@ -180,6 +182,15 @@ export default function ARDevTable({ incomingProjects }) {
   const [threadProject, setThreadProject] = useState(null)
   const [publishProject, setPublishProject] = useState(null)
   const [detailProject, setDetailProject] = useState(null)
+  const [stallsModalProject, setStallsModalProject] = useState(null)
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    const projectId = Number(searchParams.get('projectId'))
+    if (!projectId) return
+    const project = items.find(item => item.id === projectId)
+    if (project) setThreadProject(project)
+  }, [items, searchParams])
 
   useEffect(() => {
     if (!incomingProjects || incomingProjects.length === 0) return
@@ -190,6 +201,32 @@ export default function ARDevTable({ incomingProjects }) {
       return sortProjects([...prev, ...newItems])
     })
   }, [incomingProjects])
+
+  useEffect(() => {
+    if (!stallApplications || stallApplications.length === 0) return
+
+    setItems(prev => {
+      let hasChanges = false
+
+      const updated = prev.map(project => {
+        const stallApproval = stallApplications.find(app => app.mallName === project.mallName)
+        if (!stallApproval) return project
+
+        hasChanges = true
+        const stallAdditions = stallApproval.stalls || stallApproval.stallAdditions || project.stallAdditions || []
+
+        return {
+          ...project,
+          arStatus: project.arStatus === 'Live' ? 'Unpublished' : project.arStatus,
+          stallApplication: stallApproval,
+          stallAdditions,
+          lastUpdated: stallApproval.lastUpdated || project.lastUpdated,
+        }
+      })
+
+      return hasChanges ? sortProjects(updated) : prev
+    })
+  }, [stallApplications])
 
   function updateItem(id, changes) {
     const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -413,10 +450,10 @@ export default function ARDevTable({ incomingProjects }) {
                         Edit Map
                       </button>
 
-                      {project.stallAdditions && project.stallAdditions.length > 0 && (
+                      {project.stallApplication?.applicationStatus === 'Approved' && project.stallAdditions && project.stallAdditions.length > 0 && (
                         <button
                           className="ar-dev-action-btn ar-dev-action-btn--stall-additions"
-                          onClick={() => setDetailProject(project)}
+                          onClick={() => setStallsModalProject(project)}
                           title="To Be Added Stalls"
                         >
                           To Be Added Stalls ({project.stallAdditions.filter(s => s.status === 'pending').length})
@@ -541,6 +578,13 @@ export default function ARDevTable({ incomingProjects }) {
           project={detailProject}
           onClose={() => setDetailProject(null)}
           onStallStatusChange={handleStallStatusChange}
+        />
+      )}
+
+      {stallsModalProject && (
+        <ToBeAddedStallsModal
+          project={stallsModalProject}
+          onClose={() => setStallsModalProject(null)}
         />
       )}
     </>

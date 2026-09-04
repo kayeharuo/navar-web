@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, ChevronDown } from 'lucide-react'
 
 // Mock AR development versions
@@ -8,6 +8,13 @@ const AR_VERSIONS = [
   { id: 'v3', name: 'Version 3' },
   { id: 'v4', name: 'Version 4' },
 ]
+
+function getNextBatteryId(mall) {
+  const batteryIds = (mall.beacons || []).flatMap(beacon => beacon.batteryHistory || [])
+    .map(battery => Number(battery.batteryId?.match(/^BAT-(\d+)$/)?.[1]) || 0)
+  const nextNumber = Math.max(0, ...batteryIds) + 1
+  return `BAT-${String(nextNumber).padStart(4, '0')}`
+}
 
 function NodeSelectModal({ numNodes, mallNodes, selectedNodeConfig, onSave, onClose }) {
   const [localConfig, setLocalConfig] = useState(selectedNodeConfig || [])
@@ -27,6 +34,7 @@ function NodeSelectModal({ numNodes, mallNodes, selectedNodeConfig, onSave, onCl
     })
   }
 
+  // eslint-disable-next-line no-unused-vars
   const versionUsed = (versionId) => localConfig.some(n => n.versionId === versionId)
   const selectedForVersion = (versionId) => localConfig.find(n => n.versionId === versionId)?.nodeId
 
@@ -115,6 +123,11 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
     minor:      initialData?.minor       != null ? String(initialData.minor) : '',
     txPower:    initialData?.txPower     != null ? String(initialData.txPower) : '-59',
     numNodes:   initialData?.numNodes    != null ? String(initialData.numNodes) : '',
+    dateInstalled: initialData?.dateInstalled || '',
+    lastMaintenanceDate: initialData?.lastMaintenanceDate || '',
+    batteryId: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.batteryId || getNextBatteryId(mall),
+    batteryInstallDate: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.installDate || initialData?.dateInstalled || '',
+    batteryBrand: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.brand || '',
   })
 
   const [nodeConfig, setNodeConfig] = useState(initialNodeConfig)
@@ -171,6 +184,10 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
     if (!form.label.trim())      errs.label      = 'Label is required.'
     if (!form.minor.trim())      errs.minor      = 'Minor is required.'
     if (!form.txPower.trim())    errs.txPower    = 'TX Power is required.'
+    if (!form.dateInstalled)      errs.dateInstalled = 'Installation date is required.'
+    if (!form.batteryId.trim())   errs.batteryId = 'Battery ID is required.'
+    if (!form.batteryInstallDate) errs.batteryInstallDate = 'Battery install date is required.'
+    if (!form.batteryBrand.trim()) errs.batteryBrand = 'Battery brand is required.'
     return errs
   }
 
@@ -195,6 +212,21 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
       numNodes,
       nodeConfig,
       nodeConfigDisplay: configDisplay.join('; '),
+      dateInstalled:     form.dateInstalled,
+      lastMaintenanceDate: form.lastMaintenanceDate || '—',
+      batteryHistory: initialData?.batteryHistory?.length
+        ? initialData.batteryHistory.map(battery => battery.status === 'current'
+          ? { ...battery, batteryId: form.batteryId.trim(), installDate: form.batteryInstallDate, brand: form.batteryBrand.trim() }
+          : battery
+        )
+        : [{
+            id: Date.now(),
+            batteryId: form.batteryId.trim(),
+            status: 'current',
+            installDate: form.batteryInstallDate,
+            replacedDate: null,
+            brand: form.batteryBrand.trim(),
+          }],
     })
   }
 
@@ -311,6 +343,66 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 placeholder="-59"
               />
               {errors.txPower && <p className="mall-field-error">{errors.txPower}</p>}
+            </div>
+
+            {/* Installation and maintenance */}
+            <div className="mall-field-group">
+              <label className="mall-field-label">
+                DATE INSTALLED <span className="mall-field-required">*</span>
+              </label>
+              <input
+                type="date"
+                className={`mall-field-input${errors.dateInstalled ? ' mall-field-input--error' : ''}`}
+                value={form.dateInstalled}
+                onChange={e => setField('dateInstalled', e.target.value)}
+              />
+              {errors.dateInstalled && <p className="mall-field-error">{errors.dateInstalled}</p>}
+            </div>
+            <div className="mall-field-group">
+              <label className="mall-field-label">LAST MAINTENANCE / REPLACEMENT</label>
+              <input
+                type="date"
+                className="mall-field-input"
+                value={form.lastMaintenanceDate}
+                onChange={e => setField('lastMaintenanceDate', e.target.value)}
+              />
+            </div>
+
+            {/* Battery */}
+            <div className="mall-field-group">
+              <label className="mall-field-label">
+                BATTERY ID (AUTO-GENERATED)
+              </label>
+              <input
+                className="mall-field-input"
+                value={form.batteryId}
+                readOnly
+              />
+              {errors.batteryId && <p className="mall-field-error">{errors.batteryId}</p>}
+            </div>
+            <div className="mall-field-group">
+              <label className="mall-field-label">
+                BATTERY INSTALL DATE <span className="mall-field-required">*</span>
+              </label>
+              <input
+                type="date"
+                className={`mall-field-input${errors.batteryInstallDate ? ' mall-field-input--error' : ''}`}
+                value={form.batteryInstallDate}
+                onChange={e => setField('batteryInstallDate', e.target.value)}
+              />
+              {errors.batteryInstallDate && <p className="mall-field-error">{errors.batteryInstallDate}</p>}
+            </div>
+            <div className="mall-field-group mall-field-group--full">
+              <label className="mall-field-label">
+                BATTERY BRAND <span className="mall-field-required">*</span>
+              </label>
+              <input
+                className={`mall-field-input${errors.batteryBrand ? ' mall-field-input--error' : ''}`}
+                value={form.batteryBrand}
+                onChange={e => setField('batteryBrand', e.target.value)}
+                placeholder="e.g. Panasonic CR2477"
+              />
+              {errors.batteryBrand && <p className="mall-field-error">{errors.batteryBrand}</p>}
             </div>
 
             {/* No. of Nodes */}

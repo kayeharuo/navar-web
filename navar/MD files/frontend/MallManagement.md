@@ -481,6 +481,24 @@ The category filter row in StoresPanel (`stores-category-filters`) now uses `fle
   ```
 - Beacon table column **LINKED NODE** renamed to **NODES**, showing the node config display (e.g. "Version 1: nd-234; Version 2: nd-456").
 
+### Beacon Installation, Maintenance, and Battery Tracking
+- Add Beacon requires **Date Installed**, **Battery Install Date**, and **Battery Brand** before the beacon can be saved.
+- Battery IDs are system-generated in the `BAT-0001` format and are read-only for both initial installation and replacement.
+- The beacon table displays Date Installed, Last Maintenance / Replacement Date, Current Battery, and Battery Replacements count.
+- The Battery action opens the beacon-specific battery history, sorted with the current battery first and then replaced batteries from newest to oldest.
+- Each battery record displays Battery ID, status (Current or Replaced), Install Date, Replaced Date, and Brand.
+- Battery records have an **Edit** action and no delete action.
+- The **Replace** action appears only for the current battery. Replacement marks the old battery as Replaced, records its replacement date, and adds the new battery as Current.
+- Edit and Replace actions have visible spacing between them.
+
+### Beacon Ticket History
+- Each beacon row includes a Tickets action that opens ticket history for that beacon.
+- Ticket history displays a ticket reason/title, ticket ID, date, status, and details.
+- Beacon Tickets list entries show the ticket reason/title as the main label and the ticket ID plus beacon code as supporting details.
+- Ticket IDs use the stored `ticketId` or the generated `TKT-0000` format when mock data has no stored ID.
+- Beacon ticket activity is displayed newest-first from top to bottom.
+- General ticket activity follows the same newest-first ordering.
+
 ### AR Versions (Mock Data)
 ```javascript
 const AR_VERSIONS = [

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, ChevronDown, LayoutDashboard, Building2, FileText, Layers, Users, CreditCard, BarChart2, Mail, Settings, ClipboardList, Menu, LogOut } from 'lucide-react'
+import { Bell, ChevronDown, LayoutDashboard, Building2, FileText, Layers, Users, CreditCard, BarChart2, Mail, Settings, ClipboardList, Menu, LogOut, MessageCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import ChatInboxPanel from './ChatInboxPanel'
 import '../../styles/layout/topbar.css'
 import '../../styles/panels.css'
 import { Building2 as BuildingIcon } from 'lucide-react'
@@ -40,6 +42,8 @@ export default function TopBar({
   const PageIcon = pageIconMap[activePage] || LayoutDashboard
   const [showAccount, setShowAccount] = useState(false)
   const [showNotifDropdown, setShowNotifDropdown] = useState(false)
+  const [showChatInbox, setShowChatInbox] = useState(false)
+  const navigate = useNavigate()
 
   const accountRef = useRef(null)
   const notifRef   = useRef(null)
@@ -76,6 +80,27 @@ export default function TopBar({
       </div>
 
       <div className="topbar-right">
+        {/* Conversations */}
+        <div className="chat-inbox-wrap">
+          <button
+            className="topbar-icon-btn chat-inbox-trigger"
+            aria-label="Open all conversations"
+            onClick={() => setShowChatInbox(s => !s)}
+          >
+            <MessageCircle size={18} strokeWidth={1.75} />
+            <span className="chat-inbox-count">3</span>
+          </button>
+          {showChatInbox && (
+            <ChatInboxPanel
+              onClose={() => setShowChatInbox(false)}
+              onOpenThread={path => {
+                setShowChatInbox(false)
+                navigate(path)
+              }}
+            />
+          )}
+        </div>
+
         {/* Bell */}
         <div className="notif-mini-wrap" ref={notifRef}>
           <div className="bell-btn-wrap">

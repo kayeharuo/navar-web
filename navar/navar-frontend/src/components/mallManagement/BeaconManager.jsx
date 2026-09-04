@@ -9,6 +9,13 @@ const STATUS_FILTERS = ['All', 'Placed', 'Faulty']
 
 let nextBeaconId = 1000
 
+function getNextBatteryId(batteries) {
+  const batteryIds = batteries
+    .map(battery => Number(battery.batteryId?.match(/^BAT-(\d+)$/)?.[1]) || 0)
+  const nextNumber = Math.max(0, ...batteryIds) + 1
+  return `BAT-${String(nextNumber).padStart(4, '0')}`
+}
+
 // ─── Status badge ──────────────────────────────────────────
 function StatusBadge({ status }) {
   return (
@@ -97,6 +104,182 @@ function FaultyModal({ onCancel, onConfirm }) {
 
 
 // ─── Reactivate modal ──────────────────────────────────────
+function BatteryForm({ initialData = null, onCancel, onSave, isReplacement = false }) {
+  const [batteryId, setBatteryId] = useState(initialData?.batteryId || '')
+  const [installDate, setInstallDate] = useState(initialData?.installDate || '')
+  const [brand, setBrand] = useState(initialData?.brand || '')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onCancel])
+
+  function handleSubmit() {
+    if (!batteryId.trim() || !installDate || !brand.trim()) {
+      setError('Battery ID, install date, and brand are required.')
+      return
+    }
+    onSave({ batteryId: batteryId.trim(), installDate, brand: brand.trim() })
+  }
+
+  return (
+    <div className="bcn-history-modal-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div className="bcn-history-modal" role="dialog" aria-modal="true">
+        <div className="mall-modal-header">
+          <h3 className="mall-modal-title">{isReplacement ? 'Replace Battery' : 'Edit Battery'}</h3>
+          <button className="mall-modal-close" onClick={onCancel}>X</button>
+        </div>
+        <div className="mall-modal-divider" />
+        <div className="mall-modal-body">
+          <div className="mall-field-group">
+            <label className="mall-field-label">BATTERY ID (AUTO-GENERATED)</label>
+            <input className="mall-field-input" value={batteryId} readOnly />
+          </div>
+          <div className="mall-field-group">
+            <label className="mall-field-label">INSTALL DATE <span className="mall-field-required">*</span></label>
+            <input type="date" className="mall-field-input" value={installDate} onChange={e => setInstallDate(e.target.value)} />
+          </div>
+          <div className="mall-field-group">
+            <label className="mall-field-label">BRAND <span className="mall-field-required">*</span></label>
+            <input className="mall-field-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Panasonic CR2477" />
+          </div>
+          {error && <p className="mall-field-error">{error}</p>}
+        </div>
+        <div className="mall-modal-divider" />
+        <div className="mall-modal-footer">
+          <button className="mall-modal-cancel-btn" onClick={onCancel}>Cancel</button>
+          <button className="mall-modal-save-btn" onClick={handleSubmit}>{isReplacement ? 'Replace Battery' : 'Save Changes'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BatteryHistoryModal({ beacon, onClose, onUpdate }) {
+  const [formMode, setFormMode] = useState(null)
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape' && !formMode) onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose, formMode])
+
+  const batteries = [...(beacon.batteryHistory || [])].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'current' ? -1 : 1
+    return new Date(b.installDate).getTime() - new Date(a.installDate).getTime()
+  })
+  const currentBattery = batteries.find(battery => battery.status === 'current')
+
+  function handleBatterySave(data) {
+    if (formMode === 'replace') {
+      const updated = batteries.map(battery => battery.status === 'current'
+        ? { ...battery, status: 'replaced', replacedDate: data.installDate }
+        : battery
+      )
+      onUpdate({
+        batteryHistory: [...updated, { id: Date.now(), ...data, status: 'current', replacedDate: null }],
+        lastMaintenanceDate: data.installDate,
+      })
+    } else {
+      onUpdate({
+        batteryHistory: batteries.map(battery => battery.id === formMode.id ? { ...battery, ...data } : battery),
+      })
+    }
+    setFormMode(null)
+  }
+
+  return (
+    <>
+      <div className="bcn-history-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="bcn-history-modal" role="dialog" aria-modal="true">
+          <div className="mall-modal-header">
+            <div>
+              <h3 className="mall-modal-title">Battery History</h3>
+              <p className="bcn-history-subtitle">{beacon.beaconCode} · {beacon.label}</p>
+            </div>
+            <button className="mall-modal-close" onClick={onClose}>X</button>
+          </div>
+          <div className="mall-modal-divider" />
+          <div className="bcn-history-body">
+            {batteries.length === 0 ? <p className="stores-empty">No battery records found.</p> : batteries.map(battery => (
+              <div className="bcn-history-card" key={battery.id}>
+                <div className="bcn-history-card-header">
+                  <strong>{battery.batteryId}</strong>
+                  <span className={`bcn-battery-status bcn-battery-status--${battery.status}`}>{battery.status === 'current' ? 'Current' : 'Replaced'}</span>
+                </div>
+                <div className="bcn-history-grid">
+                  <span>Install date</span><strong>{battery.installDate}</strong>
+                  <span>Replaced date</span><strong>{battery.replacedDate || '—'}</strong>
+                  <span>Brand</span><strong>{battery.brand}</strong>
+                </div>
+                <div className="bcn-history-actions">
+                  <button className="stores-action-btn stores-action-btn--edit" onClick={() => setFormMode(battery)}>Edit</button>
+                  {battery.status === 'current' && currentBattery?.id === battery.id && (
+                    <button className="stores-action-btn bcn-btn--maintenance" onClick={() => setFormMode('replace')}>Replace</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {formMode && (
+        <BatteryForm
+          initialData={formMode === 'replace' ? { batteryId: getNextBatteryId(batteries) } : formMode}
+          isReplacement={formMode === 'replace'}
+          onCancel={() => setFormMode(null)}
+          onSave={handleBatterySave}
+        />
+      )}
+    </>
+  )
+}
+
+function TicketHistoryModal({ beacon, onClose }) {
+  const tickets = [...(beacon.ticketHistory || [])].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
+  return (
+    <div className="bcn-history-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bcn-history-modal" role="dialog" aria-modal="true">
+        <div className="mall-modal-header">
+          <div>
+            <h3 className="mall-modal-title">Beacon Ticket History</h3>
+            <p className="bcn-history-subtitle">{beacon.beaconCode} · {beacon.label}</p>
+          </div>
+          <button className="mall-modal-close" onClick={onClose}>X</button>
+        </div>
+        <div className="mall-modal-divider" />
+        <div className="bcn-history-body">
+          {tickets.length === 0 ? <p className="stores-empty">No ticket history found.</p> : tickets.map(ticket => (
+            <div className="bcn-history-card" key={ticket.id}>
+              <div className="bcn-history-card-header"><strong>{ticket.title || ticket.reason}</strong><StatusBadge status={ticket.status || 'faulty'} /></div>
+              <div className="bcn-history-grid">
+                <span>Ticket ID</span><strong>{ticket.ticketId || `TKT-${String(ticket.id).padStart(4, '0')}`}</strong>
+                <span>Date</span><strong>{ticket.date || ticket.timeAgo || '—'}</strong>
+                <span>Details</span><strong>{ticket.note || ticket.reason || '—'}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReactivateModal({ onCancel, onConfirm }) {
   useEffect(() => {
     function handleEsc(e) {
@@ -133,6 +316,8 @@ export default function BeaconManager({ mall, onClose, onSave }) {
   const [editingBeacon, setEditing]   = useState(null)
   const [faultyTarget, setFaulty]     = useState(null)
   const [reactTarget, setReact]       = useState(null)
+  const [batteryBeacon, setBatteryBeacon] = useState(null)
+  const [ticketBeacon, setTicketBeacon] = useState(null)
 
   function handleAddSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -141,6 +326,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       ...data,
       status:     'placed',
       faultyNote: '',
+      ticketHistory: [],
       dateAdded:  now,
     }])
     setShowAdd(false)
@@ -151,6 +337,11 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       b.id === editingBeacon.id ? { ...b, ...data } : b
     ))
     setEditing(null)
+  }
+
+  function handleBeaconUpdate(id, changes) {
+    setBeacons(prev => prev.map(b => b.id === id ? { ...b, ...changes } : b))
+    setBatteryBeacon(prev => prev && prev.id === id ? { ...prev, ...changes } : prev)
   }
 
   function handleSetFaulty(issue, note) {
@@ -254,6 +445,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                   <th>MINOR</th>
                   <th>TX POWER(dBm)</th>
                   <th>NODES</th>
+                  <th>DATE INSTALLED</th>
+                  <th>LAST MAINTENANCE / REPLACEMENT</th>
+                  <th>CURRENT BATTERY</th>
+                  <th>BATTERY REPLACEMENTS</th>
                   <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -261,7 +456,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
               <tbody>
                 {filteredBeacons.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="stores-empty">No beacons found.</td>
+                    <td colSpan={14} className="stores-empty">No beacons found.</td>
                   </tr>
                 ) : filteredBeacons.map(b => (
                   <tr key={b.id} className="stores-table-row">
@@ -273,9 +468,15 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                     <td>{b.minor}</td>
                     <td>{b.txPower}</td>
                     <td>{b.nodeConfigDisplay || '—'}</td>
+                    <td>{b.dateInstalled || b.dateAdded || '—'}</td>
+                    <td>{b.lastMaintenanceDate || '—'}</td>
+                    <td>{b.batteryHistory?.find(battery => battery.status === 'current')?.batteryId || '—'}</td>
+                    <td>{b.batteryHistory?.filter(battery => battery.status === 'replaced').length || 0}</td>
                     <td><StatusBadge status={b.status} /></td>
                     <td>
                       <div className="stores-action-row">
+                        <button className="stores-action-btn bcn-btn--history" onClick={() => setTicketBeacon(b)}>Tickets</button>
+                        <button className="stores-action-btn bcn-btn--battery" onClick={() => setBatteryBeacon(b)}>Battery</button>
                         {b.status === 'placed' ? (
                           <button className="stores-action-btn bcn-btn--faulty" onClick={() => setFaulty(b)}>
                             Faulty
@@ -334,6 +535,18 @@ export default function BeaconManager({ mall, onClose, onSave }) {
           onCancel={() => setReact(null)}
           onConfirm={handleReactivate}
         />
+      )}
+
+      {batteryBeacon && (
+        <BatteryHistoryModal
+          beacon={batteryBeacon}
+          onClose={() => setBatteryBeacon(null)}
+          onUpdate={changes => handleBeaconUpdate(batteryBeacon.id, changes)}
+        />
+      )}
+
+      {ticketBeacon && (
+        <TicketHistoryModal beacon={ticketBeacon} onClose={() => setTicketBeacon(null)} />
       )}
     </>
   )

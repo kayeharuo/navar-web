@@ -29,9 +29,9 @@ const SAMPLE_MALLS = [
     zipCode: '6000',
     major: 1,
     beacons: [
-      { id: 1, beaconCode: 'BCN-0001', floorNo: 'GF', floorLabel: 'Ground Floor', label: 'Zara Entrance', major: 1, minor: 101, txPower: -59, linkedNode: 'Zara', status: 'placed', faultyNote: '', dateAdded: 'August 15, 2024' },
-      { id: 2, beaconCode: 'BCN-0002', floorNo: '2F', floorLabel: '2nd Floor', label: 'Starbucks Entrance', major: 1, minor: 102, txPower: -59, linkedNode: 'Starbucks', status: 'placed', faultyNote: '', dateAdded: 'August 15, 2024' },
-      { id: 3, beaconCode: 'BCN-0003', floorNo: 'GF', floorLabel: 'Ground Floor', label: 'Jollibee Entrance', major: 1, minor: 103, txPower: -59, linkedNode: 'Jollibee', status: 'placed', faultyNote: '', dateAdded: 'August 15, 2024' },
+      { id: 1, beaconCode: 'BCN-0001', floorNo: 'GF', floorLabel: 'Ground Floor', label: 'Zara Entrance', major: 1, minor: 101, txPower: -59, linkedNode: 'Zara', status: 'placed', faultyNote: '', dateAdded: 'August 15, 2024', dateInstalled: '2024-08-15', lastMaintenanceDate: '—', batteryHistory: [{ id: 1, batteryId: 'BAT-0001', status: 'current', installDate: '2024-08-15', replacedDate: null, brand: 'Panasonic CR2477' }], ticketHistory: [] },
+      { id: 2, beaconCode: 'BCN-0002', floorNo: '2F', floorLabel: '2nd Floor', label: 'Starbucks Entrance', major: 1, minor: 102, txPower: -59, linkedNode: 'Starbucks', status: 'placed', faultyNote: '', dateAdded: 'August 15, 2024', dateInstalled: '2024-08-15', lastMaintenanceDate: '—', batteryHistory: [], ticketHistory: [] },
+      { id: 3, beaconCode: 'BCN-0003', floorNo: 'GF', floorLabel: 'Ground Floor', label: 'Jollibee Entrance', major: 1, minor: 103, txPower: -59, linkedNode: 'Jollibee', status: 'placed', faultyNote: '', dateAdded: 'August 15, 2024', dateInstalled: '2024-08-15', lastMaintenanceDate: '—', batteryHistory: [], ticketHistory: [] },
     ],
     storesCount: 4,
     stores: [],
@@ -90,7 +90,17 @@ export default function BeaconsPage() {
   useEffect(() => {
     const foundMall = SAMPLE_MALLS.find(m => m.id === parseInt(mallId))
     if (foundMall) {
-      setMall({ ...foundMall })
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMall({
+        ...foundMall,
+        beacons: (foundMall.beacons || []).map(beacon => ({
+          ...beacon,
+          dateInstalled: beacon.dateInstalled || foundMall.dateAdded,
+          lastMaintenanceDate: beacon.lastMaintenanceDate || '—',
+          batteryHistory: beacon.batteryHistory || [],
+          ticketHistory: beacon.ticketHistory || [],
+        })),
+      })
     } else {
       navigate('/mall-management')
     }
@@ -99,6 +109,7 @@ export default function BeaconsPage() {
   useEffect(() => {
     function handleEsc(e) {
       if (e.key === 'Escape') {
+        if (document.querySelector('[role="dialog"]')) return
         navigate('/mall-management')
       }
     }

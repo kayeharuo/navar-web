@@ -8,7 +8,7 @@ function UploadFileIcon() {
   )
 }
 
-export default function RequestRevisionModal({ mallName, onCancel, onSubmit }) {
+export default function RequestRevisionModal({ mallName, onCancel, onSubmit, isStallApplication = false }) {
   const [notes, setNotes] = useState('')
 
   function handleSubmit() {
@@ -24,6 +24,7 @@ export default function RequestRevisionModal({ mallName, onCancel, onSubmit }) {
         <p className="app-modal-desc">
           Describe what needs to be corrected. Status will change to{' '}
           <span className="app-modal-desc-highlight">For Revision</span> and the mall admin will be notified.
+          {isStallApplication && ' Please verify all stalls have been added to the store list.'}
         </p>
         <div className="app-modal-label">
           REVISION NOTES <span className="app-modal-label-required">*</span>

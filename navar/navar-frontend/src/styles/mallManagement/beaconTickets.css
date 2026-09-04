@@ -267,6 +267,13 @@
   margin: 0;
 }
 
+.bkt-detail-subtitle {
+  margin: 3px 0 0;
+  color: #9B9C9C;
+  font-family: 'Fira Mono', monospace;
+  font-size: 11px;
+}
+
 .bkt-detail-close {
   font-family: 'Fira Mono', monospace;
   font-size: 16px;

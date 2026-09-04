@@ -5,10 +5,14 @@ import RequestRevisionModal from './RequestRevisionModal'
 import ApproveModal from './ApproveModal'
 import Stepper from './Stepper'
 
-export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove, onSendNote, isStallApplication = false }) {
-  const [activeTab, setActiveTab] = useState('submission')
+export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove, onSendNote, isStallApplication = false, initialTab = 'submission' }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [showRevisionModal, setShowRevisionModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
+
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [app.id, initialTab])
 
   useEffect(() => {
     function handleEsc(e) {
@@ -26,6 +30,11 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
 
   function handleApproveConfirm() {
     if (isStallApplication) {
+      if (!app.floorPlans || app.floorPlans.length === 0) {
+        alert('Please submit floor plans before approving this application.')
+        return
+      }
+
       // Check if all stalls have been added to store list
       const allStallsAdded = app.stalls && app.stalls.every(stall => stall.status === 'added_to_store_list')
       if (!allStallsAdded) {
@@ -111,13 +120,24 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
             }
           </div>
 
-          {!isApproved && (
+          {!isApproved && !isStallApplication && (
             <div className="review-panel-footer">
               <button className="review-footer-btn review-footer-btn--revision" onClick={() => setShowRevisionModal(true)}>
                 Request Revision
               </button>
               <button className="review-footer-btn review-footer-btn--approve" onClick={() => setShowApproveModal(true)}>
                 Approve Application
+              </button>
+            </div>
+          )}
+
+          {!isApproved && isStallApplication && (
+            <div className="review-panel-footer">
+              <button className="review-footer-btn review-footer-btn--revision" onClick={() => setShowRevisionModal(true)}>
+                Request Revision
+              </button>
+              <button className="review-footer-btn review-footer-btn--approve" onClick={() => setShowApproveModal(true)}>
+                Approve Stall Addition
               </button>
             </div>
           )}
@@ -129,6 +149,7 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
           mallName={app.mallName}
           onCancel={() => setShowRevisionModal(false)}
           onSubmit={handleRevisionSubmit}
+          isStallApplication={isStallApplication}
         />
       )}
 
@@ -137,6 +158,7 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
           mallName={app.mallName}
           onCancel={() => setShowApproveModal(false)}
           onConfirm={handleApproveConfirm}
+          isStallApplication={isStallApplication}
         />
       )}
     </>

@@ -360,6 +360,11 @@
 
 .app-mgmt-review-btn:hover { background: #1d4fd8; }
 
+.app-mgmt-review-btn--stall {
+  background: #2563EB;
+  color: #fff;
+}
+
 /* =====================================================
    REVIEW PANEL (right-side drawer)
    ===================================================== */

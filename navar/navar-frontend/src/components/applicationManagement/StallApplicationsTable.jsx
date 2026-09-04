@@ -12,13 +12,13 @@ const STALL_PRICE = 3500 // Price per extra stall
 const INITIAL_STALL_APPLICATIONS = [
   {
     id: 101,
-    mallName: 'SM Seaside City Cebu',
+    mallName: 'Ayala Center Cebu',
     city: 'Cebu City',
-    adminName: 'Jose Dela Cruz',
-    adminEmail: 'jdelacruz@smseaside.ph',
-    tier: 'Standard', // Current subscription tier
-    currentStores: 95, // Current number of stores
-    submittedStalls: 8, // New stalls being submitted
+    adminName: 'Maria Santos',
+    adminEmail: 'msantos@ayalacebu.ph',
+    tier: 'Premium', // Current subscription tier
+    currentStores: 6, // Current number of stores
+    submittedStalls: 4, // New stalls being submitted
     applicationStatus: 'Submitted',
     submittedDate: 'April 1, 2026',
     lastUpdated: 'April 1, 2026',
@@ -139,9 +139,8 @@ function StatusBadge({ status }) {
     'Submitted': { color: '#2563EB', bg: '#EFF6FF' },
     'For Revision': { color: '#EA580C', bg: '#FFF3E0' },
     'Approved': { color: '#16A34A', bg: '#E1FFEC' },
-    'Draft': { color: '#9B9C9C', bg: '#F7F8FA' },
   }
-  const style = statusMap[status] || statusMap['Draft']
+  const style = statusMap[status] || statusMap['Submitted']
   return (
     <span style={{
       color: style.color,
@@ -158,23 +157,28 @@ function StatusBadge({ status }) {
   )
 }
 
-const STATUS_FILTERS = ['All', 'Submitted', 'For Revision', 'Approved', 'Draft']
+const STATUS_FILTERS = ['All', 'Submitted', 'For Revision', 'Approved']
 
-export default function StallApplicationsTable({ applications, onApplicationsChange, onReviewApp }) {
+export default function StallApplicationsTable({ applications, onApplicationsChange, onReviewApp, liveProjects = [] }) {
   const [apps, setApps] = useState(INITIAL_STALL_APPLICATIONS)
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Get list of malls that have published AR (Live status)
+  const liveProjectMallNames = new Set(liveProjects?.map(p => p.mallName) || [])
 
   useEffect(() => {
     onApplicationsChange(apps)
   }, [apps, onApplicationsChange])
 
+  const visibleApps = apps.filter(app => liveProjectMallNames.has(app.mallName))
+
   function getFilterCount(filter) {
-    if (filter === 'All') return apps.length
-    return apps.filter(a => a.applicationStatus === filter).length
+    if (filter === 'All') return visibleApps.length
+    return visibleApps.filter(a => a.applicationStatus === filter).length
   }
 
-  const filtered = apps.filter(app => {
+  const filtered = visibleApps.filter(app => {
     const matchesFilter = activeFilter === 'All' || app.applicationStatus === activeFilter
     const q = searchQuery.toLowerCase()
     const matchesSearch = !q || app.mallName.toLowerCase().includes(q) || app.city.toLowerCase().includes(q) || app.adminName.toLowerCase().includes(q)
@@ -186,7 +190,7 @@ export default function StallApplicationsTable({ applications, onApplicationsCha
     ...filtered.filter(a => a.applicationStatus === 'Approved'),
   ]
 
-  const pendingCount = apps.filter(a => a.applicationStatus === 'Submitted' || a.applicationStatus === 'For Revision').length
+  const pendingCount = visibleApps.filter(a => a.applicationStatus === 'Submitted' || a.applicationStatus === 'For Revision').length
 
   function calculateCost(app) {
     const tier = SUBSCRIPTION_TIERS[app.tier]
@@ -209,6 +213,12 @@ export default function StallApplicationsTable({ applications, onApplicationsCha
             <span className="app-mgmt-subtitle-alert">{pendingCount} submissions awaiting review.</span>
           </p>
         </div>
+      )}
+
+      {visibleApps.length === 0 && (
+        <p style={{ margin: '0 0 16px', color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>
+          No stall applications are available yet for malls with published AR.
+        </p>
       )}
 
       {/* Toolbar */}
@@ -281,7 +291,7 @@ export default function StallApplicationsTable({ applications, onApplicationsCha
                     <td style={{ fontSize: '12px', color: '#9B9C9C' }}>{app.submittedDate}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <button
-                        className="app-mgmt-view-btn"
+                        className="app-mgmt-review-btn app-mgmt-review-btn--stall"
                         onClick={() => onReviewApp(app)}
                       >
                         Review
@@ -295,7 +305,7 @@ export default function StallApplicationsTable({ applications, onApplicationsCha
         </div>
       </div>
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && visibleApps.length > 0 && (
         <p style={{ textAlign: 'center', color: '#9B9C9C', marginTop: '20px' }}>
           No stall applications found.
         </p>
