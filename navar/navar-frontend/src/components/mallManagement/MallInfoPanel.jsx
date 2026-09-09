@@ -48,7 +48,7 @@ function InfoRow({ label, value }) {
   )
 }
 
-export default function MallInfoPanel({ mall, onClose, onUnits, onStores, onBeacons, onEdit }) {
+export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdit }) {
   const navigate = useNavigate()
   const [showLogoLightbox, setShowLogoLightbox] = useState(false)
 

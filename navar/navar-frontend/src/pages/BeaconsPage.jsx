@@ -90,13 +90,12 @@ export default function BeaconsPage() {
   useEffect(() => {
     const foundMall = SAMPLE_MALLS.find(m => m.id === parseInt(mallId))
     if (foundMall) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMall({
         ...foundMall,
         beacons: (foundMall.beacons || []).map(beacon => ({
           ...beacon,
           dateInstalled: beacon.dateInstalled || foundMall.dateAdded,
-          lastMaintenanceDate: beacon.lastMaintenanceDate || '—',
+          lastMaintenanceDate: beacon.lastMaintenanceDate || beacon.lastReplacementDate || '—',
           batteryHistory: beacon.batteryHistory || [],
           ticketHistory: beacon.ticketHistory || [],
         })),

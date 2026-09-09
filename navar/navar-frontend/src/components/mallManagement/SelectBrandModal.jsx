@@ -1,7 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const BRANDS = [
   { id: 1, name: 'Jollibee',           category: 'Food & Beverage' },
   { id: 2, name: 'Zara',               category: 'Fashion & Apparel' },

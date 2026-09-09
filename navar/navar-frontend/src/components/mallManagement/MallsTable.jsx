@@ -8,11 +8,10 @@ import UnitsPanel from './UnitsPanel'
 import MallInfoPanel from './MallInfoPanel'
 import InquiriesTab from './InquiriesTab'
 import BeaconTicketsTab from './BeaconTicketsTab'
-import GeneralTicketsTab from './GeneralTicketsTab'
 import '../../styles/mallManagement/mallModal.css'
 import '../../styles/mallManagement/inquiries.css'
 
-const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets', 'General Tickets']
+const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets']
 
 const STATUS_FILTERS = [
   { label: 'All',          count: 17 },
@@ -544,8 +543,6 @@ export default function MallsTable() {
               <p className="mall-subtitle">Brands List</p>
             ) : activeTab === 'Beacon Tickets' ? (
               <p className="mall-subtitle">Manage Tickets Filed after a beacon is found to be faulty by the system or the mall administrators.</p>
-            ) : activeTab === 'General Tickets' ? (
-              <p className="mall-subtitle">Manage General Support Tickets from users and customers.</p>
             ) : (
               <p className="mall-subtitle">{malls.length} malls · Click any row to view full details</p>
             )}
@@ -771,10 +768,6 @@ export default function MallsTable() {
           <BeaconTicketsTab />
         )}
 
-        {/* General Tickets tab */}
-        {activeTab === 'General Tickets' && (
-          <GeneralTicketsTab />
-        )}
       </div>
 
       {/* Add Mall modal */}

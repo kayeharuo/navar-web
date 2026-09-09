@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Search, TriangleAlert } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import AddBeaconModal from './AddBeaconModal'
 
 // Placeholder UUID — will be replaced by real value from backend
@@ -105,7 +105,7 @@ function FaultyModal({ onCancel, onConfirm }) {
 
 // ─── Reactivate modal ──────────────────────────────────────
 function BatteryForm({ initialData = null, onCancel, onSave, isReplacement = false }) {
-  const [batteryId, setBatteryId] = useState(initialData?.batteryId || '')
+  const [batteryId] = useState(initialData?.batteryId || '')
   const [installDate, setInstallDate] = useState(initialData?.installDate || '')
   const [brand, setBrand] = useState(initialData?.brand || '')
   const [error, setError] = useState('')
@@ -183,7 +183,7 @@ function BatteryHistoryModal({ beacon, onClose, onUpdate }) {
         : battery
       )
       onUpdate({
-        batteryHistory: [...updated, { id: Date.now(), ...data, status: 'current', replacedDate: null }],
+        batteryHistory: [...updated, { id: `${data.installDate}-${data.batteryId}`, ...data, status: 'current', replacedDate: null }],
         lastMaintenanceDate: data.installDate,
       })
     } else {
@@ -399,8 +399,6 @@ export default function BeaconManager({ mall, onClose, onSave }) {
         <div className="stores-page-toolbar">
           <div className="stores-category-filters">
             {STATUS_FILTERS.map(f => {
-              const key = f.toLowerCase()
-              const count = key === 'all' ? counts.all : counts[key] || 0
               const isActive = statusFilter === f
               return (
                 <button
@@ -446,7 +444,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                   <th>TX POWER(dBm)</th>
                   <th>NODES</th>
                   <th>DATE INSTALLED</th>
-                  <th>LAST MAINTENANCE / REPLACEMENT</th>
+                  <th>LAST MAINTENANCE</th>
                   <th>CURRENT BATTERY</th>
                   <th>BATTERY REPLACEMENTS</th>
                   <th>STATUS</th>
@@ -469,7 +467,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                     <td>{b.txPower}</td>
                     <td>{b.nodeConfigDisplay || '—'}</td>
                     <td>{b.dateInstalled || b.dateAdded || '—'}</td>
-                    <td>{b.lastMaintenanceDate || '—'}</td>
+                    <td>{b.lastMaintenanceDate || b.lastReplacementDate || '—'}</td>
                     <td>{b.batteryHistory?.find(battery => battery.status === 'current')?.batteryId || '—'}</td>
                     <td>{b.batteryHistory?.filter(battery => battery.status === 'replaced').length || 0}</td>
                     <td><StatusBadge status={b.status} /></td>

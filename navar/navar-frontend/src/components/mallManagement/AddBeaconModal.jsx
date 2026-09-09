@@ -124,7 +124,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
     txPower:    initialData?.txPower     != null ? String(initialData.txPower) : '-59',
     numNodes:   initialData?.numNodes    != null ? String(initialData.numNodes) : '',
     dateInstalled: initialData?.dateInstalled || '',
-    lastMaintenanceDate: initialData?.lastMaintenanceDate || '',
+    lastMaintenanceDate: initialData?.lastMaintenanceDate || initialData?.lastReplacementDate || '',
     batteryId: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.batteryId || getNextBatteryId(mall),
     batteryInstallDate: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.installDate || initialData?.dateInstalled || '',
     batteryBrand: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.brand || '',
@@ -345,7 +345,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               {errors.txPower && <p className="mall-field-error">{errors.txPower}</p>}
             </div>
 
-            {/* Installation and maintenance */}
+            {/* Beacon installation */}
             <div className="mall-field-group">
               <label className="mall-field-label">
                 DATE INSTALLED <span className="mall-field-required">*</span>
@@ -358,16 +358,6 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               />
               {errors.dateInstalled && <p className="mall-field-error">{errors.dateInstalled}</p>}
             </div>
-            <div className="mall-field-group">
-              <label className="mall-field-label">LAST MAINTENANCE / REPLACEMENT</label>
-              <input
-                type="date"
-                className="mall-field-input"
-                value={form.lastMaintenanceDate}
-                onChange={e => setField('lastMaintenanceDate', e.target.value)}
-              />
-            </div>
-
             {/* Battery */}
             <div className="mall-field-group">
               <label className="mall-field-label">
@@ -391,6 +381,15 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 onChange={e => setField('batteryInstallDate', e.target.value)}
               />
               {errors.batteryInstallDate && <p className="mall-field-error">{errors.batteryInstallDate}</p>}
+            </div>
+            <div className="mall-field-group">
+              <label className="mall-field-label">LAST MAINTENANCE</label>
+              <input
+                type="date"
+                className="mall-field-input"
+                value={form.lastMaintenanceDate}
+                onChange={e => setField('lastMaintenanceDate', e.target.value)}
+              />
             </div>
             <div className="mall-field-group mall-field-group--full">
               <label className="mall-field-label">

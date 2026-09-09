@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { X, Plus, Search, XCircle, CheckCircle } from 'lucide-react'
+import { useCallback, useState, useEffect } from 'react'
+import { Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
 import AddStoreModal from './AddStoreModal'
 
@@ -80,6 +80,23 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   const [deactivating, setDeactivating]       = useState(null)
   const [reactivating, setReactivating]       = useState(null)
 
+  const handleClose = useCallback(() => {
+    // Update unit statuses based on current store assignments
+    let updatedUnits = [...(mallState.units || [])]
+    updatedUnits = updatedUnits.map(u => ({ ...u, status: 'vacant' }))
+    stores.forEach(store => {
+      if (store.active && store.unitNos && store.unitNos.length > 0) {
+        store.unitNos.forEach(unitNo => {
+          updatedUnits = updatedUnits.map(u =>
+            u.unitNo === unitNo ? { ...u, status: 'occupied' } : u
+          )
+        })
+      }
+    })
+    onSave(stores, updatedUnits)
+    onClose()
+  }, [mallState.units, onClose, onSave, stores])
+
   useEffect(() => {
     function handleEsc(e) {
       if (e.key === 'Escape' && !showSelectBrand && !showAddStore && !deactivating && !reactivating) {
@@ -88,7 +105,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
     }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [showSelectBrand, showAddStore, deactivating, reactivating])
+  }, [handleClose, showSelectBrand, showAddStore, deactivating, reactivating])
 
   function handleAddStoreClick() { setShowSelectBrand(true) }
 
@@ -182,28 +199,6 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       s.id === reactivating.id ? { ...s, active: true } : s
     ))
     setReactivating(null)
-  }
-
-  function handleClose() {
-    // Update unit statuses based on current store assignments
-    let updatedUnits = [...(mallState.units || [])]
-
-    // First mark all as vacant
-    updatedUnits = updatedUnits.map(u => ({ ...u, status: 'vacant' }))
-
-    // Then mark assigned ones as occupied
-    stores.forEach(store => {
-      if (store.active && store.unitNos && store.unitNos.length > 0) {
-        store.unitNos.forEach(unitNo => {
-          updatedUnits = updatedUnits.map(u =>
-            u.unitNo === unitNo ? { ...u, status: 'occupied' } : u
-          )
-        })
-      }
-    })
-
-    onSave(stores, updatedUnits)
-    onClose()
   }
 
   const activeCount = stores.filter(s => s.active).length

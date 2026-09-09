@@ -25,7 +25,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
     description: initialData?.description || '',
   })
 
-  const [logo, setLogo]               = useState(null)
+  const [, setLogo]                   = useState(null)
   const [logoPreview, setLogoPreview] = useState(initialData?.logo || null)
   const [errors, setErrors]           = useState({})
   const fileInputRef = useRef(null)

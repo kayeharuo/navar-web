@@ -205,11 +205,6 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
         )}
         {errors.isPrimary && <span className="acct-form-error">{errors.isPrimary}</span>}
       </div>
-      <div className="acct-form-divider" />
-      <div className="acct-form-group">
-        <label className="acct-form-label">ACCOUNT STATUS</label>
-        <div className="acct-form-status-display">Partial</div>
-      </div>
     </>
   )
 
@@ -518,7 +513,7 @@ export default function AccountManagement() {
     setModal('created')
   }
 
-  function handleSaveEdit({ role, name, email, jobTitle, contact, mall, isPrimary }) {
+  function handleSaveEdit({ name, email, jobTitle, contact, mall, isPrimary }) {
     const now = formatDate(new Date())
     if (selectedAccount.mall !== undefined) {
       setMallAdmins(prev => prev.map(a => a.id === selectedAccount.id ? { ...a, name, email, jobTitle, contact, mall, isPrimary, lastUpdated: now } : a))
@@ -604,19 +599,22 @@ export default function AccountManagement() {
       <div className="acct-mgmt-table-wrap">
         <div className="acct-mgmt-table-scroll">
           <table className="acct-mgmt-table">
-            <thead><tr><th>ACCOUNT</th><th>EMAIL</th><th>JOB TITLE</th><th>CONTACT</th><th>CREATED</th><th>LAST UPDATED</th><th>LAST LOGIN</th><th>ACTIONS</th></tr></thead>
+            <thead><tr><th>ACCOUNT</th><th>EMAIL</th><th>JOB TITLE</th><th>CONTACT</th><th>CREATED</th><th>LAST UPDATED</th><th>LAST LOGIN</th><th>ACCOUNT STATUS</th><th>ACTIONS</th></tr></thead>
             <tbody>
-              {superList.length === 0 && <tr className="acct-empty-row"><td colSpan={8}>No accounts found.</td></tr>}
-              {superList.map(a => (
-                <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
-                  <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Temp PW</span>}</div></td>
-                  <td>{a.email}</td>
-                  <td>{a.jobTitle || '-'}</td>
-                  <td>{a.contact || '-'}</td>
-                  <td>{a.created}</td>
-                  <td>{a.lastUpdated}</td>
-                  <td>{a.lastLogin}</td>
-                  <td>
+              {superList.length === 0 && <tr className="acct-empty-row"><td colSpan={9}>No accounts found.</td></tr>}
+              {superList.map(a => {
+                const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
+                return (
+                  <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
+                    <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Temp PW</span>}</div></td>
+                    <td>{a.email}</td>
+                    <td>{a.jobTitle || '-'}</td>
+                    <td>{a.contact || '-'}</td>
+                    <td>{a.created}</td>
+                    <td>{a.lastUpdated}</td>
+                    <td>{a.lastLogin}</td>
+                    <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
+                    <td>
                     <div className="acct-actions">
                       <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
                       {a.status === 'pending'
@@ -624,9 +622,10 @@ export default function AccountManagement() {
                         : <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset PW</button>}
                       <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
                     </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -159,8 +159,8 @@ function StatusBadge({ status }) {
 
 const STATUS_FILTERS = ['All', 'Submitted', 'For Revision', 'Approved']
 
-export default function StallApplicationsTable({ applications, onApplicationsChange, onReviewApp, liveProjects = [] }) {
-  const [apps, setApps] = useState(INITIAL_STALL_APPLICATIONS)
+export default function StallApplicationsTable({ onApplicationsChange, onReviewApp, liveProjects = [] }) {
+  const [apps] = useState(INITIAL_STALL_APPLICATIONS)
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -191,18 +191,6 @@ export default function StallApplicationsTable({ applications, onApplicationsCha
   ]
 
   const pendingCount = visibleApps.filter(a => a.applicationStatus === 'Submitted' || a.applicationStatus === 'For Revision').length
-
-  function calculateCost(app) {
-    const tier = SUBSCRIPTION_TIERS[app.tier]
-    if (!tier) return 0
-    const exceedsBy = Math.max(0, app.currentStores + app.submittedStalls - tier.maxTenants)
-    return exceedsBy * STALL_PRICE
-  }
-
-  function checkAllStallsAdded(app) {
-    // Check if all stalls have status 'added_to_store_list'
-    return app.stalls.every(stall => stall.status === 'added_to_store_list')
-  }
 
   return (
     <>
@@ -274,8 +262,6 @@ export default function StallApplicationsTable({ applications, onApplicationsCha
                 const totalAfter = app.currentStores + app.submittedStalls
                 const exceedsBy = Math.max(0, totalAfter - tier.maxTenants)
                 const cost = exceedsBy * STALL_PRICE
-                const allStallsAdded = checkAllStallsAdded(app)
-
                 return (
                   <tr key={app.id} className="app-mgmt-table-row" onClick={() => onReviewApp(app)}>
                     <td><strong>{app.mallName}</strong></td>

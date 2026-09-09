@@ -51,7 +51,7 @@ export default function StoresPage() {
     }
   }, [mallId, navigate])
 
-  function handleStoresSave(updatedStores, updatedUnits) {
+  function handleStoresSave(updatedStores) {
     // Calculate correct unit statuses based on store assignments
     let calculatedUnits = [...(mall.units || [])]
 

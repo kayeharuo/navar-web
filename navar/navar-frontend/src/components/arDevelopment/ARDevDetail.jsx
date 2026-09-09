@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
 
 export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
   const [activeTab, setActiveTab] = useState('main')

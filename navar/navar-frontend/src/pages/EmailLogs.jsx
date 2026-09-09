@@ -251,7 +251,7 @@ export default function EmailLogs() {
       const matchType = typeFilter === 'All Email Types' || l.type === typeFilter
       return matchSearch && matchStatus && matchType
     })
-  }, [logs, search, statusFilter, typeFilter, statusToDisplay])
+  }, [logs, search, typeFilter, statusToDisplay])
 
   function handleResend(id) {
     setLogs(prev => prev.map(l => l.id === id ? { ...l, status: 'sent' } : l))

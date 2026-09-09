@@ -161,7 +161,6 @@ export default function AddStoreModal({
   const [unitNos, setUnitNos]       = useState(initialData?.unitNos || [])
   const [unitsSaved, setUnitsSaved] = useState((initialData?.unitNos?.length || 0) > 0)
   const [showUnitAssign, setShowUnitAssign] = useState(false)
-  const [unitsChanged, setUnitsChanged] = useState(false)
 
   const [logo, setLogo]             = useState(null)
   const [logoPreview, setLogoPreview] = useState(initialData?.brandLogo || null)
@@ -220,7 +219,6 @@ export default function AddStoreModal({
   function handleUnitsSave(selected) {
     setUnitNos(selected)
     setUnitsSaved(selected.length > 0)
-    setUnitsChanged(true)
     setShowUnitAssign(false)
   }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Building2 } from 'lucide-react'
 
 export const INITIAL_NOTIFICATIONS = [
