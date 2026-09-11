@@ -1,469 +1,563 @@
-import { useState } from 'react'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Download, Clock, TrendingUp, Ticket, Users, MapPin } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  LineChart, Line, BarChart, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
+import DateRangePicker from '../components/analytics/DateRangePicker'
+import '../styles/analytics/analytics.css'
 
-const REVENUE_MONTHLY = [
-  { month: 'Feb', basic: 180, standard: 300, premium: 350 },
-  { month: 'Mar', basic: 190, standard: 320, premium: 380 },
-  { month: 'Apr', basic: 205, standard: 330, premium: 410 },
-  { month: 'May', basic: 210, standard: 360, premium: 430 },
-  { month: 'Jun', basic: 225, standard: 400, premium: 460 },
-  { month: 'Jul', basic: 240, standard: 420, premium: 500 },
+const SESSIONS_PER_DAY = [
+  1450, 1500, 2200, 2800, 2750, 1600, 1500,
+  1480, 1500, 1550, 2300, 2800, 2700, 1550,
+  1500, 1480, 1500, 2250, 2800, 2700, 1550,
+  1500, 1480, 1500, 2200, 2800, 2700, 1550,
+  1500, 1480,
 ]
 
-const OPS_STATS = [
-  { label: 'Open tickets', value: '23' },
-  { label: 'Avg. resolution time', value: '1.8 days' },
-  { label: 'SLA compliance', value: '96%' },
-  { label: 'Low-battery flags', value: '41' },
+const CHART_START_DATE = new Date(2025, 1, 12) // Feb 12, 2025
+
+const SESSIONS_OVER_TIME = SESSIONS_PER_DAY.map((sessions, i) => {
+  const date = new Date(CHART_START_DATE)
+  date.setDate(date.getDate() + i)
+  return {
+    date,
+    label: `${date.getMonth() + 1}/${date.getDate()}`,
+    sessions,
+  }
+})
+
+const RANGE_OPTIONS = [
+  { key: 7, label: '7 days' },
+  { key: 14, label: '14 days' },
+  { key: 30, label: '30 days' },
 ]
 
-const FUNNEL_STATS = [
-  { label: 'Chatbot sessions', value: '312' },
-  { label: 'Quotes given', value: '58' },
-  { label: 'Signed contracts', value: '9' },
-  { label: 'Avg. quote-to-go-live', value: '34 days' },
+const STAT_CARDS = [
+  {
+    label: 'SESSIONS (LAST 7D)',
+    icon: '\u{1F4CD}',
+    value: '12,936',
+    color: '#2563EB',
+    sub: 'Across all active malls',
+    badge: '\u2191 1%',
+  },
+  {
+    label: 'SESSIONS (LAST 30D)',
+    icon: '\u{1F5FA}\uFE0F',
+    value: '54,589',
+    color: '#16A34A',
+    sub: 'Avg 10,918 per mall',
+  },
+  {
+    label: 'ACTIVE MALLS',
+    icon: '\u{1F3E2}',
+    value: '5',
+    color: '#16A34A',
+    sub: '0 in setup',
+  },
+  {
+    label: 'PEAK HOUR',
+    icon: '\u23F0',
+    value: '5PM',
+    color: '#7C3AED',
+    sub: 'Highest navigation traffic',
+  },
+  {
+    label: 'ANNUAL REVENUE',
+    icon: '\u{1F4B0}',
+    value: '\u20B1635,000',
+    color: '#16A34A',
+    sub: 'Active contracts only',
+  },
+  {
+    label: 'TOP MALL (30D)',
+    icon: '\u{1F3C6}',
+    value: 'SM Seaside City',
+    color: '#EA8C1D',
+    sub: '13,849 sessions',
+  },
+  {
+    label: 'TOP DESTINATION',
+    icon: '\u{1F6CD}\uFE0F',
+    value: 'Food Court',
+    color: '#2563EB',
+    sub: '4,820 navigations',
+  },
+  {
+    label: 'AVG SESSION DURATION',
+    icon: '\u{1F553}',
+    value: '4m 32s',
+    color: '#7C3AED',
+    sub: 'Per navigation session',
+  },
 ]
 
-const TOP_MALLS = [
-  { name: 'SM City Cebu', sessions: 6120 },
-  { name: 'Ayala Center Cebu', sessions: 4850 },
-  { name: 'Robinsons Galleria Cebu', sessions: 2940 },
-  { name: 'Gaisano Grand Mall Mandaue', sessions: 1610 },
-]
-
-const TOP_DESTINATIONS = [
-  { name: 'Uniqlo', requests: 940 },
-  { name: 'Food Court', requests: 810 },
-  { name: 'H&M', requests: 640 },
-  { name: 'National Bookstore', requests: 520 },
-  { name: 'Restroom Level 2', requests: 410 },
+const MALL_PERFORMANCE = [
+  { name: 'SM Seaside City', sessions: 13849, revenue: 120000, color: '#2563EB' },
+  { name: 'Pacific Mall', sessions: 6912, revenue: 80000, color: '#16A34A' },
+  { name: 'Gaisano Grand', sessions: 5637, revenue: 75000, color: '#EA8C1D' },
+  { name: 'Robinsons Galleria', sessions: 10125, revenue: 150000, color: '#7C3AED' },
+  { name: 'Ayala Center', sessions: 10095, revenue: 110000, color: '#0D9488' },
+  { name: 'SM City Consolacion', sessions: 7971, revenue: 100000, color: '#DC2626' },
 ]
 
 const PEAK_HOURS = [
-  { hour: '8am', sessions: 40 },
-  { hour: '10am', sessions: 120 },
-  { hour: '12pm', sessions: 310 },
-  { hour: '2pm', sessions: 260 },
-  { hour: '4pm', sessions: 280 },
-  { hour: '6pm', sessions: 340 },
-  { hour: '8pm', sessions: 190 },
-  { hour: '10pm', sessions: 60 },
+  { hour: '7AM', value: 320 },
+  { hour: '8AM', value: 680 },
+  { hour: '9AM', value: 780 },
+  { hour: '11AM', value: 960 },
+  { hour: '1PM', value: 1050 },
+  { hour: '3PM', value: 1150 },
+  { hour: '5PM', value: 1300, peak: true },
+  { hour: '7PM', value: 900 },
+  { hour: '9PM', value: 480 },
 ]
 
-const LOW_ARRIVAL = [
-  { route: 'Level 3 → Cinema entrance', arrival: 38 },
-  { route: 'Level 1 → Parking entrance C', arrival: 54 },
-  { route: 'Level 2 → PWD restroom', arrival: 61 },
+const TOP_DESTINATIONS = [
+  { label: 'Food Court', value: 4820 },
+  { label: 'Restroom', value: 3910 },
+  { label: 'Cinema', value: 3540 },
+  { label: 'Information Desk', value: 2760 },
+  { label: 'ATM', value: 2480 },
+  { label: 'Supermarket', value: 2200 },
+  { label: 'Parking Entrance', value: 1980 },
+  { label: 'Pharmacy', value: 1640 },
 ]
 
-const MALLS = ['All malls', 'SM City Cebu', 'Ayala Center Cebu', 'Robinsons Galleria Cebu']
-const RANGES = ['Last 30 days', 'Last 90 days', 'Last 12 months', 'All time']
-
-const MONTHS_BY_RANGE = {
-  'Last 30 days': 1,
-  'Last 90 days': 3,
-  'Last 12 months': 6,
-  'All time': 6,
+const USER_TYPE = {
+  newUsers: 10847,
+  returningUsers: 5103,
+  totalUnique: 15950,
 }
 
-const TABS = [
-  { key: 'overview', label: 'Overview', icon: TrendingUp },
-  { key: 'revenue', label: 'Revenue', icon: TrendingUp },
-  { key: 'ops', label: 'Operations', icon: Ticket },
-  { key: 'funnel', label: 'Sales Funnel', icon: Users },
-  { key: 'usage', label: 'Usage & Rankings', icon: MapPin },
+const MONTHLY_REVENUE = [
+  { month: "Mar'25", value: 300000 },
+  { month: "Apr'25", value: 330000 },
+  { month: "May'25", value: 350000 },
+  { month: "Jun'25", value: 340000 },
+  { month: "Jul'25", value: 370000 },
+  { month: "Aug'25", value: 360000 },
+  { month: "Sep'25", value: 380000 },
+  { month: "Oct'25", value: 400000 },
+  { month: "Nov'25", value: 420000 },
+  { month: "Dec'25", value: 450000 },
+  { month: "Jan'26", value: 440000 },
+  { month: "Feb'26", value: 460000 },
 ]
 
-function StatCard({ label, value }) {
-  return (
-    <div style={{
-      flex: '1',
-      minWidth: '140px',
-      borderRadius: '12px',
-      border: '1px solid #e2e8f0',
-      backgroundColor: '#fff',
-      padding: '12px 16px',
-    }}>
-      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>{label}</div>
-      <div style={{ fontSize: '20px', fontWeight: '600', color: '#0f172a' }}>{value}</div>
-    </div>
-  )
-}
+const MALL_BREAKDOWN = [
+  { mall: 'SM Seaside City Cebu', city: 'Cebu City', status: 'Active', sessions30: 13849, last7: 3238, trend: 'up', vsPrev7: '3%', fee: '\u20B1120,000', topDestination: 'Food Court' },
+  { mall: 'Pacific Mall Cebu', city: 'Mandaue City', status: 'Active', sessions30: 6912, last7: 1662, trend: 'up', vsPrev7: '2%', fee: '\u20B180,000', topDestination: 'Cinema' },
+  { mall: 'Gaisano Grand Mall', city: 'Cebu City', status: 'Active', sessions30: 5637, last7: 1301, trend: 'down', vsPrev7: '2%', fee: '\u20B175,000', topDestination: 'ATM' },
+  { mall: 'Robinsons Galleria Cebu', city: 'Cebu City', status: 'Grace', sessions30: 10125, last7: 2389, trend: 'down', vsPrev7: '2%', fee: '\u20B1150,000', topDestination: 'Supermarket' },
+  { mall: 'Ayala Center Cebu', city: 'Cebu City', status: 'Active', sessions30: 10095, last7: 2448, trend: 'up', vsPrev7: '2%', fee: '\u20B1110,000', topDestination: 'Food Hall' },
+  { mall: 'SM City Consolacion Cebu', city: 'Consolacion', status: 'Active', sessions30: 7971, last7: 1981, trend: 'down', vsPrev7: '1%', fee: '\u20B1100,000', topDestination: 'Food Court' },
+]
+
+const TOP_STORES = [
+  { rank: 1, name: 'SM Supermarket', mall: 'SM Seaside City Cebu', value: 1240 },
+  { rank: 2, name: 'Ayala Food Hall', mall: 'Ayala Center Cebu', value: 1050 },
+  { rank: 3, name: 'SM Supermarket', mall: 'SM City Consolacion Cebu', value: 890 },
+  { rank: 4, name: 'Timezone', mall: 'SM Seaside City Cebu', value: 780 },
+  { rank: 5, name: 'Coffee Bean & Tea Leaf', mall: 'Ayala Center Cebu', value: 640 },
+]
 
 export default function Analytics() {
-  const [tab, setTab] = useState('overview')
-  const [range, setRange] = useState('Last 12 months')
-  const [mall, setMall] = useState('All malls')
+  const [dateRange, setDateRange] = useState({
+    from: new Date(2025, 2, 13),
+    to: new Date(2026, 2, 13),
+  })
+  const [chartRange, setChartRange] = useState(30)
+  const [mallMetric, setMallMetric] = useState('sessions')
 
-  const monthsToShow = MONTHS_BY_RANGE[range]
-  const revenueSlice = REVENUE_MONTHLY.slice(REVENUE_MONTHLY.length - monthsToShow)
-  const mallFactor = mall === 'All malls' ? 1 : 0.35
+  const chartData = useMemo(
+    () => SESSIONS_OVER_TIME.slice(SESSIONS_OVER_TIME.length - chartRange),
+    [chartRange]
+  )
 
-  const toCSV = (rows) => {
-    return [
-      Object.keys(rows[0]).join(','),
-      ...rows.map(row => Object.values(row).map(v => `"${v}"`).join(',')),
+  const handleExport = () => {
+    const rows = chartData.map(d => ({ date: d.label, sessions: d.sessions }))
+    const csv = [
+      'date,sessions',
+      ...rows.map(r => `${r.date},${r.sessions}`),
     ].join('\n')
-  }
 
-  const downloadCSV = (filename, data) => {
-    const blob = new Blob([data], { type: 'text/csv' })
+    const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = filename
+    a.download = `navar_analytics_${Date.now()}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
   }
 
-  const handleExport = () => {
-    const stamp = `${range.replace(/\s+/g, '_')}_${mall.replace(/\s+/g, '_')}`
-    let filename = ''
-    let data = ''
-
-    if (tab === 'overview' || tab === 'revenue') {
-      const scaledRevenue = revenueSlice.map(row => ({
-        month: row.month,
-        basic: Math.round(row.basic * mallFactor * 1000),
-        standard: Math.round(row.standard * mallFactor * 1000),
-        premium: Math.round(row.premium * mallFactor * 1000),
-      }))
-      filename = `navar_revenue_${stamp}.csv`
-      data = toCSV(scaledRevenue)
-    } else if (tab === 'ops') {
-      filename = `navar_operations_${stamp}.csv`
-      data = toCSV(OPS_STATS)
-    } else if (tab === 'funnel') {
-      filename = `navar_sales_funnel_${stamp}.csv`
-      data = toCSV(FUNNEL_STATS)
-    } else if (tab === 'usage') {
-      const scaledMalls = TOP_MALLS.map(m => ({
-        name: m.name,
-        sessions: Math.round(m.sessions * mallFactor),
-      }))
-      filename = `navar_usage_rankings_${stamp}.csv`
-      data = toCSV(scaledMalls)
-    }
-
-    downloadCSV(filename, data)
-  }
-
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0' }}>
-        {/* Header */}
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#0f172a', marginBottom: '2px' }}>
-          Analytics
-        </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#94a3b8', marginBottom: '20px' }}>
-          <Clock size={13} />
-          <span>Last updated today, 2:00 AM · refreshes daily</span>
+    <div className="analytics-page">
+      <div className="analytics-header">
+        <div>
+          <h1 className="analytics-title">Analytics</h1>
+          <p className="analytics-subtitle">
+            Provides insights through data visualization, reports, and performance metrics to support decision-making.
+          </p>
         </div>
 
-        {/* Filters + Export */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: '12px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          backgroundColor: '#fff',
-          padding: '12px 16px',
-          marginBottom: '20px',
-        }}>
-          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>History range</span>
-          <select
-            value={range}
-            onChange={e => setRange(e.target.value)}
-            style={{
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '6px 12px',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-            }}
-          >
-            {RANGES.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-
-          <select
-            value={mall}
-            onChange={e => setMall(e.target.value)}
-            style={{
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '6px 12px',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-            }}
-          >
-            {MALLS.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-
-          <div style={{ flex: '1' }} />
-
-          <button
-            onClick={handleExport}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              borderRadius: '8px',
-              backgroundColor: '#2563eb',
-              padding: '6px 16px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'background-color 0.15s',
-            }}
-            onMouseOver={e => e.target.style.backgroundColor = '#1d4ed8'}
-            onMouseOut={e => e.target.style.backgroundColor = '#2563eb'}
-          >
-            <Download size={15} /> Export CSV
+        <div className="analytics-header-actions">
+          <DateRangePicker
+            from={dateRange.from}
+            to={dateRange.to}
+            onChange={setDateRange}
+          />
+          <button type="button" className="analytics-export-btn" onClick={handleExport}>
+            Export
           </button>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '4px',
-          borderBottom: '1px solid #e2e8f0',
-          marginBottom: '20px',
-          overflowX: 'auto',
-        }}>
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: '10px 16px',
-                fontSize: '14px',
-                fontWeight: '500',
-                backgroundColor: 'transparent',
-                border: 'none',
-                borderBottom: tab === t.key ? '2px solid #2563eb' : '2px solid transparent',
-                color: tab === t.key ? '#2563eb' : '#64748b',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => {
-                if (tab !== t.key) e.target.style.color = '#334155'
-              }}
-              onMouseLeave={e => {
-                if (tab !== t.key) e.target.style.color = '#64748b'
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Overview Tab */}
-        {tab === 'overview' && (
-          <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-              <StatCard label="MRR" value="₱1.24M" />
-              <StatCard label="Active malls" value="14" />
-              <StatCard label="Open tickets" value="23" />
-              <StatCard label="SLA compliance" value="96%" />
-              <StatCard label="Signed this month" value="9" />
-              <StatCard label="Total app sessions" value="18.4K" />
+      <div className="analytics-stats-grid">
+        {STAT_CARDS.map(card => (
+          <div key={card.label} className="analytics-stat-card">
+            <div className="analytics-stat-top">
+              <span className="analytics-stat-label">{card.label}</span>
+              <span className="analytics-stat-icon">{card.icon}</span>
             </div>
-            <p style={{ fontSize: '14px', color: '#cbd5e1' }}>
-              Switch tabs for the full breakdown behind each figure above.
-            </p>
-          </>
-        )}
-
-        {/* Revenue Tab */}
-        {tab === 'revenue' && (
-          <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-              <StatCard label="MRR" value="₱1.24M" />
-              <StatCard label="Onboarding revenue (MTD)" value="₱2.11M" />
-              <StatCard label="Add-on fee revenue" value="₱84K" />
-              <StatCard label="Churn (90d)" value="2.1%" />
+            <div className="analytics-stat-value-row">
+              <span className="analytics-stat-value" style={{ color: card.color }}>
+                {card.value}
+              </span>
+              {card.badge && <span className="analytics-stat-badge">{card.badge}</span>}
             </div>
-            <div style={{
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0',
-              backgroundColor: '#fff',
-              padding: '16px',
-              height: '260px',
-            }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueSlice}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Bar dataKey="basic" stackId="a" fill="#2a78d6" name="Basic" />
-                  <Bar dataKey="standard" stackId="a" fill="#1baf7a" name="Standard" />
-                  <Bar dataKey="premium" stackId="a" fill="#eda100" name="Premium" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </>
-        )}
+            <span className="analytics-stat-sub">{card.sub}</span>
+          </div>
+        ))}
+      </div>
 
-        {/* Operations Tab */}
-        {tab === 'ops' && (
-          <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-              {OPS_STATS.map(s => (
-                <StatCard key={s.label} label={s.label} value={s.value} />
-              ))}
-            </div>
-            <p style={{ fontSize: '14px', color: '#cbd5e1' }}>
-              Ticket breakdown by type (Fault, Low Battery, Structural Change, Stall Node, General) and assignee available in the exported CSV.
-            </p>
-          </>
-        )}
+      <div className="analytics-chart-card">
+        <div className="analytics-chart-header">
+          <div>
+            <h2 className="analytics-chart-title">Sessions Over Time</h2>
+            <p className="analytics-chart-subtitle">Total navigation sessions per day across all active malls</p>
+          </div>
 
-        {/* Sales Funnel Tab */}
-        {tab === 'funnel' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            {FUNNEL_STATS.map(s => (
-              <StatCard key={s.label} label={s.label} value={s.value} />
+          <div className="analytics-range-tabs">
+            {RANGE_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                type="button"
+                className={`analytics-range-tab-btn${chartRange === opt.key ? ' analytics-range-tab-btn--active' : ''}`}
+                onClick={() => setChartRange(opt.key)}
+              >
+                {opt.label}
+              </button>
             ))}
           </div>
-        )}
+        </div>
 
-        {/* Usage & Rankings Tab */}
-        {tab === 'usage' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Top Malls */}
+        <div className="analytics-chart-body">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8ECF2" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: '#94A3B8' }}
+                axisLine={{ stroke: '#E8ECF2' }}
+                tickLine={false}
+                interval={Math.max(0, Math.floor(chartData.length / 6) - 1)}
+              />
+              <YAxis
+                domain={[0, 2800]}
+                ticks={[0, 700, 1400, 2100, 2800]}
+                tick={{ fontSize: 11, fill: '#94A3B8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="sessions"
+                stroke="#2563EB"
+                strokeWidth={2.5}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="analytics-row-2col">
+        <div className="analytics-card">
+          <div className="analytics-chart-header">
             <div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#334155', marginBottom: '12px' }}>
-                Top malls
-              </h3>
-              <div style={{
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#fff',
-                borderCollapse: 'collapse',
-              }}>
-                {TOP_MALLS.map((m, i) => (
+              <h2 className="analytics-chart-title">Mall Performance</h2>
+              <p className="analytics-chart-subtitle">Sessions last 30 days per mall</p>
+            </div>
+
+            <div className="analytics-range-tabs">
+              <button
+                type="button"
+                className={`analytics-range-tab-btn${mallMetric === 'sessions' ? ' analytics-range-tab-btn--active' : ''}`}
+                onClick={() => setMallMetric('sessions')}
+              >
+                Sessions
+              </button>
+              <button
+                type="button"
+                className={`analytics-range-tab-btn${mallMetric === 'revenue' ? ' analytics-range-tab-btn--active' : ''}`}
+                onClick={() => setMallMetric('revenue')}
+              >
+                Revenue
+              </button>
+            </div>
+          </div>
+
+          <div className="analytics-chart-body">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={MALL_PERFORMANCE} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8ECF2" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 10, fill: '#94A3B8' }}
+                  axisLine={{ stroke: '#E8ECF2' }}
+                  tickLine={false}
+                  angle={-20}
+                  textAnchor="end"
+                  height={50}
+                  interval={0}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#94A3B8' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip />
+                <Bar dataKey={mallMetric} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {MALL_PERFORMANCE.map(entry => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="analytics-card">
+          <div className="analytics-chart-header">
+            <div>
+              <h2 className="analytics-chart-title">Peak Hours</h2>
+              <p className="analytics-chart-subtitle">Average sessions by hour of day</p>
+            </div>
+          </div>
+
+          <div className="analytics-chart-body">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={PEAK_HOURS} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8ECF2" />
+                <XAxis
+                  dataKey="hour"
+                  tick={{ fontSize: 10, fill: '#94A3B8' }}
+                  axisLine={{ stroke: '#E8ECF2' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 1400]}
+                  ticks={[0, 350, 700, 1050, 1400]}
+                  tick={{ fontSize: 11, fill: '#94A3B8' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                  {PEAK_HOURS.map(entry => (
+                    <Cell key={entry.hour} fill={entry.peak ? '#EA8C1D' : '#BFDBFE'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="analytics-row-3col">
+        <div className="analytics-card">
+          <h2 className="analytics-chart-title">Top Destinations</h2>
+          <p className="analytics-chart-subtitle">Most navigated destination types (all malls)</p>
+
+          <div className="analytics-bar-list">
+            {TOP_DESTINATIONS.map(dest => (
+              <div key={dest.label} className="analytics-bar-list-row">
+                <div className="analytics-bar-list-labels">
+                  <span className="analytics-bar-list-label">{dest.label}</span>
+                  <span className="analytics-bar-list-value">{dest.value.toLocaleString()}</span>
+                </div>
+                <div className="analytics-bar-list-track">
                   <div
-                    key={m.name}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '10px 16px',
-                      borderBottom: i < TOP_MALLS.length - 1 ? '1px solid #f1f5f9' : 'none',
-                      backgroundColor: '#fff',
-                    }}
-                  >
-                    <span style={{ width: '20px', fontSize: '12px', color: '#cbd5e1' }}>{i + 1}</span>
-                    <span style={{ flex: '1', fontSize: '14px', color: '#334155' }}>{m.name}</span>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      {Math.round(m.sessions * mallFactor).toLocaleString()} sessions
-                    </span>
-                  </div>
-                ))}
+                    className="analytics-bar-list-fill"
+                    style={{ width: `${(dest.value / TOP_DESTINATIONS[0].value) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="analytics-card">
+          <h2 className="analytics-chart-title">User Type</h2>
+          <p className="analytics-chart-subtitle">First-time vs returning users (30d)</p>
+
+          <div className="analytics-user-type-list">
+            <div className="analytics-user-type-row">
+              <div className="analytics-bar-list-labels">
+                <span className="analytics-user-type-label">
+                  <span className="analytics-legend-dot analytics-legend-dot--blue" />
+                  New Users
+                </span>
+                <span className="analytics-bar-list-value">
+                  {USER_TYPE.newUsers.toLocaleString()}{' '}
+                  <span className="analytics-user-type-pct">
+                    {Math.round((USER_TYPE.newUsers / USER_TYPE.totalUnique) * 100)}%
+                  </span>
+                </span>
+              </div>
+              <div className="analytics-bar-list-track">
+                <div
+                  className="analytics-bar-list-fill analytics-bar-list-fill--blue"
+                  style={{ width: `${(USER_TYPE.newUsers / USER_TYPE.totalUnique) * 100}%` }}
+                />
               </div>
             </div>
 
-            {/* Top Destinations */}
-            <div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#334155', marginBottom: '12px' }}>
-                Top destinations
-              </h3>
-              <div style={{
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#fff',
-                padding: '16px',
-                height: '200px',
-              }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={TOP_DESTINATIONS} layout="vertical" margin={{ left: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                    <Tooltip />
-                    <Bar dataKey="requests" fill="#1baf7a" />
-                  </BarChart>
-                </ResponsiveContainer>
+            <div className="analytics-user-type-row">
+              <div className="analytics-bar-list-labels">
+                <span className="analytics-user-type-label">
+                  <span className="analytics-legend-dot analytics-legend-dot--teal" />
+                  Returning Users
+                </span>
+                <span className="analytics-bar-list-value">
+                  {USER_TYPE.returningUsers.toLocaleString()}{' '}
+                  <span className="analytics-user-type-pct">
+                    {Math.round((USER_TYPE.returningUsers / USER_TYPE.totalUnique) * 100)}%
+                  </span>
+                </span>
               </div>
-            </div>
-
-            {/* Peak Hours */}
-            <div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#334155', marginBottom: '12px' }}>
-                Peak hours (avg. sessions, last 7 days)
-              </h3>
-              <div style={{
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#fff',
-                padding: '16px',
-                height: '180px',
-              }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={PEAK_HOURS}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="sessions" stroke="#2a78d6" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Low Arrival Routes */}
-            <div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#334155', marginBottom: '12px' }}>
-                Low-arrival routes
-              </h3>
-              <div style={{
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#fff',
-              }}>
-                {LOW_ARRIVAL.map((r, i) => (
-                  <div
-                    key={r.route}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 16px',
-                      borderBottom: i < LOW_ARRIVAL.length - 1 ? '1px solid #f1f5f9' : 'none',
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', color: '#334155' }}>{r.route}</span>
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        padding: '4px 10px',
-                        borderRadius: '9999px',
-                        backgroundColor: r.arrival < 45 ? '#fee2e2' : '#fed7aa',
-                        color: r.arrival < 45 ? '#dc2626' : '#ea580c',
-                      }}
-                    >
-                      {r.arrival}% arrival
-                    </span>
-                  </div>
-                ))}
+              <div className="analytics-bar-list-track">
+                <div
+                  className="analytics-bar-list-fill analytics-bar-list-fill--teal"
+                  style={{ width: `${(USER_TYPE.returningUsers / USER_TYPE.totalUnique) * 100}%` }}
+                />
               </div>
             </div>
           </div>
-        )}
+
+          <div className="analytics-total-box">
+            <span className="analytics-total-label">Total Unique Users (30d)</span>
+            <span className="analytics-total-value">{USER_TYPE.totalUnique.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div className="analytics-card">
+          <h2 className="analytics-chart-title">Monthly Revenue</h2>
+          <p className="analytics-chart-subtitle">Total confirmed payments received per month</p>
+
+          <div className="analytics-chart-body">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={MONTHLY_REVENUE} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8ECF2" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 9, fill: '#94A3B8' }}
+                  axisLine={{ stroke: '#E8ECF2' }}
+                  tickLine={false}
+                  angle={-30}
+                  textAnchor="end"
+                  height={40}
+                  interval={0}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#94A3B8' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={v => `${v / 1000}k`}
+                />
+                <Tooltip formatter={v => `\u20B1${v.toLocaleString()}`} />
+                <Bar dataKey="value" fill="#16A34A" radius={[4, 4, 0, 0]} maxBarSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="analytics-card">
+        <h2 className="analytics-chart-title analytics-chart-title--center">Mall Breakdown</h2>
+        <p className="analytics-chart-subtitle analytics-chart-subtitle--center">Detailed performance per mall — last 30 days</p>
+
+        <div className="analytics-table-wrap">
+          <table className="analytics-table">
+            <thead>
+              <tr>
+                <th>MALL</th>
+                <th>CITY</th>
+                <th>STATUS</th>
+                <th>SESSIONS (30D)</th>
+                <th>LAST 7D</th>
+                <th>VS PREV 7D</th>
+                <th>ANNUAL FEE</th>
+                <th>TOP DESTINATION</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MALL_BREAKDOWN.map(row => (
+                <tr key={row.mall}>
+                  <td className="analytics-table-mall">{row.mall}</td>
+                  <td>{row.city}</td>
+                  <td>
+                    <span className={`analytics-status-badge analytics-status-badge--${row.status.toLowerCase()}`}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td>{row.sessions30.toLocaleString()}</td>
+                  <td>{row.last7.toLocaleString()}</td>
+                  <td>
+                    <span className={`analytics-trend analytics-trend--${row.trend}`}>
+                      {row.trend === 'up' ? '\u2191' : '\u2193'} {row.vsPrev7}
+                    </span>
+                  </td>
+                  <td>{row.fee}</td>
+                  <td>{row.topDestination}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="analytics-card">
+        <h2 className="analytics-chart-title analytics-chart-title--center">Top Stores by Navigation</h2>
+        <p className="analytics-chart-subtitle analytics-chart-subtitle--center">Most navigated individual stores across all malls</p>
+
+        <div className="analytics-store-list">
+          {TOP_STORES.map(store => (
+            <div key={store.rank} className="analytics-store-row">
+              <span className="analytics-store-rank">{store.rank}</span>
+
+              <div className="analytics-store-info">
+                <span className="analytics-store-name">{store.name}</span>
+                <span className="analytics-store-mall">{store.mall}</span>
+              </div>
+
+              <div className="analytics-store-metric">
+                <div className="analytics-store-value-row">
+                  <span className="analytics-store-value">{store.value.toLocaleString()}</span>
+                  <span className="analytics-store-value-sub">navigations</span>
+                </div>
+                <div className="analytics-bar-list-track">
+                  <div
+                    className="analytics-bar-list-fill analytics-bar-list-fill--blue"
+                    style={{ width: `${(store.value / TOP_STORES[0].value) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

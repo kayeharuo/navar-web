@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
+import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
 import StoresPage from './pages/StoresPage'
@@ -70,6 +71,7 @@ function PlaceholderPage({ title }) {
 
 export default function App() {
   const location = useLocation()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [activePanel, setActivePanel]   = useState(null)
   const [showLogout, setShowLogout]     = useState(false)
@@ -80,6 +82,10 @@ export default function App() {
     setSidebarOpen(false)
     setActivePanel(null)
   }, [location.pathname])
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={() => setIsLoggedIn(true)} />
+  }
 
   const activePage = getActiveNavItem(location.pathname).label
 
