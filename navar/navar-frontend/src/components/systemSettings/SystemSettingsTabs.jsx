@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import SubscriptionTiersTab from './SubscriptionTiersTab'
 import BeaconConfigTab from './BeaconConfigTab'
 
 const TABS = ['Subscription Tiers', 'Beacon config']
 
 export default function SystemSettingsTabs() {
-  const [activeTab, setActiveTab] = useState('Subscription Tiers')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const activeTab = location.pathname.endsWith('/beacon-config') ? 'Beacon config' : 'Subscription Tiers'
 
   return (
     <div className="settings-content">
@@ -20,7 +22,7 @@ export default function SystemSettingsTabs() {
         {TABS.map(tab => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => navigate(tab === 'Beacon config' ? '/system-settings/beacon-config' : '/system-settings')}
             className={`settings-tab-btn${activeTab === tab ? ' settings-tab-btn--active' : ''}`}
           >
             {tab}

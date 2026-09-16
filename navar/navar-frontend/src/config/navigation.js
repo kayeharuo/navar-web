@@ -25,5 +25,7 @@ export const NAV_ITEMS = [
 ]
 
 export function getActiveNavItem(pathname) {
-  return NAV_ITEMS.find(item => item.path === pathname) || NAV_ITEMS[0]
+  return NAV_ITEMS
+    .filter(item => item.path === '/' ? pathname === '/' : pathname === item.path || pathname.startsWith(`${item.path}/`))
+    .sort((a, b) => b.path.length - a.path.length)[0] || NAV_ITEMS[0]
 }

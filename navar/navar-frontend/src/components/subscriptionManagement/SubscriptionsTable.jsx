@@ -10,7 +10,7 @@ const TIERS = {
   Premium:  { annualFee: 350000, onboardingFee: 1585000, gracePeriodDays: 45, reinstatementRate: 10 },
 }
 
-const STATUS_FILTERS = ['All', 'Active', 'Grace Period', 'Suspended', 'Setup']
+const STATUS_FILTERS = ['All', 'Active', 'Grace Period', 'Suspended']
 
 const initialMalls = [
   {
@@ -157,23 +157,6 @@ const initialMalls = [
       { reason: 'Breach of Contract', dateStart: 'Jan 30, 2026', dateEnd: null, notes: 'Unauthorized resale of beacon hardware to a third party.', resolution: null },
     ],
   },
-  {
-    id: 8,
-    name: 'SM City Consolacion Cebu',
-    city: 'Consolacion, Cebu',
-    tier: 'Standard',
-    status: 'Setup',
-    wallet: 0,
-    subscriptionStart: null,
-    subscriptionEnd: null,
-    daysLeftLabel: 'Not started yet',
-    suspension: null,
-    tierHistory: [],
-    paymentHistory: [
-      { date: 'Jan 12, 2025', type: 'Onboarding Fee', amount: 594600, status: 'Paid' },
-    ],
-    suspensionHistory: [],
-  },
 ]
 
 const initialNotifications = [
@@ -184,7 +167,7 @@ const initialNotifications = [
 ]
 
 function statusVariant(status) {
-  const map = { Active: 'active', 'Grace Period': 'grace', Suspended: 'suspended', Setup: 'setup' }
+  const map = { Active: 'active', 'Grace Period': 'grace', Suspended: 'suspended' }
   return map[status] || 'default'
 }
 
@@ -220,7 +203,6 @@ export default function SubscriptionsTable() {
       Active: malls.filter(m => m.status === 'Active').length,
       'Grace Period': malls.filter(m => m.status === 'Grace Period').length,
       Suspended: malls.filter(m => m.status === 'Suspended').length,
-      Setup: malls.filter(m => m.status === 'Setup').length,
     }
   }
   const filterCounts = counts()
@@ -327,10 +309,6 @@ export default function SubscriptionsTable() {
           <div className="sub-mgmt-stat-num">{filterCounts.Suspended}</div>
           <div className="sub-mgmt-stat-label">Suspended</div>
         </div>
-        <div className="sub-mgmt-stat-card sub-mgmt-stat-card--navy">
-          <div className="sub-mgmt-stat-num">{filterCounts.Setup}</div>
-          <div className="sub-mgmt-stat-label">Setup</div>
-        </div>
       </div>
 
       {/* Toolbar */}
@@ -399,7 +377,7 @@ export default function SubscriptionsTable() {
                       >
                         View
                       </button>
-                      {mall.status !== 'Setup' && mall.status !== 'Suspended' && (
+                      {mall.status !== 'Suspended' && (
                         <button
                           className="sub-mgmt-action-btn sub-mgmt-action-btn--suspend"
                           onClick={e => { e.stopPropagation(); setSuspendMall(mall) }}

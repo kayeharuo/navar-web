@@ -5,6 +5,7 @@ import TopBar from './components/layout/TopBar'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
+import UnitsPage from './pages/UnitsPage'
 import StoresPage from './pages/StoresPage'
 import BeaconsPage from './pages/BeaconsPage'
 import ApplicationManagement from './pages/ApplicationManagement'
@@ -71,7 +72,7 @@ function PlaceholderPage({ title }) {
 
 export default function App() {
   const location = useLocation()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('navar_logged_in') === 'true')
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [activePanel, setActivePanel]   = useState(null)
   const [showLogout, setShowLogout]     = useState(false)
@@ -84,7 +85,10 @@ export default function App() {
   }, [location.pathname])
 
   if (!isLoggedIn) {
-    return <LoginPage onLogin={() => setIsLoggedIn(true)} />
+    return <LoginPage onLogin={() => {
+      localStorage.setItem('navar_logged_in', 'true')
+      setIsLoggedIn(true)
+    }} />
   }
 
   const activePage = getActiveNavItem(location.pathname).label
@@ -154,15 +158,19 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/mall-management" element={<MallManagement />} />
+            <Route path="/mall-management/:tab" element={<MallManagement />} />
+            <Route path="/mall-management/units/:mallId" element={<UnitsPage />} />
             <Route path="/mall-management/stores/:mallId" element={<StoresPage />} />
             <Route path="/mall-management/beacons/:mallId" element={<BeaconsPage />} />
             <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} arProjects={arIncomingProjects} onStallAppApproved={handleStallAppApproved} />} />
+            <Route path="/application-management/:tab" element={<ApplicationManagement onAppApproved={handleAppApproved} arProjects={arIncomingProjects} onStallAppApproved={handleStallAppApproved} />} />
             <Route path="/ar-development" element={<ARDevelopment incomingProjects={arIncomingProjects} />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/account-management" element={<AccountManagement />} />
             <Route path="/email-logs" element={<EmailLogs />} />
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/system-settings" element={<SystemSettings />} />
+            <Route path="/system-settings/:tab" element={<SystemSettings />} />
             <Route path="/subscription-management" element={<SubscriptionManagement />} />
             {NAV_ITEMS.filter(item => !['/', '/mall-management', '/mall-management/stores/:mallId', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs', '/system-settings', '/subscription-management'].includes(item.path)).map(item => (
               <Route
@@ -196,7 +204,8 @@ export default function App() {
           onCancel={() => setShowLogout(false)}
           onConfirm={() => {
             setShowLogout(false)
-            alert('Logged out! (No backend yet)')
+            localStorage.removeItem('navar_logged_in')
+            setIsLoggedIn(false)
           }}
         />
       )}

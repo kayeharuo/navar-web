@@ -1,27 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 // eslint-disable-next-line no-unused-vars
 import { Search, Plus, Pencil, ImageIcon } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AddMallModal from './AddMallModal'
 import AddBrandModal from './AddBrandModal'
-import UnitsPanel from './UnitsPanel'
 import MallInfoPanel from './MallInfoPanel'
 import InquiriesTab from './InquiriesTab'
 import BeaconTicketsTab from './BeaconTicketsTab'
+import { apiRequest } from '../../config/api'
 import '../../styles/mallManagement/mallModal.css'
 import '../../styles/mallManagement/inquiries.css'
 
 const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets']
+const TAB_PATHS = { Malls: '', Brands: 'brands', Inquiries: 'inquiries', 'Beacon Tickets': 'beacon-tickets' }
+const PATH_TABS = Object.fromEntries(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]))
 
-const STATUS_FILTERS = [
-  { label: 'All',          count: 17 },
-  { label: 'Active',       count: 10 },
-  { label: 'Grace Period', count: 1  },
-  { label: 'Suspended',    count: 1  },
-  { label: 'Setup',        count: 5  },
-]
+const STATUS_NAMES = ['All', 'Active', 'Grace Period', 'Suspended', 'Pending']
 
-const initialMalls = [
+const initialMalls = [] /*
   {
     id: 1,
     name: 'SM Seaside City Cebu',
@@ -258,10 +254,10 @@ const initialMalls = [
     city: 'Cebu City',
     address: 'General Maxilom Ave, Cebu City',
     floors: 4,
-    agreementStatus: 'Setup',
+    agreementStatus: 'Pending',
     tier: 'Standard',
-    application: 'Draft',
-    arDevelopment: 'Pending',
+    application: '-',
+    arDevelopment: '-',
     dateAdded: 'January 10, 2025',
     lastUpdated: 'January 12, 2025',
     note: null,
@@ -286,10 +282,10 @@ const initialMalls = [
     city: 'Iloilo City',
     address: 'Quezon St., Iloilo City',
     floors: 3,
-    agreementStatus: 'Setup',
+    agreementStatus: 'Pending',
     tier: 'Basic',
-    application: 'Draft',
-    arDevelopment: 'Pending',
+    application: '-',
+    arDevelopment: '-',
     dateAdded: 'February 3, 2025',
     lastUpdated: 'February 5, 2025',
     note: null,
@@ -336,13 +332,13 @@ const initialMalls = [
     description: null,
     units: [],
   },
-]
+*/
 
 const agreementVariantMap = {
   Active:         'active',
   Suspended:      'suspended',
   'Grace Period': 'grace',
-  Setup:          'setup',
+  Pending:        'pending',
 }
 
 const applicationVariantMap = {
@@ -396,21 +392,32 @@ const initialBrands = [
   { id: 4, name: 'Starbucks',    category: 'Food & Beverages',  description: 'Sip the quality',              logo: null, dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
   { id: 5, name: 'Uniqlo',       category: 'Fashion & Apparel', description: 'Genderless international fashion', logo: null, dateAdded: 'August 15, 2024', lastUpdated: 'August 15, 2024' },
 ]
-
-let nextId = initialMalls.length + 1
-let nextBrandId = initialBrands.length + 1
+void initialBrands
 
 export default function MallsTable() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('Malls')
+  const location = useLocation()
+  const activeTab = PATH_TABS[location.pathname.split('/').filter(Boolean)[1]] || 'Malls'
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [malls, setMalls] = useState(initialMalls)
+  const [loading, setLoading] = useState(true)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingMall, setEditingMall] = useState(null)
-  const [unitsMall, setUnitsMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
+
+  function showRequestError(error) {
+    console.error('Mall Management request failed:', error.details || error)
+    window.alert(error.message)
+  }
+
+  useEffect(() => {
+    apiRequest('/api/malls')
+      .then(setMalls)
+      .catch(showRequestError)
+      .finally(() => setLoading(false))
+  }, [])
 
   function handleStoresClick(mall) {
     navigate(`/mall-management/stores/${mall.id}`)
@@ -420,97 +427,86 @@ export default function MallsTable() {
     navigate(`/mall-management/beacons/${mall.id}`)
   }
 
-  const [brands, setBrands] = useState(initialBrands)
+  function handleUnitsClick(mall) {
+    navigate(`/mall-management/units/${mall.id}`)
+  }
+
+  const [brands, setBrands] = useState([])
   const [showBrandModal, setShowBrandModal] = useState(false)
   const [editingBrand, setEditingBrand] = useState(null)
   const [brandSearch, setBrandSearch] = useState('')
+  const [brandImage, setBrandImage] = useState(null)
+
+  useEffect(() => {
+    if (activeTab !== 'Brands') return
+    apiRequest('/api/brands').then(setBrands).catch(showRequestError)
+  }, [activeTab])
   
   function openBrandImage(brand) {
     try {
-      if (brand.logo) {
-        window.open(brand.logo, '_blank', 'noopener,noreferrer')
-        return
-      }
+      const logoUrl = brand.logo?.startsWith('/')
+        ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${brand.logo}`
+        : brand.logo
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><rect fill="#E5E7EB" width="100%" height="100%"/><text x="50%" y="55%" font-size="360" fill="#9CA3AF" text-anchor="middle" dominant-baseline="middle" font-family="Poppins, sans-serif">${brand.name.charAt(0)}</text></svg>`
-      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
-      window.open(url, '_blank', 'noopener,noreferrer')
+      setBrandImage({ name: brand.name, url: logoUrl || `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` })
     // eslint-disable-next-line no-unused-vars
     } catch (err) {
       // fallback: do nothing
     }
   }
 
-  function handleAddSave(data) {
-    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setMalls(prev => [
-      ...prev,
-      {
-        id: nextId++,
-        name: data.name,
-        city: data.city,
-        address: data.address,
-        floors: data.floors,
-        agreementStatus: 'Setup',
-        tier: data.agreementType,
-        application: 'Draft',
-        arDevelopment: 'Pending',
-        dateAdded: now,
-        lastUpdated: now,
-        note: null,
-        operatingHours: data.operatingHours,
-        floorDetails: data.floorDetails,
-        logoUrl: data.logoUrl,
-      },
-    ])
-    setShowAddModal(false)
+  function getBrandLogoUrl(brand) {
+    return brand.logo?.startsWith('/')
+      ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${brand.logo}`
+      : brand.logo
   }
 
-  function handleEditSave(data) {
-    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setMalls(prev =>
-      prev.map(m =>
-        m.id === editingMall.id
-          ? {
-              ...m,
-              name: data.name,
-              city: data.city,
-              address: data.address,
-              floors: data.floors,
-              tier: data.agreementType,
-              operatingHours: data.operatingHours,
-              floorDetails: data.floorDetails,
-              logoUrl: data.logoUrl,
-              lastUpdated: now,
-            }
-          : m
-      )
-    )
-    setEditingMall(null)
+  async function handleAddSave(data) {
+    try {
+      const savedMall = await apiRequest('/api/malls', { method: 'POST', body: JSON.stringify(data) })
+      // A newly added mall has no subscription workflow records yet.
+      const mall = {
+        ...savedMall,
+        agreementStatus: 'Pending',
+        application: '-',
+        arDevelopment: '-',
+      }
+      setMalls(prev => [...prev, mall])
+      setShowAddModal(false)
+    } catch (error) {
+      showRequestError(error)
+    }
   }
 
-  function handleUnitsSave(updatedUnits) {
-    setMalls(prev =>
-      prev.map(m => m.id === unitsMall.id ? { ...m, units: updatedUnits } : m)
-    )
-    setUnitsMall(null)
+  async function handleEditSave(data) {
+    try {
+      const mall = await apiRequest(`/api/malls/${editingMall.id}`, { method: 'PUT', body: JSON.stringify(data) })
+      setMalls(prev => prev.map(item => item.id === mall.id ? mall : item))
+      setViewMall(current => current?.id === mall.id ? mall : current)
+      setEditingMall(null)
+    } catch (error) {
+      showRequestError(error)
+    }
   }
 
-  function handleBrandAddSave(data) {
-    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setBrands(prev => [...prev, { id: nextBrandId++, ...data, dateAdded: now, lastUpdated: now }])
-    setShowBrandModal(false)
+  async function handleBrandAddSave(data) {
+    try {
+      const brand = await apiRequest('/api/brands', { method: 'POST', body: JSON.stringify(data) })
+      setBrands(prev => [...prev, brand])
+      setShowBrandModal(false)
+    } catch (error) { showRequestError(error) }
   }
 
-  function handleBrandEditSave(data) {
-    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setBrands(prev => prev.map(b =>
-      b.id === editingBrand.id ? { ...b, ...data, lastUpdated: now } : b
-    ))
-    setEditingBrand(null)
+  async function handleBrandEditSave(data) {
+    try {
+      const brand = await apiRequest(`/api/brands/${editingBrand.id}`, { method: 'PUT', body: JSON.stringify(data) })
+      setBrands(prev => prev.map(item => item.id === brand.id ? brand : item))
+      setEditingBrand(null)
+    } catch (error) { showRequestError(error) }
   }
 
   function openUnitsFromInfo(mall) {
-    setUnitsMall(mall)
+    handleUnitsClick(mall)
   }
 
   function openEditFromInfo(mall) {
@@ -565,7 +561,7 @@ export default function MallsTable() {
           {TABS.map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => navigate(`/mall-management${TAB_PATHS[tab] ? `/${TAB_PATHS[tab]}` : ''}`)}
               className={`mall-tab-btn${activeTab === tab ? ' mall-tab-btn--active' : ''}`}
             >
               {tab}
@@ -576,7 +572,7 @@ export default function MallsTable() {
         {/* Filter bar + search — Malls tab only */}
         {activeTab === 'Malls' && <div className="mall-toolbar">
           <div className="mall-filters">
-            {STATUS_FILTERS.map(({ label, count }) => (
+            {STATUS_NAMES.map(label => (
               <button
                 key={label}
                 onClick={() => setActiveFilter(label)}
@@ -584,7 +580,7 @@ export default function MallsTable() {
               >
                 {label}
                 <span className={`mall-filter-count${activeFilter === label ? ' mall-filter-count--active' : ''}`}>
-                  {count}
+                  {label === 'All' ? malls.length : malls.filter(mall => mall.agreementStatus === label).length}
                 </span>
               </button>
             ))}
@@ -646,10 +642,10 @@ export default function MallsTable() {
                           <td>
                             {brand.logo ? (
                               <img
-                                src={brand.logo}
+                                src={getBrandLogoUrl(brand)}
                                 alt={brand.name}
                                 className="brand-table-logo brand-table-logo--clickable"
-                                onClick={() => openBrandImage(brand)}
+                                onClick={event => { event.stopPropagation(); openBrandImage(brand) }}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={e => e.key === 'Enter' && openBrandImage(brand)}
@@ -658,7 +654,7 @@ export default function MallsTable() {
                             ) : (
                               <div
                                 className="brand-table-logo-placeholder"
-                                onClick={() => openBrandImage(brand)}
+                                onClick={event => { event.stopPropagation(); openBrandImage(brand) }}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={e => e.key === 'Enter' && openBrandImage(brand)}
@@ -711,7 +707,11 @@ export default function MallsTable() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredMalls.map(mall => (
+                    {loading ? (
+                      <tr><td colSpan={9} className="mall-table-empty">Loading malls...</td></tr>
+                    ) : filteredMalls.length === 0 ? (
+                      <tr><td colSpan={9} className="mall-table-empty">No malls found.</td></tr>
+                    ) : filteredMalls.map(mall => (
                       <tr
                         key={mall.id}
                         className="mall-table-row"
@@ -743,7 +743,7 @@ export default function MallsTable() {
                         <td>
                           <ActionButtons
                             onEdit={() => setEditingMall(mall)}
-                            onUnits={() => setUnitsMall(mall)}
+                            onUnits={() => handleUnitsClick(mall)}
                             onStores={() => handleStoresClick(mall)}
                             onBeacons={() => handleBeaconsClick(mall)}
                           />
@@ -778,15 +778,6 @@ export default function MallsTable() {
         />
       )}
 
-      {/* Units panel (stacked on top of info panel) */}
-      {unitsMall && (
-        <UnitsPanel
-          mall={unitsMall}
-          onClose={() => setUnitsMall(null)}
-          onSave={handleUnitsSave}
-          stackedOnInfoPanel={!!viewMall}
-        />
-      )}
 
       {/* Edit Mall modal (stacked on top of info panel) */}
       {editingMall && (
@@ -813,6 +804,15 @@ export default function MallsTable() {
           onClose={() => setEditingBrand(null)}
           onSave={handleBrandEditSave}
         />
+      )}
+      {brandImage && (
+        <div className="logo-lightbox-overlay" onClick={() => setBrandImage(null)} role="presentation">
+          <div className="logo-lightbox-content" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`${brandImage.name} logo`}>
+            <button className="logo-lightbox-close" onClick={() => setBrandImage(null)} aria-label="Close logo preview">×</button>
+            <img src={brandImage.url} alt={`${brandImage.name} logo`} className="logo-lightbox-img" />
+            <p className="logo-lightbox-name">{brandImage.name}</p>
+          </div>
+        </div>
       )}
 
       {/* Brand Logo Lightbox */}

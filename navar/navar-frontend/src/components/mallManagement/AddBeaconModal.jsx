@@ -1,22 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, ChevronDown } from 'lucide-react'
 
-// Mock AR development versions
-const AR_VERSIONS = [
-  { id: 'v1', name: 'Version 1' },
-  { id: 'v2', name: 'Version 2' },
-  { id: 'v3', name: 'Version 3' },
-  { id: 'v4', name: 'Version 4' },
-]
-
-function getNextBatteryId(mall) {
-  const batteryIds = (mall.beacons || []).flatMap(beacon => beacon.batteryHistory || [])
-    .map(battery => Number(battery.batteryId?.match(/^BAT-(\d+)$/)?.[1]) || 0)
-  const nextNumber = Math.max(0, ...batteryIds) + 1
-  return `BAT-${String(nextNumber).padStart(4, '0')}`
+function getARVersions(maxVersion) {
+  return Array.from({ length: Math.max(1, maxVersion) }, (_, index) => ({
+    id: `v${index + 1}`,
+    name: `Version ${index + 1}`,
+  }))
 }
 
-function NodeSelectModal({ numNodes, mallNodes, selectedNodeConfig, onSave, onClose }) {
+function getMallCodePrefix(name) {
+  const words = String(name || 'MALL').toUpperCase().match(/[A-Z0-9]+/g) || ['MALL']
+  return words.slice(0, 3).map(word => word[0]).join('') || 'MALL'
+}
+
+function getNextGeneratedCode(rows, field, prefix, suffix) {
+  const pattern = new RegExp(`^${prefix}-${suffix}-(\\d+)$`, 'i')
+  const highest = rows.reduce((max, row) => {
+    const match = pattern.exec(row[field] || '')
+    return Math.max(max, match ? Number(match[1]) : 0)
+  }, 0)
+  return `${prefix}-${suffix}-${String(highest + 1).padStart(4, '0')}`
+}
+
+function NodeSelectModal({ versions, numNodes, mallNodes, selectedNodeConfig, onSave, onClose }) {
   const [localConfig, setLocalConfig] = useState(selectedNodeConfig || [])
   const [expandedVersion, setExpandedVersion] = useState(null)
 
@@ -57,7 +63,7 @@ function NodeSelectModal({ numNodes, mallNodes, selectedNodeConfig, onSave, onCl
         </p>
 
         <div className="unit-assign-list">
-          {AR_VERSIONS.map(ver => {
+          {versions.map(ver => {
             const versionNodes = mallNodes.filter(n => n.versionId === ver.id)
             const isExpanded = expandedVersion === ver.id
             const selectedNode = selectedForVersion(ver.id)
@@ -113,19 +119,24 @@ function NodeSelectModal({ numNodes, mallNodes, selectedNodeConfig, onSave, onCl
 }
 
 export default function AddBeaconModal({ mall, initialData = null, onClose, onSave, isEdit = false }) {
+  const arVersions = getARVersions(mall.arMaxVersion || 1)
   const initialNodeConfig = initialData?.nodeConfig || []
+  const codePrefix = getMallCodePrefix(mall.name)
+  const generatedBeaconCode = getNextGeneratedCode(mall.beacons || [], 'beaconCode', codePrefix, 'BCN')
+  const batteryRows = (mall.beacons || []).flatMap(beacon => beacon.batteryHistory || [])
+  const generatedBatteryId = getNextGeneratedCode(batteryRows, 'batteryId', codePrefix, 'BAT')
 
   const [form, setForm] = useState({
-    beaconCode: initialData?.beaconCode  || '',
+    beaconCode: initialData?.beaconCode || generatedBeaconCode,
     floorNo:    initialData?.floorNo     || '',
     location:   initialData?.location    || '',
     label:      initialData?.label       || '',
     minor:      initialData?.minor       != null ? String(initialData.minor) : '',
-    txPower:    initialData?.txPower     != null ? String(initialData.txPower) : '-59',
+    txPower:    initialData?.txPower     != null ? String(initialData.txPower) : '-30',
     numNodes:   initialData?.numNodes    != null ? String(initialData.numNodes) : '',
     dateInstalled: initialData?.dateInstalled || '',
     lastMaintenanceDate: initialData?.lastMaintenanceDate || initialData?.lastReplacementDate || '',
-    batteryId: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.batteryId || getNextBatteryId(mall),
+    batteryId: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.batteryId || generatedBatteryId,
     batteryInstallDate: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.installDate || initialData?.dateInstalled || '',
     batteryBrand: initialData?.batteryHistory?.find(battery => battery.status === 'current')?.brand || '',
   })
@@ -134,10 +145,12 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
   const [nodesSaved, setNodesSaved] = useState(initialNodeConfig.length > 0)
   const [showNodeSelect, setShowNodeSelect] = useState(false)
   const prevNumNodes = useRef(form.numNodes)
+  const shakeTimer = useRef(null)
 
   const [errors, setErrors] = useState({})
+  const [shakeFields, setShakeFields] = useState(false)
   const floors = mall.floorDetails || []
-  const major = mall.major || 1
+  const major = mall.majorBeacons ?? mall.major ?? 1
 
   useEffect(() => {
     function handleEsc(e) {
@@ -179,13 +192,13 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
 
   function validate() {
     const errs = {}
-    if (!form.beaconCode.trim()) errs.beaconCode = 'Beacon code is required.'
+    if (isEdit && !form.beaconCode.trim()) errs.beaconCode = 'Beacon code is required.'
     if (!form.floorNo)           errs.floorNo    = 'Floor is required.'
     if (!form.label.trim())      errs.label      = 'Label is required.'
     if (!form.minor.trim())      errs.minor      = 'Minor is required.'
     if (!form.txPower.trim())    errs.txPower    = 'TX Power is required.'
     if (!form.dateInstalled)      errs.dateInstalled = 'Installation date is required.'
-    if (!form.batteryId.trim())   errs.batteryId = 'Battery ID is required.'
+    if (isEdit && !form.batteryId.trim()) errs.batteryId = 'Battery ID is required.'
     if (!form.batteryInstallDate) errs.batteryInstallDate = 'Battery install date is required.'
     if (!form.batteryBrand.trim()) errs.batteryBrand = 'Battery brand is required.'
     return errs
@@ -193,34 +206,42 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
 
   function handleSave() {
     const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs)
+      setShakeFields(false)
+      window.clearTimeout(shakeTimer.current)
+      window.requestAnimationFrame(() => setShakeFields(true))
+      shakeTimer.current = window.setTimeout(() => setShakeFields(false), 500)
+      window.alert('Please fill in all required fields before saving.')
+      return
+    }
     const floorDetail = floors.find(f => f.floorNo === form.floorNo)
     const numNodes = parseInt(form.numNodes) || 0
     const configDisplay = nodeConfig.map(nc => {
-      const ver = AR_VERSIONS.find(v => v.id === nc.versionId)
+            const ver = arVersions.find(v => v.id === nc.versionId)
       return `${ver?.name}: ${nc.nodeId}`
     })
     onSave({
-      beaconCode:      form.beaconCode.trim(),
+      beaconCode:      isEdit ? form.beaconCode.trim() : '',
       floorNo:         form.floorNo,
       floorLabel:      floorDetail?.label || form.floorNo,
       location:        form.location.trim(),
       label:           form.label.trim(),
       major,
       minor:           parseInt(form.minor) || 0,
-      txPower:         parseInt(form.txPower) || -59,
+      txPower:         parseInt(form.txPower) || -30,
       numNodes,
       nodeConfig,
       nodeConfigDisplay: configDisplay.join('; '),
       dateInstalled:     form.dateInstalled,
-      lastMaintenanceDate: form.lastMaintenanceDate || '—',
+      lastMaintenanceDate: form.lastMaintenanceDate || null,
       batteryHistory: initialData?.batteryHistory?.length
         ? initialData.batteryHistory.map(battery => battery.status === 'current'
           ? { ...battery, batteryId: form.batteryId.trim(), installDate: form.batteryInstallDate, brand: form.batteryBrand.trim() }
           : battery
         )
         : [{
-            id: Date.now(),
+            id: `${form.batteryInstallDate}-${form.batteryBrand.trim()}`,
             batteryId: form.batteryId.trim(),
             status: 'current',
             installDate: form.batteryInstallDate,
@@ -250,10 +271,11 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 BEACON CODE <span className="mall-field-required">*</span>
               </label>
               <input
-                className={`mall-field-input${errors.beaconCode ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.beaconCode ? ' mall-field-input--error' : ''}${shakeFields && errors.beaconCode ? ' mall-field-input--shake' : ''}`}
                 value={form.beaconCode}
                 onChange={e => setField('beaconCode', e.target.value)}
-                placeholder="e.g. BCN-0001"
+                readOnly={!isEdit}
+                disabled={!isEdit}
               />
               {errors.beaconCode && <p className="mall-field-error">{errors.beaconCode}</p>}
             </div>
@@ -264,7 +286,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 FLOOR <span className="mall-field-required">*</span>
               </label>
               <select
-                className={`mall-field-input${errors.floorNo ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.floorNo ? ' mall-field-input--error' : ''}${shakeFields && errors.floorNo ? ' mall-field-input--shake' : ''}`}
                 value={form.floorNo}
                 onChange={e => setField('floorNo', e.target.value)}
               >
@@ -295,7 +317,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 LABEL <span className="mall-field-required">*</span>
               </label>
               <input
-                className={`mall-field-input${errors.label ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.label ? ' mall-field-input--error' : ''}${shakeFields && errors.label ? ' mall-field-input--shake' : ''}`}
                 value={form.label}
                 onChange={e => setField('label', e.target.value)}
                 placeholder="e.g. Zara Entrance"
@@ -322,7 +344,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               </label>
               <input
                 type="number"
-                className={`mall-field-input${errors.minor ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.minor ? ' mall-field-input--error' : ''}${shakeFields && errors.minor ? ' mall-field-input--shake' : ''}`}
                 value={form.minor}
                 onChange={e => setField('minor', e.target.value)}
                 placeholder="e.g. 101"
@@ -337,7 +359,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               </label>
               <input
                 type="number"
-                className={`mall-field-input${errors.txPower ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.txPower ? ' mall-field-input--error' : ''}${shakeFields && errors.txPower ? ' mall-field-input--shake' : ''}`}
                 value={form.txPower}
                 onChange={e => setField('txPower', e.target.value)}
                 placeholder="-59"
@@ -352,7 +374,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               </label>
               <input
                 type="date"
-                className={`mall-field-input${errors.dateInstalled ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.dateInstalled ? ' mall-field-input--error' : ''}${shakeFields && errors.dateInstalled ? ' mall-field-input--shake' : ''}`}
                 value={form.dateInstalled}
                 onChange={e => setField('dateInstalled', e.target.value)}
               />
@@ -361,12 +383,13 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
             {/* Battery */}
             <div className="mall-field-group">
               <label className="mall-field-label">
-                BATTERY ID (AUTO-GENERATED)
+                BATTERY ID
               </label>
               <input
                 className="mall-field-input"
                 value={form.batteryId}
                 readOnly
+                disabled
               />
               {errors.batteryId && <p className="mall-field-error">{errors.batteryId}</p>}
             </div>
@@ -376,7 +399,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               </label>
               <input
                 type="date"
-                className={`mall-field-input${errors.batteryInstallDate ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.batteryInstallDate ? ' mall-field-input--error' : ''}${shakeFields && errors.batteryInstallDate ? ' mall-field-input--shake' : ''}`}
                 value={form.batteryInstallDate}
                 onChange={e => setField('batteryInstallDate', e.target.value)}
               />
@@ -396,7 +419,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
                 BATTERY BRAND <span className="mall-field-required">*</span>
               </label>
               <input
-                className={`mall-field-input${errors.batteryBrand ? ' mall-field-input--error' : ''}`}
+                className={`mall-field-input${errors.batteryBrand ? ' mall-field-input--error' : ''}${shakeFields && errors.batteryBrand ? ' mall-field-input--shake' : ''}`}
                 value={form.batteryBrand}
                 onChange={e => setField('batteryBrand', e.target.value)}
                 placeholder="e.g. Panasonic CR2477"
@@ -431,7 +454,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               {nodesSaved && nodeConfig.length > 0 && (
                 <p className="mall-field-hint">
                   {nodeConfig.map(nc => {
-                    const ver = AR_VERSIONS.find(v => v.id === nc.versionId)
+                    const ver = arVersions.find(v => v.id === nc.versionId)
                     return `${ver?.name}: ${nc.nodeId}`
                   }).join('; ')}
                 </p>
@@ -452,6 +475,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
 
       {showNodeSelect && numNodes > 0 && (
         <NodeSelectModal
+          versions={arVersions}
           numNodes={numNodes}
           mallNodes={mall.nodes || []}
           selectedNodeConfig={nodeConfig}

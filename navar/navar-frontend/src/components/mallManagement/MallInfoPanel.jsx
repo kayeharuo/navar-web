@@ -65,7 +65,9 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
   }
   const opHours = formatOperatingHours(mall.operatingHours)
   const cityProvince = [mall.city, mall.province].filter(Boolean).join(', ')
-  const logoFileName = mall.logoFileName || (mall.logoUrl ? mall.logoUrl.split('/').pop().split('?')[0] || 'logo.png' : null)
+  const logoUrl = mall.logoUrl?.startsWith('/')
+    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${mall.logoUrl}`
+    : mall.logoUrl
 
   return (
     <>
@@ -100,14 +102,13 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
           <div className="mall-info-row">
             <span className="mall-info-label">Logo</span>
             <div className="mall-info-logo-wrap">
-              {mall.logoUrl ? (
+              {logoUrl ? (
                 <button
                   className="mall-info-logo-filename-btn"
                   onClick={() => setShowLogoLightbox(true)}
                   title="Click to preview logo"
                 >
-                  <ImageIcon size={13} />
-                  {logoFileName}
+                  <img src={logoUrl} className="mall-info-logo mall-info-logo--clickable" alt={`${mall.name} logo`} />
                 </button>
               ) : (
                 <div className="mall-info-logo-placeholder">
@@ -155,9 +156,9 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
         </div>
       </aside>
 
-      {showLogoLightbox && mall.logoUrl && (
+      {showLogoLightbox && logoUrl && (
         <div className="logo-lightbox-overlay" onClick={() => setShowLogoLightbox(false)}>
-          <img src={mall.logoUrl} alt={`${mall.name} logo`} className="logo-lightbox-img" />
+          <img src={logoUrl} alt={`${mall.name} logo`} className="logo-lightbox-img" />
           <button className="logo-lightbox-close" aria-label="Close preview">
             <X size={20} />
           </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ApplicationsTable from '../components/applicationManagement/ApplicationsTable'
 import StallApplicationsTable from '../components/applicationManagement/StallApplicationsTable'
 import ReviewPanel from '../components/applicationManagement/ReviewPanel'
@@ -12,6 +12,11 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
   const [applications, setApplications] = useState(null) // Will be passed from ApplicationsTable
   const [stallApplications, setStallApplications] = useState(null) // Will be passed from StallApplicationsTable
   const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    setActiveTab(location.pathname.endsWith('/stall-applications') ? 'stall' : 'new')
+  }, [location.pathname])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -178,13 +183,13 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
       <div className="app-mgmt-tabs">
         <button
           className={`app-mgmt-tab ${activeTab === 'new' ? 'app-mgmt-tab--active' : ''}`}
-          onClick={() => setActiveTab('new')}
+          onClick={() => navigate('/application-management')}
         >
           New Applications
         </button>
         <button
           className={`app-mgmt-tab ${activeTab === 'stall' ? 'app-mgmt-tab--active' : ''}`}
-          onClick={() => setActiveTab('stall')}
+          onClick={() => navigate('/application-management/stall-applications')}
         >
           Stall Applications
         </button>

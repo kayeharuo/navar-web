@@ -16,6 +16,12 @@ const CATEGORIES = [
 
 const MAX_LOGO_MB = 2
 
+function getLogoUrl(logo) {
+  return logo?.startsWith('/')
+    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
+    : logo
+}
+
 function UnitAssignModal({ count, units, selected, onSave, onClose }) {
   const [localSelected, setLocalSelected] = useState(selected || [])
 
@@ -63,6 +69,7 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
   // Separate into vacant and occupied
   const vacantUnits = sortedUnits.filter(u => u.status === 'vacant')
   const occupiedUnits = sortedUnits.filter(u => u.status !== 'vacant')
+  const selectedFloors = new Set(units.filter(unit => localSelected.includes(unit.unitNo)).map(unit => unit.floorNo))
 
   return (
     <>
@@ -79,6 +86,7 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
         <div className="mall-modal-divider" />
 
         <div className="unit-assign-list">
+          {selectedFloors.size > 1 && <p className="mall-field-hint">Selected units span different floors. Confirm that the spaces are physically connected before continuing.</p>}
           {units.length === 0 ? (
             <p className="unit-assign-empty">No units available in this mall. Add units first via the Units button.</p>
           ) : (
@@ -155,6 +163,7 @@ export default function AddStoreModal({
     status:        initialData?.status        || 'unmapped',
     brandName:     isOthers ? (initialData?.brand || '') : '',
     category:      isOthers ? (initialData?.category || '') : (brand?.category || ''),
+    brandDescription: isOthers ? (initialData?.brandDescription || '') : '',
     description:   initialData?.description   || '',
   })
 
@@ -189,7 +198,9 @@ export default function AddStoreModal({
       return
     }
     setLogo(file)
-    setLogoPreview(URL.createObjectURL(file))
+    const reader = new FileReader()
+    reader.onload = () => setLogoPreview(reader.result)
+    reader.readAsDataURL(file)
     setErrors(e => ({ ...e, logo: undefined }))
   }
 
@@ -226,8 +237,9 @@ export default function AddStoreModal({
     const errs = {}
     if (!form.storeName.trim()) errs.storeName = 'Store name is required.'
     // Only validate units for store type
-    if (form.storeType === 'store' && (form.numUnits === '' || parseInt(form.numUnits) < 0)) errs.numUnits = 'Enter a valid number of units (0 or more).'
-    if (!form.status) errs.status = 'Status is required.'
+    if (form.storeType === 'store' && (form.numUnits === '' || parseInt(form.numUnits) < 1)) errs.numUnits = 'Enter at least one unit.'
+    if (form.storeType === 'store' && unitNos.length !== parseInt(form.numUnits)) errs.numUnits = 'Choose the exact number of units requested.'
+    if (isOthers && !form.brandName.trim()) errs.brandName = 'Brand name is required.'
     if (isOthers && !form.category) errs.category = 'Category is required.'
     if (isOthers && !logo && !logoPreview) errs.logo = 'Logo is required for unlisted brands.'
     return errs
@@ -247,6 +259,8 @@ export default function AddStoreModal({
       brand:         isOthers ? form.brandName.trim() : brand?.name,
       brandLogo:     isOthers ? logoPreview : (brand?.logo || null),
       category:      isOthers ? form.category : brand?.category,
+      brandDescription: isOthers ? form.brandDescription.trim() : '',
+      isOthers,
       description:   form.description.trim(),
     })
   }
@@ -271,7 +285,11 @@ export default function AddStoreModal({
           {!isOthers && brand && (
             <div className="brand-selected-row">
               <div className="brand-selected-logo-box">
-                <span className="brand-card-initial">{brand.name?.charAt(0)}</span>
+                {getLogoUrl(brand.logo) ? (
+                  <img src={getLogoUrl(brand.logo)} alt="" className="brand-selected-logo" />
+                ) : (
+                  <span className="brand-card-initial">{brand.name?.charAt(0)}</span>
+                )}
               </div>
               <div className="brand-selected-info">
                 <p className="brand-selected-name">{brand.name}</p>
@@ -286,6 +304,19 @@ export default function AddStoreModal({
           )}
 
           <div className="mall-modal-grid">
+            {isOthers && <div className="mall-field-group mall-field-group--full"><strong>Brand details</strong><p className="mall-field-hint">These details create a new reusable brand together with this store.</p></div>}
+            {isOthers && (
+              <div className="mall-field-group mall-field-group--full">
+                <label className="mall-field-label">BRAND DESCRIPTION</label>
+                <textarea
+                  className="mall-field-input brand-description-input"
+                  value={form.brandDescription}
+                  onChange={e => setField('brandDescription', e.target.value)}
+                  placeholder="Describe the brand"
+                  rows={3}
+                />
+              </div>
+            )}
             {/* Store Name */}
             <div className="mall-field-group">
               <label className="mall-field-label">
@@ -381,22 +412,6 @@ export default function AddStoreModal({
               />
             </div>
 
-            {/* Status */}
-            <div className="mall-field-group">
-              <label className="mall-field-label">
-                STATUS <span className="mall-field-required">*</span>
-              </label>
-              <select
-                className={`mall-field-input${errors.status ? ' mall-field-input--error' : ''}`}
-                value={form.status}
-                onChange={e => setField('status', e.target.value)}
-              >
-                <option value="unmapped">Unmapped</option>
-                <option value="mapped">Mapped</option>
-              </select>
-              {errors.status && <p className="mall-field-error">{errors.status}</p>}
-            </div>
-
             {/* Others only: Category */}
             {isOthers && (
               <div className="mall-field-group">
@@ -418,13 +433,14 @@ export default function AddStoreModal({
             {/* Others only: Brand Name */}
             {isOthers && (
               <div className="mall-field-group">
-                <label className="mall-field-label">BRAND NAME</label>
+                <label className="mall-field-label">BRAND NAME <span className="mall-field-required">*</span></label>
                 <input
                   className="mall-field-input"
                   value={form.brandName}
                   onChange={e => setField('brandName', e.target.value)}
                   placeholder="Enter brand name"
                 />
+                {errors.brandName && <p className="mall-field-error">{errors.brandName}</p>}
               </div>
             )}
           </div>
@@ -432,9 +448,7 @@ export default function AddStoreModal({
           {/* Others only: Logo upload */}
           {isOthers && (
             <div className="mall-field-group mall-field-group--full">
-              <label className="mall-field-label">
-                STORE LOGO <span className="mall-field-required">*</span>
-              </label>
+              <label className="mall-field-label">BRAND LOGO <span className="mall-field-required">*</span></label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -469,6 +483,7 @@ export default function AddStoreModal({
               {errors.logo && <p className="mall-field-error">{errors.logo}</p>}
             </div>
           )}
+          {isOthers && <div className="mall-field-group mall-field-group--full"><strong>Store details</strong><p className="mall-field-hint">The store name identifies this specific mall location. New stores begin as Unmapped.</p></div>}
         </div>
 
         <div className="mall-modal-divider" />

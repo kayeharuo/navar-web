@@ -2,6 +2,8 @@ import { useCallback, useState, useEffect } from 'react'
 import { Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
 import AddStoreModal from './AddStoreModal'
+import { apiRequest } from '../../config/api'
+import { readStoredBrands, writeStoredBrands } from '../../utils/brandStore'
 
 const CATEGORIES = [
   'All',
@@ -79,6 +81,17 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   const [editingStore, setEditingStore]       = useState(null)
   const [deactivating, setDeactivating]       = useState(null)
   const [reactivating, setReactivating]       = useState(null)
+  const [brands, setBrands] = useState([])
+
+  useEffect(() => {
+    setBrands(readStoredBrands())
+    apiRequest('/api/brands')
+      .then(items => {
+        setBrands(items)
+        writeStoredBrands(items)
+      })
+      .catch(() => setBrands(readStoredBrands()))
+  }, [])
 
   const handleClose = useCallback(() => {
     // Update unit statuses based on current store assignments
@@ -121,16 +134,33 @@ export default function StoresPanel({ mall, onClose, onSave }) {
     setShowSelectBrand(true)
   }
 
-  function handleAddSave(data) {
+  async function handleAddSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setStores(prev => [...prev, {
+    let brand = data.brand
+    let brandLogo = data.brandLogo || null
+    let category = data.category
+
+    if (data.isOthers) {
+      const savedBrand = await apiRequest('/api/brands', {
+        method: 'POST',
+        body: JSON.stringify({ name: data.brand, category: data.category, description: data.brandDescription, logo: data.brandLogo }),
+      })
+      brand = savedBrand.name
+      brandLogo = savedBrand.logo || brandLogo
+      category = savedBrand.category
+      const nextBrands = [...brands, savedBrand]
+      setBrands(nextBrands)
+      writeStoredBrands(nextBrands)
+    }
+
+    const newStore = {
       id:            nextStoreId++,
       storeName:     data.storeName,
       unitNos:       data.unitNos || [],
       floorLabel:    getFloorLabel(data.unitNos, mallState),
-      brand:         data.brand,
-      brandLogo:     data.brandLogo || null,
-      category:      data.category,
+      brand,
+      brandLogo,
+      category,
       contactPerson: data.contactPerson || '',
       contactNo:     data.contactNo    || '',
       email:         data.email        || '',
@@ -139,7 +169,16 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       active:        true,
       dateAdded:     now,
       lastUpdated:   now,
-    }])
+    }
+    const nextStores = [...stores, newStore]
+    const nextUnits = (mallState.units || []).map(unit =>
+      newStore.active && newStore.unitNos.includes(unit.unitNo)
+        ? { ...unit, status: 'occupied', storeId: newStore.id }
+        : unit
+    )
+    setStores(nextStores)
+    setMallState(prev => ({ ...prev, units: nextUnits }))
+    onSave(nextStores)
     setShowAddStore(false)
     setSelectedBrand(null)
   }
@@ -150,7 +189,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
     const newUnitNos = data.unitNos || []
 
     // Update stores
-    setStores(prev => prev.map(s =>
+    const nextStores = stores.map(s =>
       s.id === editingStore.id ? {
         ...s,
         storeName:     data.storeName,
@@ -166,7 +205,8 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         description:   data.description  || '',
         lastUpdated:   now,
       } : s
-    ))
+    )
+    setStores(nextStores)
 
     // Update unit statuses immediately so pencil button shows correct statuses
     if (mallState.units) {
@@ -181,24 +221,41 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       })
       setMallState(prev => ({ ...prev, units: updatedUnits }))
     }
+    onSave(nextStores)
 
     setEditingStore(null)
   }
 
   function handleDeactivateConfirm() {
-    setStores(prev => prev.map(s =>
+    const nextStores = stores.map(s =>
       s.id === deactivating.id
         ? { ...s, active: false, status: s.status === 'mapped' ? 'unmapped' : s.status }
         : s
-    ))
+    )
+    setStores(nextStores)
+    setMallState(prev => ({
+      ...prev,
+      units: (prev.units || []).map(unit =>
+        deactivating.unitNos?.includes(unit.unitNo) ? { ...unit, status: 'vacant', storeId: null } : unit
+      ),
+    }))
+    onSave(nextStores)
     setDeactivating(null)
   }
 
   function handleReactivateConfirm() {
-    setStores(prev => prev.map(s =>
-      s.id === reactivating.id ? { ...s, active: true } : s
-    ))
+    const storeForAssignment = { ...reactivating, active: true, status: 'unmapped', unitNos: [] }
+    const nextStores = stores.map(s => s.id === reactivating.id ? storeForAssignment : s)
+    setStores(nextStores)
+    setMallState(prev => ({
+      ...prev,
+      units: (prev.units || []).map(unit =>
+        reactivating.unitNos?.includes(unit.unitNo) ? { ...unit, status: 'vacant', storeId: null } : unit
+      ),
+    }))
+    onSave(nextStores)
     setReactivating(null)
+    setEditingStore(storeForAssignment)
   }
 
   const activeCount = stores.filter(s => s.active).length
@@ -361,6 +418,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       {showSelectBrand && (
         <SelectBrandModal
           mall={mallState}
+          brands={brands}
           onSelect={handleBrandSelect}
           onClose={() => setShowSelectBrand(false)}
         />

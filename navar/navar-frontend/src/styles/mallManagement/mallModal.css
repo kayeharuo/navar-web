@@ -314,8 +314,25 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+.mall-field-input:disabled {
+  background: #F1F3F5;
+  color: #697386;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 .mall-field-input--error {
   border-color: #D51D1D;
+}
+
+@keyframes mall-field-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.mall-field-input--shake {
+  animation: mall-field-shake 0.45s ease-in-out;
 }
 
 .mall-field-input::placeholder {
@@ -870,26 +887,52 @@ select.mall-field-input {
 }
 
 .units-action-btn {
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 3px;
+  width: auto;
+  min-width: 54px;
+  height: 32px;
+  padding: 0 7px;
+  border-radius: 4px;
   border: none;
   font-family: 'Poppins', sans-serif;
   font-size: 11px;
-  font-weight: 500;
+  line-height: 1;
+  font-weight: 600;
   color: #fff;
   cursor: pointer;
   white-space: nowrap;
   transition: filter 0.12s ease;
+  display: inline-flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
 }
 
 .units-action-btn:hover {
   filter: brightness(0.88);
 }
 
-.units-action-btn--mark-vacant   { background-color: #347545; }
-.units-action-btn--mark-occupied { background-color: #FF9233; }
-.units-action-btn--remove        { background-color: #D51D1D; }
+.units-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+}
+
+.units-action-btn--edit   { background-color: #FF9233; }
+.units-action-btn--remove { background-color: #D51D1D; }
+
+.brand-card-logo,
+.brand-selected-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.brand-selected-logo {
+  width: 42px;
+  height: 42px;
+}
 
 /* ─── Add Unit section ────────────────────────────────────── */
 .units-add-section {
@@ -1058,6 +1101,7 @@ select.mall-field-input {
 /* ─── Scrollable body ─────────────────────────────────────── */
 .mall-info-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px 24px 16px;
   display: flex;
@@ -1080,29 +1124,32 @@ select.mall-field-input {
 
 /* ─── Info row (label + value) ────────────────────────────── */
 .mall-info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  min-height: 20px;
+  display: grid;
+  grid-template-columns: 115px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 16px;
+  min-height: max-content;
+  min-width: 0;
 }
 
 .mall-info-label {
   font-family: 'Fira Mono', monospace;
   font-size: 12px;
   color: #9B9C9C;
-  flex-shrink: 0;
-  min-width: 115px;
   padding-top: 1px;
 }
 
 .mall-info-value {
+  display: block;
   font-family: 'Poppins', sans-serif;
   font-size: 12px;
   color: #000;
   text-align: right;
   white-space: pre-line;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
   line-height: 1.6;
 }
 
@@ -1110,6 +1157,8 @@ select.mall-field-input {
 .mall-info-logo-wrap {
   display: flex;
   justify-content: flex-end;
+  min-width: 0;
+  width: 100%;
 }
 
 .mall-info-logo {
@@ -1119,6 +1168,10 @@ select.mall-field-input {
   border-radius: 4px;
   border: 1px solid #E8ECF2;
   background: #F7F8FA;
+}
+
+.mall-info-logo--clickable {
+  cursor: pointer;
 }
 
 .mall-info-logo-placeholder {
@@ -1146,8 +1199,9 @@ select.mall-field-input {
 
 /* ─── Logo filename button ────────────────────────────────── */
 .mall-info-logo-filename-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   font-family: 'Fira Mono', monospace;
   font-size: 11px;
@@ -1156,10 +1210,10 @@ select.mall-field-input {
   border: none;
   padding: 0;
   cursor: pointer;
-  text-decoration: underline;
-  word-break: break-all;
-  text-align: right;
-  max-width: 180px;
+  text-decoration: none;
+  width: 80px;
+  height: 52px;
+  flex: 0 0 80px;
   transition: color 0.12s;
 }
 
@@ -1665,14 +1719,20 @@ select.mall-field-input {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+  padding: 2px 4px 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
 }
 
 .brand-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 16px;
+  gap: 7px;
+  min-height: 132px;
+  padding: 12px;
   border-radius: 5px;
   border: 0.3px solid #9B9C9C;
   background: #F4F4F4;
@@ -1693,6 +1753,19 @@ select.mall-field-input {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.sbrand-grid .brand-card-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.sbrand-grid .brand-card-initial-box {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
 }
 
 .brand-card-initial {

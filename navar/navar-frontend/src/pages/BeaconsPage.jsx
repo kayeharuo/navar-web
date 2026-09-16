@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import BeaconManager from '../components/mallManagement/BeaconManager'
+import { apiRequest } from '../config/api'
 
 const SAMPLE_MALLS = [
   {
@@ -81,6 +82,7 @@ const SAMPLE_MALLS = [
     units: [],
   },
 ]
+void SAMPLE_MALLS
 
 export default function BeaconsPage() {
   const { mallId } = useParams()
@@ -88,9 +90,8 @@ export default function BeaconsPage() {
   const [mall, setMall] = useState(null)
 
   useEffect(() => {
-    const foundMall = SAMPLE_MALLS.find(m => m.id === parseInt(mallId))
-    if (foundMall) {
-      setMall({
+    apiRequest(`/api/malls/${mallId}`)
+      .then(foundMall => setMall({
         ...foundMall,
         beacons: (foundMall.beacons || []).map(beacon => ({
           ...beacon,
@@ -99,10 +100,8 @@ export default function BeaconsPage() {
           batteryHistory: beacon.batteryHistory || [],
           ticketHistory: beacon.ticketHistory || [],
         })),
-      })
-    } else {
-      navigate('/mall-management')
-    }
+      }))
+      .catch(() => navigate('/mall-management', { replace: true }))
   }, [mallId, navigate])
 
   useEffect(() => {

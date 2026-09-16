@@ -7,8 +7,8 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
     for (let i = 0; i < floorCount; i++) {
       arr.push(
         initialDetails && initialDetails[i]
-          ? { ...initialDetails[i] }
-          : { floorNo: '', label: '' }
+          ? { ...initialDetails[i], floorNo: String(i + 1) }
+          : { floorNo: String(i + 1), label: '' }
       )
     }
     return arr
@@ -32,7 +32,7 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
   function validate() {
     const errs = []
     details.forEach((d, i) => {
-      if (!d.floorNo.trim()) errs.push({ index: i, field: 'floorNo' })
+      if (!/^\d+$/.test(d.floorNo.trim()) || Number(d.floorNo) !== i + 1) errs.push({ index: i, field: 'floorNo' })
       if (!d.label.trim()) errs.push({ index: i, field: 'label' })
     })
     return errs
@@ -72,10 +72,12 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
                   FLOOR NO. <span className="mall-field-required">*</span>
                 </label>
                 <input
+                  type="number"
+                  min="1"
+                  step="1"
                   className={`mall-field-input${hasError(index, 'floorNo') ? ' mall-field-input--error' : ''}`}
                   value={detail.floorNo}
-                  onChange={e => handleChange(index, 'floorNo', e.target.value)}
-                  placeholder={`e.g. ${index + 1}`}
+                  readOnly
                 />
               </div>
               <div className="mall-field-group">

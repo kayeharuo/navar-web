@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import StoresPanel from '../components/mallManagement/StoresPanel'
+import { apiRequest } from '../config/api'
 
-// Sample malls data - same as in MallsTable
+/* Legacy sample retained as reference only; store routes load the selected mall from the API. */
 const SAMPLE_MALLS = [
   {
     id: 1,
@@ -35,6 +36,7 @@ const SAMPLE_MALLS = [
     beacons: [],
   },
 ]
+void SAMPLE_MALLS
 
 export default function StoresPage() {
   const { mallId } = useParams()
@@ -42,13 +44,18 @@ export default function StoresPage() {
   const [mall, setMall] = useState(null)
 
   useEffect(() => {
-    // Find the mall from the ID in params
-    const foundMall = SAMPLE_MALLS.find(m => m.id === parseInt(mallId))
-    if (foundMall) {
-      setMall({ ...foundMall })
-    } else {
-      navigate('/mall-management')
-    }
+    apiRequest(`/api/malls/${mallId}`)
+      .then(data => {
+        const storedStores = (() => {
+          try {
+            return JSON.parse(localStorage.getItem(`navar.stores.${mallId}`) || '[]')
+          } catch {
+            return []
+          }
+        })()
+        setMall({ ...data, stores: storedStores.length ? storedStores : (data.stores || []), units: data.units || [] })
+      })
+      .catch(() => navigate('/mall-management', { replace: true }))
   }, [mallId, navigate])
 
   function handleStoresSave(updatedStores) {
@@ -75,13 +82,18 @@ export default function StoresPage() {
       units: calculatedUnits,
       storesCount: updatedStores.filter(s => s.active).length,
     }))
+    localStorage.setItem(`navar.stores.${mallId}`, JSON.stringify(updatedStores))
+    apiRequest(`/api/malls/${mallId}/units`, {
+      method: 'PUT',
+      body: JSON.stringify({ units: calculatedUnits }),
+    }).catch(error => console.error('Could not persist store unit assignments:', error))
   }
 
   function handleClose() {
     navigate('/mall-management')
   }
 
-  if (!mall) return null
+  if (!mall) return <div className="stores-page">Loading stores…</div>
 
   return (
     <StoresPanel

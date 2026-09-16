@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search } from 'lucide-react'
 import AddBeaconModal from './AddBeaconModal'
+import { apiRequest } from '../../config/api'
 
 // Placeholder UUID — will be replaced by real value from backend
 const SYSTEM_UUID = 'F7826DA6-4FA2-4E98-8024-BC5B71E0893E'
 
 const STATUS_FILTERS = ['All', 'Placed', 'Faulty']
-
-let nextBeaconId = 1000
 
 function getNextBatteryId(batteries) {
   const batteryIds = batteries
@@ -178,18 +177,9 @@ function BatteryHistoryModal({ beacon, onClose, onUpdate }) {
 
   function handleBatterySave(data) {
     if (formMode === 'replace') {
-      const updated = batteries.map(battery => battery.status === 'current'
-        ? { ...battery, status: 'replaced', replacedDate: data.installDate }
-        : battery
-      )
-      onUpdate({
-        batteryHistory: [...updated, { id: `${data.installDate}-${data.batteryId}`, ...data, status: 'current', replacedDate: null }],
-        lastMaintenanceDate: data.installDate,
-      })
+      onUpdate({ batteryReplacement: data })
     } else {
-      onUpdate({
-        batteryHistory: batteries.map(battery => battery.id === formMode.id ? { ...battery, ...data } : battery),
-      })
+      onUpdate({ batteryEdit: { id: formMode.id, ...data } })
     }
     setFormMode(null)
   }
@@ -319,29 +309,42 @@ export default function BeaconManager({ mall, onClose, onSave }) {
   const [batteryBeacon, setBatteryBeacon] = useState(null)
   const [ticketBeacon, setTicketBeacon] = useState(null)
 
-  function handleAddSave(data) {
+  async function handleAddSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setBeacons(prev => [...prev, {
-      id:         nextBeaconId++,
-      ...data,
-      status:     'placed',
-      faultyNote: '',
-      ticketHistory: [],
-      dateAdded:  now,
-    }])
-    setShowAdd(false)
+    try {
+      const beacon = await apiRequest(`/api/malls/${mall.id}/beacons`, { method: 'POST', body: JSON.stringify(data) })
+      setBeacons(prev => [...prev, { ...beacon, faultyNote: '', ticketHistory: [], dateAdded: now }])
+      setShowAdd(false)
+    } catch (error) {
+      window.alert(error.message)
+    }
   }
 
-  function handleEditSave(data) {
-    setBeacons(prev => prev.map(b =>
-      b.id === editingBeacon.id ? { ...b, ...data } : b
-    ))
-    setEditing(null)
+  async function handleEditSave(data) {
+    try {
+      const beacon = await apiRequest(`/api/malls/${mall.id}/beacons/${editingBeacon.id}`, { method: 'PUT', body: JSON.stringify(data) })
+      setBeacons(prev => prev.map(b => b.id === editingBeacon.id ? { ...b, ...beacon } : b))
+      setEditing(null)
+    } catch (error) {
+      window.alert(error.message)
+    }
   }
 
-  function handleBeaconUpdate(id, changes) {
-    setBeacons(prev => prev.map(b => b.id === id ? { ...b, ...changes } : b))
-    setBatteryBeacon(prev => prev && prev.id === id ? { ...prev, ...changes } : prev)
+  async function handleBeaconUpdate(id, changes) {
+    try {
+      const path = changes.batteryReplacement
+        ? `/api/malls/${mall.id}/beacons/${id}/batteries`
+        : `/api/malls/${mall.id}/beacons/${id}/batteries/${changes.batteryEdit.id}`
+      const body = changes.batteryReplacement || changes.batteryEdit
+      const updated = await apiRequest(path, {
+        method: changes.batteryReplacement ? 'POST' : 'PUT',
+        body: JSON.stringify(body),
+      })
+      setBeacons(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b))
+      setBatteryBeacon(prev => prev && prev.id === id ? { ...prev, ...updated } : prev)
+    } catch (error) {
+      window.alert(error.message)
+    }
   }
 
   function handleSetFaulty(issue, note) {
@@ -439,7 +442,6 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                   <th>FLOOR</th>
                   <th>LOCATION</th>
                   <th>LABEL</th>
-                  <th>MAJOR</th>
                   <th>MINOR</th>
                   <th>TX POWER(dBm)</th>
                   <th>NODES</th>
@@ -454,7 +456,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
               <tbody>
                 {filteredBeacons.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="stores-empty">No beacons found.</td>
+                    <td colSpan={13} className="stores-empty">No beacons found.</td>
                   </tr>
                 ) : filteredBeacons.map(b => (
                   <tr key={b.id} className="stores-table-row">
@@ -462,7 +464,6 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                     <td>{b.floorLabel || b.floorNo}</td>
                     <td>{b.location || '—'}</td>
                     <td>{b.label}</td>
-                    <td>{b.major}</td>
                     <td>{b.minor}</td>
                     <td>{b.txPower}</td>
                     <td>{b.nodeConfigDisplay || '—'}</td>
@@ -480,15 +481,13 @@ export default function BeaconManager({ mall, onClose, onSave }) {
                             Faulty
                           </button>
                         ) : (
-                          <>
-                            <button className="stores-action-btn bcn-btn--reactivate" onClick={() => setReact(b)}>
-                              Reactivate
-                            </button>
-                            <button className="stores-action-btn stores-action-btn--edit" onClick={() => setEditing(b)}>
-                              Edit
-                            </button>
-                          </>
+                          <button className="stores-action-btn bcn-btn--reactivate" onClick={() => setReact(b)}>
+                            Reactivate
+                          </button>
                         )}
+                        <button className="stores-action-btn stores-action-btn--edit" onClick={() => setEditing(b)}>
+                          Edit
+                        </button>
                       </div>
                     </td>
                   </tr>

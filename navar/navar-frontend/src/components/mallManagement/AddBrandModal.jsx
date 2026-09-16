@@ -16,6 +16,12 @@ const BRAND_CATEGORIES = [
 
 const MAX_LOGO_MB = 2
 
+function getLogoUrl(logo) {
+  return logo?.startsWith('/')
+    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
+    : logo
+}
+
 export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   const isEdit = !!initialData
 
@@ -26,7 +32,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   })
 
   const [, setLogo]                   = useState(null)
-  const [logoPreview, setLogoPreview] = useState(initialData?.logo || null)
+  const [logoPreview, setLogoPreview] = useState(getLogoUrl(initialData?.logo) || null)
   const [errors, setErrors]           = useState({})
   const fileInputRef = useRef(null)
 
@@ -51,7 +57,9 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
       return
     }
     setLogo(file)
-    setLogoPreview(URL.createObjectURL(file))
+    const reader = new FileReader()
+    reader.onload = () => setLogoPreview(reader.result)
+    reader.readAsDataURL(file)
     setErrors(e => ({ ...e, logo: undefined }))
   }
 

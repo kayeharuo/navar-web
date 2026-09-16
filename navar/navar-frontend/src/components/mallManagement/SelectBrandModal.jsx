@@ -1,26 +1,25 @@
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
 
-export const BRANDS = [
-  { id: 1, name: 'Jollibee',           category: 'Food & Beverage' },
-  { id: 2, name: 'Zara',               category: 'Fashion & Apparel' },
-  { id: 3, name: 'H & M',              category: 'Fashion & Apparel' },
-  { id: 4, name: 'Starbucks',          category: 'Food & Beverage' },
-  { id: 5, name: 'Uniqlo',             category: 'Fashion & Apparel' },
-  { id: 6, name: 'National Book Store',category: 'Books & Hobby' },
-  { id: 7, name: 'Mercury Drug',       category: 'Health & Beauty' },
-  { id: 8, name: 'Others',             category: null, isOthers: true },
-]
+export const BRANDS = []
 
-function BrandInitial({ name }) {
+function getLogoUrl(logo) {
+  return logo?.startsWith('/')
+    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
+    : logo
+}
+
+function BrandLogo({ brand }) {
+  const logoUrl = getLogoUrl(brand.logo)
+  if (logoUrl) return <img src={logoUrl} alt="" className="brand-card-logo" />
   return (
     <div className="brand-card-initial-box">
-      <span className="brand-card-initial">{name.charAt(0).toUpperCase()}</span>
+      <span className="brand-card-initial">{brand.name.charAt(0).toUpperCase()}</span>
     </div>
   )
 }
 
-export default function SelectBrandModal({ mall, onSelect, onClose }) {
+export default function SelectBrandModal({ mall, brands = BRANDS, onSelect, onClose }) {
   useEffect(() => {
     function handleEsc(e) {
       if (e.key === 'Escape') onClose()
@@ -49,13 +48,13 @@ export default function SelectBrandModal({ mall, onSelect, onClose }) {
             Choose a brand or select Others for unlisted stores.
           </p>
           <div className="sbrand-grid">
-            {BRANDS.map(brand => (
+            {[...brands.filter(brand => !brand.isOthers && brand.name !== 'Others'), { id: 'others', name: 'Others', category: null, isOthers: true }].map(brand => (
               <button
                 key={brand.id}
                 className="brand-card"
                 onClick={() => onSelect(brand)}
               >
-                <BrandInitial name={brand.name} />
+                <BrandLogo brand={brand} />
                 <span className="brand-card-name">{brand.name}</span>
               </button>
             ))}

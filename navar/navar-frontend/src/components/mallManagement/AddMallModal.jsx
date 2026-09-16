@@ -5,19 +5,28 @@ import OperatingHoursBuilder from './OperatingHoursBuilder'
 
 const MAX_LOGO_MB = 5
 
+function getLogoUrl(logo) {
+  return logo?.startsWith('/')
+    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
+    : logo
+}
+
 export default function AddMallModal({ onClose, onSave, initialData = null, stackedOnInfoPanel = false }) {
   const isEdit = !!initialData
 
   const [form, setForm] = useState({
     mallName: initialData?.name || '',
     city: initialData?.city || '',
+    province: initialData?.province || '',
+    zipCode: initialData?.zipCode || '',
     address: initialData?.address || '',
+    description: initialData?.description || '',
+    majorBeacons: initialData?.majorBeacons != null ? String(initialData.majorBeacons) : '1',
     floors: initialData?.floors != null ? String(initialData.floors) : '',
-    agreementType: initialData?.tier || 'Standard',
   })
 
   const [logo, setLogo] = useState(null)
-  const [logoPreview, setLogoPreview] = useState(initialData?.logoUrl || null)
+  const [logoPreview, setLogoPreview] = useState(getLogoUrl(initialData?.logoUrl) || null)
   const [logoError, setLogoError] = useState('')
 
   const [floorDetails, setFloorDetails] = useState(initialData?.floorDetails || [])
@@ -90,31 +99,46 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     const errs = {}
     if (!form.mallName.trim()) errs.mallName = 'Mall name is required.'
     if (!form.city.trim()) errs.city = 'City is required.'
+    if (!form.province.trim()) errs.province = 'State/Province is required.'
+    if (!form.zipCode.trim()) errs.zipCode = 'Zip code is required.'
     if (!form.address.trim()) errs.address = 'Address is required.'
+    if (!form.majorBeacons || Number(form.majorBeacons) < 1) errs.majorBeacons = 'Beacon major must be at least 1.'
     if (!form.floors || parseInt(form.floors) < 1)
       errs.floors = 'At least 1 floor is required.'
     if (operatingHours.length === 0)
       errs.operatingHours = 'At least one operating schedule is required.'
-    if (!logo && !logoPreview) errs.logo = 'Logo is required.'
+    if (!isEdit && !logo && !logoPreview) errs.logo = 'Logo is required.'
     return errs
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate()
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return
     }
+    const logoDataUrl = logo
+      ? await new Promise(resolve => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.readAsDataURL(logo)
+        })
+      : null
+
     onSave({
       name: form.mallName.trim(),
       city: form.city.trim(),
+      province: form.province.trim(),
+      zipCode: form.zipCode.trim(),
       address: form.address.trim(),
+      description: form.description.trim(),
+      majorBeacons: Number(form.majorBeacons),
       floors: parseInt(form.floors),
-      tier: form.agreementType,
       floorDetails,
       operatingHours,
       logo,
       logoUrl: logoPreview,
+      logoDataUrl,
     })
   }
 
@@ -180,6 +204,18 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               {errors.address && <p className="mall-field-error">{errors.address}</p>}
             </div>
 
+            <div className="mall-field-group">
+              <label className="mall-field-label">STATE / PROVINCE <span className="mall-field-required">*</span></label>
+              <input className={`mall-field-input${errors.province ? ' mall-field-input--error' : ''}`} value={form.province} onChange={e => setField('province', e.target.value)} placeholder="Enter state or province" />
+              {errors.province && <p className="mall-field-error">{errors.province}</p>}
+            </div>
+
+            <div className="mall-field-group">
+              <label className="mall-field-label">ZIP CODE <span className="mall-field-required">*</span></label>
+              <input className={`mall-field-input${errors.zipCode ? ' mall-field-input--error' : ''}`} value={form.zipCode} onChange={e => setField('zipCode', e.target.value)} placeholder="Enter zip code" />
+              {errors.zipCode && <p className="mall-field-error">{errors.zipCode}</p>}
+            </div>
+
             {/* No. of Floors */}
             <div className="mall-field-group">
               <label className="mall-field-label">
@@ -214,20 +250,23 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               )}
             </div>
 
-            {/* Agreement Type */}
+            <div className="mall-field-group">
+              <label className="mall-field-label">BEACON MAJOR <span className="mall-field-required">*</span></label>
+              <input type="number" min="1" className={`mall-field-input${errors.majorBeacons ? ' mall-field-input--error' : ''}`} value={form.majorBeacons} onChange={e => setField('majorBeacons', e.target.value)} />
+              {errors.majorBeacons && <p className="mall-field-error">{errors.majorBeacons}</p>}
+            </div>
+
+            {/* Agreement Type is selected after the mall administrator subscribes. */}
             <div className="mall-field-group">
               <label className="mall-field-label">
                 AGREEMENT TYPE
               </label>
-              <select
-                className="mall-field-input"
-                value={form.agreementType}
-                onChange={e => setField('agreementType', e.target.value)}
-              >
-                <option value="Premium">Premium</option>
-                <option value="Standard">Standard</option>
-                <option value="Basic">Basic</option>
-              </select>
+              <input className="mall-field-input mall-field-input--disabled" value="Pending" disabled />
+            </div>
+
+            <div className="mall-field-group mall-field-group--full">
+              <label className="mall-field-label">MALL DESCRIPTION</label>
+              <textarea className="mall-field-input mall-field-textarea" value={form.description} onChange={e => setField('description', e.target.value)} placeholder="Enter mall description" rows="3" />
             </div>
 
             {/* Logo */}
