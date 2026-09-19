@@ -1,0 +1,60 @@
+/* ─── Mall Management page wrapper ──────────────────────── */
+.mall-page {
+  display: flex;
+  flex-direction: column;
+  max-width: 1400px;
+  width: 100%;
+  min-height: calc(100vh - 75px - 64px);
+}
+
+/* ─── Main content block ─────────────────────────────────── */
+.mall-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ─── Stores page fills mall-page wrapper ─────────────────── */
+.mall-page > .stores-page {
+  flex: 1;
+}
+
+/* ─── Page header row ────────────────────────────────────── */
+.mall-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ─── Table wrapper card ─────────────────────────────────── */
+.mall-table-wrap {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 0.5px solid #e8ecf2;
+  overflow: hidden;
+}
+
+.mall-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .mall-content {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .mall-content {
+    gap: 14px;
+  }
+
+  .mall-header {
+    gap: 12px;
+  }
+}

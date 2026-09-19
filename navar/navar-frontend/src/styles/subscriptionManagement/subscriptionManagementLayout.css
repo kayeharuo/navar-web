@@ -1,0 +1,52 @@
+/* ─── Subscription Management page wrapper ───────────────── */
+.sub-mgmt-page {
+  display: flex;
+  flex-direction: column;
+  max-width: 1400px;
+  width: 100%;
+  min-height: calc(100vh - 75px - 64px);
+}
+
+.sub-mgmt-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Table wrapper card ──────────────────────────────────── */
+.sub-mgmt-table-wrap {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 0.5px solid #e8ecf2;
+  overflow: hidden;
+  padding: 0 0 10px;
+}
+
+.sub-mgmt-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E2E8F0 transparent;
+}
+
+.sub-mgmt-hint {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 500;
+  color: #979797;
+  margin: 8px 0 0;
+  padding: 0 16px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .sub-mgmt-content {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 767px) {
+  .sub-mgmt-content {
+    gap: 12px;
+  }
+}
