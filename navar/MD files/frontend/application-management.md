@@ -410,7 +410,7 @@ When a stall application is approved:
 5. **No Thread for Stalls:** Thread tab is hidden; stall apps use request revision for communication
 6. **Store Management Gate:** New stores and stalls that exceed the agreed tenant-node allowance require an explicit ₱3,500-per-stall payment agreement and sufficient wallet balance before they are added to the store list.
 7. **Store-List Prerequisite:** A stall application can only be submitted after its stalls are present in the store list; Application Management verifies this and any required payment before approval.
-8. **To Be Added Stalls Button:** AR Development table shows button to view pending stalls (see ARDevelopment.md)
+8. **To Be Added Stalls Button:** AR Development table shows button to view pending stalls (see ar-development.md)
 
 ---
 
