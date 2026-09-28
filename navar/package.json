@@ -1,5 +1,15 @@
 {
+  "name": "navar",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names backend,frontend --prefix-colors blue,green \"npm --prefix navar-backend run dev\" \"npm --prefix navar-frontend run dev\"",
+    "dev:backend": "npm --prefix navar-backend run dev",
+    "dev:frontend": "npm --prefix navar-frontend run dev"
+  },
   "dependencies": {
     "react-router-dom": "^7.17.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

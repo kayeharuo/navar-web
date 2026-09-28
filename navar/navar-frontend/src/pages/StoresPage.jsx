@@ -46,54 +46,34 @@ export default function StoresPage() {
   useEffect(() => {
     apiRequest(`/api/malls/${mallId}`)
       .then(data => {
-        const storedStores = (() => {
-          try {
-            return JSON.parse(localStorage.getItem(`navar.stores.${mallId}`) || '[]')
-          } catch {
+        return apiRequest(`/api/malls/${mallId}/stores`)
+          .catch(error => {
+            console.error('Could not load stores:', error)
             return []
-          }
-        })()
-        setMall({ ...data, stores: storedStores.length ? storedStores : (data.stores || []), units: data.units || [] })
+          })
+          .then(stores => setMall({ ...data, stores, units: data.units || [] }))
       })
       .catch(() => navigate('/mall-management', { replace: true }))
   }, [mallId, navigate])
 
-  function handleStoresSave(updatedStores) {
-    // Calculate correct unit statuses based on store assignments
-    let calculatedUnits = [...(mall.units || [])]
-
-    // First mark all as vacant
-    calculatedUnits = calculatedUnits.map(u => ({ ...u, status: 'vacant' }))
-
-    // Then mark assigned ones as occupied
-    updatedStores.forEach(store => {
-      if (store.active && store.unitNos && store.unitNos.length > 0) {
-        store.unitNos.forEach(unitNo => {
-          calculatedUnits = calculatedUnits.map(u =>
-            u.unitNo === unitNo ? { ...u, status: 'occupied' } : u
-          )
-        })
-      }
+  async function handleStoresSave(updatedStores) {
+    const savedStores = await apiRequest(`/api/malls/${mallId}/stores`, {
+      method: 'PUT',
+      body: JSON.stringify({ stores: updatedStores }),
     })
-
     setMall(prev => ({
       ...prev,
-      stores: updatedStores,
-      units: calculatedUnits,
-      storesCount: updatedStores.filter(s => s.active).length,
+      stores: savedStores,
+      storesCount: savedStores.filter(store => store.active).length,
     }))
-    localStorage.setItem(`navar.stores.${mallId}`, JSON.stringify(updatedStores))
-    apiRequest(`/api/malls/${mallId}/units`, {
-      method: 'PUT',
-      body: JSON.stringify({ units: calculatedUnits }),
-    }).catch(error => console.error('Could not persist store unit assignments:', error))
+    return savedStores
   }
 
   function handleClose() {
     navigate('/mall-management')
   }
 
-  if (!mall) return <div className="stores-page">Loading stores…</div>
+  if (!mall) return null
 
   return (
     <StoresPanel

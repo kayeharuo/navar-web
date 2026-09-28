@@ -3,7 +3,6 @@ import { Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
 import AddStoreModal from './AddStoreModal'
 import { apiRequest } from '../../config/api'
-import { readStoredBrands, writeStoredBrands } from '../../utils/brandStore'
 
 const CATEGORIES = [
   'All',
@@ -18,8 +17,6 @@ const CATEGORIES = [
   'Entertainment',
   'Others',
 ]
-
-let nextStoreId = 500
 
 function ConfirmModal({ type, onCancel, onConfirm }) {
   const isDe = type === 'deactivate'
@@ -80,17 +77,14 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   const [showAddStore, setShowAddStore]       = useState(false)
   const [editingStore, setEditingStore]       = useState(null)
   const [deactivating, setDeactivating]       = useState(null)
-  const [reactivating, setReactivating]       = useState(null)
   const [brands, setBrands] = useState([])
 
   useEffect(() => {
-    setBrands(readStoredBrands())
     apiRequest('/api/brands')
       .then(items => {
         setBrands(items)
-        writeStoredBrands(items)
       })
-      .catch(() => setBrands(readStoredBrands()))
+      .catch(() => setBrands([]))
   }, [])
 
   const handleClose = useCallback(() => {
@@ -112,13 +106,13 @@ export default function StoresPanel({ mall, onClose, onSave }) {
 
   useEffect(() => {
     function handleEsc(e) {
-      if (e.key === 'Escape' && !showSelectBrand && !showAddStore && !deactivating && !reactivating) {
+      if (e.key === 'Escape' && !showSelectBrand && !showAddStore && !deactivating && !editingStore) {
         handleClose()
       }
     }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [handleClose, showSelectBrand, showAddStore, deactivating, reactivating])
+  }, [handleClose, showSelectBrand, showAddStore, deactivating, editingStore])
 
   function handleAddStoreClick() { setShowSelectBrand(true) }
 
@@ -135,55 +129,65 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   }
 
   async function handleAddSave(data) {
-    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    let brand = data.brand
-    let brandLogo = data.brandLogo || null
-    let category = data.category
+    try {
+      const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      let brand = data.brand
+      let brandLogo = data.brandLogo || null
+      let category = data.category
 
-    if (data.isOthers) {
-      const savedBrand = await apiRequest('/api/brands', {
-        method: 'POST',
-        body: JSON.stringify({ name: data.brand, category: data.category, description: data.brandDescription, logo: data.brandLogo }),
-      })
-      brand = savedBrand.name
-      brandLogo = savedBrand.logo || brandLogo
-      category = savedBrand.category
-      const nextBrands = [...brands, savedBrand]
-      setBrands(nextBrands)
-      writeStoredBrands(nextBrands)
-    }
+      if (data.isOthers) {
+        const savedBrand = await apiRequest('/api/brands', {
+          method: 'POST',
+          body: JSON.stringify({ name: data.brand, category: data.category, description: data.brandDescription, logo: data.brandLogo }),
+        })
+        brand = savedBrand.name
+        brandLogo = savedBrand.logo || brandLogo
+        category = savedBrand.category
+        data.brandId = savedBrand.id
+        const nextBrands = [...brands, savedBrand]
+        setBrands(nextBrands)
+      }
 
-    const newStore = {
-      id:            nextStoreId++,
-      storeName:     data.storeName,
-      unitNos:       data.unitNos || [],
-      floorLabel:    getFloorLabel(data.unitNos, mallState),
-      brand,
-      brandLogo,
-      category,
-      contactPerson: data.contactPerson || '',
-      contactNo:     data.contactNo    || '',
-      email:         data.email        || '',
-      status:        data.status,
-      description:   data.description  || '',
-      active:        true,
-      dateAdded:     now,
-      lastUpdated:   now,
+      const newStore = {
+        storeName: data.storeName,
+        unitNos: data.unitNos || [],
+        floorLabel: getFloorLabel(data.unitNos, mallState),
+        brand,
+        brandLogo,
+        brandId: data.brandId || null,
+        category,
+        contactPerson: data.contactPerson || '',
+        contactNo: data.contactNo || '',
+        email: data.email || '',
+        status: 'unmapped',
+        description: data.description || '',
+        active: true,
+        dateAdded: now,
+        lastUpdated: now,
+      }
+      const nextStores = [...stores, newStore]
+      const savedStores = await onSave(nextStores)
+      setStores(savedStores || nextStores)
+      const savedByUnit = new Map(
+        (savedStores || nextStores).flatMap(store =>
+          (store.active ? store.unitNos || [] : []).map(unitNo => [unitNo, store.id])
+        )
+      )
+      setMallState(prev => ({
+        ...prev,
+        units: (prev.units || []).map(unit => savedByUnit.has(unit.unitNo)
+          ? { ...unit, status: 'occupied', storeId: savedByUnit.get(unit.unitNo) }
+          : { ...unit, status: 'vacant', storeId: null }
+        ),
+      }))
+      setShowAddStore(false)
+      setSelectedBrand(null)
+    } catch (error) {
+      window.alert(error.message || 'Could not save the store.')
     }
-    const nextStores = [...stores, newStore]
-    const nextUnits = (mallState.units || []).map(unit =>
-      newStore.active && newStore.unitNos.includes(unit.unitNo)
-        ? { ...unit, status: 'occupied', storeId: newStore.id }
-        : unit
-    )
-    setStores(nextStores)
-    setMallState(prev => ({ ...prev, units: nextUnits }))
-    onSave(nextStores)
-    setShowAddStore(false)
-    setSelectedBrand(null)
   }
 
-  function handleEditSave(data) {
+  async function handleEditSave(data) {
     const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const oldUnitNos = editingStore?.unitNos || []
     const newUnitNos = data.unitNos || []
@@ -197,17 +201,17 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         floorLabel:    getFloorLabel(newUnitNos, mallState),
         brand:         data.brand,
         brandLogo:     data.brandLogo || null,
+        brandId:       data.brandId || editingStore.brandId || null,
         category:      data.category,
         contactPerson: data.contactPerson || '',
         contactNo:     data.contactNo    || '',
         email:         data.email        || '',
-        status:        data.status,
+        status:        editingStore.status === 'mapped' ? 'mapped' : 'unmapped',
+        active:        true,
         description:   data.description  || '',
         lastUpdated:   now,
       } : s
     )
-    setStores(nextStores)
-
     // Update unit statuses immediately so pencil button shows correct statuses
     if (mallState.units) {
       const updatedUnits = mallState.units.map(u => {
@@ -221,41 +225,27 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       })
       setMallState(prev => ({ ...prev, units: updatedUnits }))
     }
-    onSave(nextStores)
+    const savedStores = await onSave(nextStores)
+    setStores(savedStores || nextStores)
 
     setEditingStore(null)
   }
 
-  function handleDeactivateConfirm() {
+  async function handleDeactivateConfirm() {
     const nextStores = stores.map(s =>
       s.id === deactivating.id
-        ? { ...s, active: false, status: s.status === 'mapped' ? 'unmapped' : s.status }
+        ? { ...s, active: false, status: 'unmapped' }
         : s
     )
-    setStores(nextStores)
     setMallState(prev => ({
       ...prev,
       units: (prev.units || []).map(unit =>
         deactivating.unitNos?.includes(unit.unitNo) ? { ...unit, status: 'vacant', storeId: null } : unit
       ),
     }))
-    onSave(nextStores)
+    const savedStores = await onSave(nextStores)
+    setStores(savedStores || nextStores)
     setDeactivating(null)
-  }
-
-  function handleReactivateConfirm() {
-    const storeForAssignment = { ...reactivating, active: true, status: 'unmapped', unitNos: [] }
-    const nextStores = stores.map(s => s.id === reactivating.id ? storeForAssignment : s)
-    setStores(nextStores)
-    setMallState(prev => ({
-      ...prev,
-      units: (prev.units || []).map(unit =>
-        reactivating.unitNos?.includes(unit.unitNo) ? { ...unit, status: 'vacant', storeId: null } : unit
-      ),
-    }))
-    onSave(nextStores)
-    setReactivating(null)
-    setEditingStore(storeForAssignment)
   }
 
   const activeCount = stores.filter(s => s.active).length
@@ -269,8 +259,9 @@ export default function StoresPanel({ mall, onClose, onSave }) {
   })
 
   const editingBrand = editingStore
-    ? { name: editingStore.brand, logo: editingStore.brandLogo, category: editingStore.category, isOthers: false }
+    ? { id: editingStore.brandId, name: editingStore.brand, logo: editingStore.brandLogo, category: editingStore.category, isOthers: false }
     : null
+  const isReactivating = editingStore && stores.find(store => store.id === editingStore.id)?.active === false
 
   return (
     <>
@@ -399,7 +390,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
                         ) : (
                           <button
                             className="stores-action-btn stores-action-btn--reactivate"
-                            onClick={() => setReactivating(store)}
+                            onClick={() => setEditingStore({ ...store, active: true, status: 'unmapped', unitNos: [] })}
                           >
                             Reactivate
                           </button>
@@ -442,6 +433,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
           onClose={() => setEditingStore(null)}
           onSave={handleEditSave}
           onChangeBrand={() => {}}
+          requireUnitAssignment={isReactivating}
           isEdit
         />
       )}
@@ -454,13 +446,6 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         />
       )}
 
-      {reactivating && (
-        <ConfirmModal
-          type="reactivate"
-          onCancel={() => setReactivating(null)}
-          onConfirm={handleReactivateConfirm}
-        />
-      )}
     </>
   )
 }

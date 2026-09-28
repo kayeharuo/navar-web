@@ -80,7 +80,7 @@ const LOGS = [
     module: 'Account Management',
     action: 'Created account',
     target: 'mvillanueva@navar.ph',
-    details: 'New Super Admin account created. Magic link sent.',
+    details: 'New Super Admin account created. Invitation email sent.',
   },
   {
     id: 9,

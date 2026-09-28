@@ -242,15 +242,7 @@ CREATE TABLE BRAND (
     BRAND_UPDATED_AT TIMESTAMP NOT NULL
 );
 
--- ---------------------------------------------------------
--- Table: BRAND_CATEGORY
--- ---------------------------------------------------------
-CREATE TABLE BRAND_CATEGORY (
-    CATEGORY_ID SERIAL PRIMARY KEY,
-    CATEGORY_NAME VARCHAR(50) NOT NULL,
-    CATEGORY_IS_ACTIVE BOOLEAN NOT NULL,
-    CATEGORY_CREATED_AT TIMESTAMP NOT NULL
-);
+
 
 -- ---------------------------------------------------------
 -- Table: CONTRACT
@@ -879,3 +871,7 @@ ALTER COLUMN BRAND_CATEGORY TYPE TEXT;
 
 ALTER TABLE BRAND 
 ALTER COLUMN BRAND_CATEGORY SET NOT NULL;
+
+
+ALTER TABLE ADMIN
+ADD COLUMN ADMIN_PROFILE_PICTURE TEXT

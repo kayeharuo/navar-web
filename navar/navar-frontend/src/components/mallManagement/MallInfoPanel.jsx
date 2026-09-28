@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ImageIcon } from 'lucide-react'
+import AuthImage from '../ui/AuthImage'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DEFAULT_MALL_COVERAGE_AREA = 'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm'
 
 function formatTime(time) {
   if (!time) return ''
@@ -64,10 +66,9 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
     navigate(`/mall-management/stores/${mall.id}`)
   }
   const opHours = formatOperatingHours(mall.operatingHours)
+  const coverageArea = mall.mallCoverageArea || DEFAULT_MALL_COVERAGE_AREA
   const cityProvince = [mall.city, mall.province].filter(Boolean).join(', ')
-  const logoUrl = mall.logoUrl?.startsWith('/')
-    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${mall.logoUrl}`
-    : mall.logoUrl
+  const logoUrl = mall.logoUrl
 
   return (
     <>
@@ -95,7 +96,9 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
           <InfoRow label="City, Province" value={cityProvince || '—'} />
           <InfoRow label="Zip Code" value={mall.zipCode} />
           <InfoRow label="Floors" value={mall.floors} />
+          <InfoRow label="Coverage Area (GFA)" value={coverageArea} />
           <InfoRow label="Stores" value={mall.storesCount} />
+          <InfoRow label="Units" value={mall.unitsCount ?? mall.units?.length ?? 0} />
           <InfoRow label="Operating Hours" value={opHours} />
 
           {/* Logo row */}
@@ -108,7 +111,7 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
                   onClick={() => setShowLogoLightbox(true)}
                   title="Click to preview logo"
                 >
-                  <img src={logoUrl} className="mall-info-logo mall-info-logo--clickable" alt={`${mall.name} logo`} />
+                  <AuthImage src={logoUrl} className="mall-info-logo mall-info-logo--clickable" alt={`${mall.name} logo`} />
                 </button>
               ) : (
                 <div className="mall-info-logo-placeholder">
@@ -158,7 +161,7 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
 
       {showLogoLightbox && logoUrl && (
         <div className="logo-lightbox-overlay" onClick={() => setShowLogoLightbox(false)}>
-          <img src={logoUrl} alt={`${mall.name} logo`} className="logo-lightbox-img" />
+          <AuthImage src={logoUrl} alt={`${mall.name} logo`} className="logo-lightbox-img" />
           <button className="logo-lightbox-close" aria-label="Close preview">
             <X size={20} />
           </button>

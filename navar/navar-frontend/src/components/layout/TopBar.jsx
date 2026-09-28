@@ -38,6 +38,7 @@ export default function TopBar({
   onLogoutClick,
   notifications = [],
   onMarkAllRead,
+  user,
 }) {
   const PageIcon = pageIconMap[activePage] || LayoutDashboard
   const [showAccount, setShowAccount] = useState(false)
@@ -167,18 +168,18 @@ export default function TopBar({
             className="topbar-user-btn"
             onClick={() => setShowAccount(s => !s)}
           >
-            <div className="topbar-avatar">🍔</div>
-            <span className="topbar-username">Delicious Burger</span>
+            <div className="topbar-avatar">{user?.profilePicture ? <img src={user.profilePicture} alt="" /> : (user?.name?.charAt(0) || '?')}</div>
+            <span className="topbar-username">{user?.name || 'Account'}</span>
             <ChevronDown size={14} className="topbar-chevron" />
           </button>
 
           {showAccount && (
             <div className="acct-dropdown">
               <div className="acct-dropdown-user">
-                <div className="acct-dropdown-avatar">🍔</div>
+                <div className="acct-dropdown-avatar">{user?.profilePicture ? <img src={user.profilePicture} alt="" /> : (user?.name?.charAt(0) || '?')}</div>
                 <div>
-                  <p className="acct-dropdown-name">Delicious Burger</p>
-                  <p className="acct-dropdown-role">IT Manager</p>
+                  <p className="acct-dropdown-name">{user?.name || 'Account'}</p>
+                  <p className="acct-dropdown-role">{user?.jobTitle || 'Super Admin'}</p>
                 </div>
               </div>
               <div className="acct-dropdown-divider" />

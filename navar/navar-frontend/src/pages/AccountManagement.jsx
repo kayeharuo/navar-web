@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import '../styles/accountManagement/accountManagement.css'
+import { apiRequest } from '../config/api'
+import MessageModal from '../components/ui/MessageModal'
+import { useRealtimeRefresh } from '../config/realtime'
 
 /* ─── SVG Icons ─── */
 function IconLock() {
@@ -43,30 +46,6 @@ const MALLS = [
   'Gaisano Grand Liloan',
   'SM City Cebu',
   'Ayala Center Cebu',
-]
-
-const INIT_SUPER_ADMINS = [
-  { id: 1, name: 'Lorenzo Reyes', email: 'lreyes@navar.ph', jobTitle: 'System Administrator', contact: '+63 917 123 4567', created: 'January 5, 2025', lastUpdated: 'January 6, 2025', lastLogin: 'March 10, 2026', status: 'active' },
-  { id: 2, name: 'Dianne Aquino', email: 'daquino@navar.ph', jobTitle: 'Operations Manager', contact: '+63 918 765 4321', created: 'January 14, 2025', lastUpdated: 'January 23, 2025', lastLogin: 'March 8, 2026', status: 'active' },
-  { id: 3, name: 'Marco Villanueva', email: 'mvillanueva@navar.ph', jobTitle: '', contact: '', created: 'March 4, 2026', lastUpdated: 'March 4, 2026', lastLogin: 'Never', status: 'pending' },
-]
-
-const INIT_MALL_ADMINS = [
-  { id: 101, name: 'Lia Tan', email: 'ltan@pacificmall.ph', mall: 'Pacific Mall Cebu', jobTitle: '', contact: '+63 934 567 4533', created: 'March 4, 2026', lastUpdated: 'March 4, 2026', lastLogin: 'Never', status: 'pending', isPrimary: true },
-  { id: 102, name: 'Ana Cruz', email: 'acruz@robinsons.ph', mall: 'Robinsons Galleria Cebu', jobTitle: 'Mall Administrator', contact: '+63 919 555 6666', created: 'February 1, 2025', lastUpdated: 'February 4, 2025', lastLogin: 'March 8, 2026', status: 'active', isPrimary: true },
-  { id: 103, name: 'Rick Uy', email: 'ruy@parkmall.ph', mall: 'Parkmall Mandaue', jobTitle: 'Operations Head', contact: '+63 917 888 9000', created: 'January 20, 2025', lastUpdated: 'March 1, 2026', lastLogin: 'March 5, 2026', status: 'active', isPrimary: true },
-  { id: 104, name: 'Jose Dela Cruz', email: 'jdelacruz@smseaside.ph', mall: 'SM Seaside City Cebu', jobTitle: 'Mall Manager', contact: '+63 912 345 6789', created: 'December 10, 2024', lastUpdated: 'March 2, 2026', lastLogin: 'March 9, 2026', status: 'active', isPrimary: true },
-  { id: 105, name: 'Maria Santos', email: 'msantos@smcity.ph', mall: 'SM City Cebu', jobTitle: 'IT Manager', contact: '+63 920 123 4567', created: 'November 15, 2024', lastUpdated: 'March 3, 2026', lastLogin: 'March 7, 2026', status: 'active', isPrimary: false },
-  { id: 106, name: 'Cardo Reyes', email: 'creyes@smcity.ph', mall: 'SM City Cebu', jobTitle: 'Operations Manager', contact: '+63 915 678 1234', created: 'January 5, 2025', lastUpdated: 'February 28, 2026', lastLogin: 'March 4, 2026', status: 'active', isPrimary: true },
-  { id: 107, name: 'Bea Ramos', email: 'bramos@ayala.ph', mall: 'Ayala Center Cebu', jobTitle: 'Admin Officer', contact: '+63 918 234 5678', created: 'February 10, 2025', lastUpdated: 'March 1, 2026', lastLogin: 'March 6, 2026', status: 'active', isPrimary: true },
-]
-
-const INIT_DEACT_SUPER = [
-  { id: 201, name: 'Tricia Lim', email: 'tlim@navar.ph', jobTitle: 'Content Manager', contact: '+63 916 000 1111', created: 'June 1, 2024', lastUpdated: 'January 1, 2025', lastLogin: 'December 30, 2024', deactivatedOn: 'January 1, 2025' },
-]
-
-const INIT_DEACT_MALL = [
-  { id: 301, name: 'Jenna Lopez', email: 'jlopez@gaisano.ph', mall: 'Gaisano Grand Liloan', jobTitle: 'Store Coordinator', contact: '+63 917 999 2222', created: 'July 15, 2024', lastUpdated: 'December 31, 2024', lastLogin: 'December 28, 2024', deactivatedOn: 'December 31, 2024', isPrimary: false },
 ]
 
 function formatDate(d) {
@@ -143,7 +122,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">EMAIL ADDRESS <span className="acct-form-label-required">*</span></label>
-        <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" value={form.email} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
+            <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" value={form.email} readOnly={isEdit} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
         {errors.email && <span className="acct-form-error">{errors.email}</span>}
       </div>
       <div className="acct-form-group">
@@ -152,7 +131,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">CONTACT NUMBER</label>
-        <input className="acct-form-input" placeholder="+63 9XX XXX XXXX" value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value }))} />
+        <input className="acct-form-input" placeholder="Contact number" type="number" inputMode="numeric" min="0" value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value.replace(/\D/g, '') }))} />
       </div>
     </>
   )
@@ -167,7 +146,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
       <div className="acct-form-row">
         <div className="acct-form-group">
           <label className="acct-form-label">EMAIL ADDRESS <span className="acct-form-label-required">*</span></label>
-          <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" value={form.email} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
+            <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" value={form.email} readOnly={isEdit} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
           {errors.email && <span className="acct-form-error">{errors.email}</span>}
         </div>
         <div className="acct-form-group">
@@ -177,7 +156,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">CONTACT NUMBER <span className="acct-form-label-required">*</span></label>
-        <input className={`acct-form-input${errors.contact ? ' acct-form-input--error' : ''}`} placeholder="+63 9XX XXX XXXX" value={form.contact} onChange={e => { setForm(f => ({ ...f, contact: e.target.value })); setErrors(ev => ({ ...ev, contact: '' })) }} />
+        <input className={`acct-form-input${errors.contact ? ' acct-form-input--error' : ''}`} placeholder="Contact number" type="number" inputMode="numeric" min="0" value={form.contact} onChange={e => { setForm(f => ({ ...f, contact: e.target.value.replace(/\D/g, '') })); setErrors(ev => ({ ...ev, contact: '' })) }} />
         {errors.contact && <span className="acct-form-error">{errors.contact}</span>}
       </div>
       <div className="acct-form-group">
@@ -219,13 +198,13 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
           {isEdit ? (
             <p className="acct-modal-subtitle">{account?.mall !== undefined ? 'Mall Admin' : 'Super Admin'}</p>
           ) : (
-            <p className="acct-modal-subtitle">A magic link will be sent to the email upon creation.</p>
+            <p className="acct-modal-subtitle">An invitation email will be sent. The recipient must set a password before signing in.</p>
           )}
         </div>
         {!isEdit && (
           <div className="acct-modal-role-tabs">
             <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setErrors({}) }}>Super Admin</button>
-            <button className={`acct-modal-role-tab${roleTab === 'mall-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('mall-admin'); setErrors({}) }}>Mall Admin</button>
+            <button className="acct-modal-role-tab" disabled>Mall Admin</button>
           </div>
         )}
         <div className="acct-modal-body">
@@ -260,7 +239,7 @@ function AccountCreatedModal({ account, onClose }) {
             <h2 className="acct-modal-title">Account Created</h2>
             <button className="acct-modal-close" onClick={onClose}>X</button>
           </div>
-          <p className="acct-modal-subtitle">Share this link with the user immediately. It will expire in 24 hrs.</p>
+          <p className="acct-modal-subtitle">An invitation email was sent to this address.</p>
           <div className="acct-modal-divider" />
         </div>
         <div className="acct-modal-body">
@@ -280,8 +259,8 @@ function AccountCreatedModal({ account, onClose }) {
             ))}
           </div>
           <div className="acct-magic-link-box">
-            <p className="acct-magic-link-title">Magic link sent to {account.email}</p>
-            <p className="acct-magic-link-text">The link lets them log in once and set their own password. It expires in 24 hours. If unused, you can resend it from their account profile.</p>
+            <p className="acct-magic-link-title">Invitation sent to {account.email}</p>
+            <p className="acct-magic-link-text">The recipient must use the invitation email to set a password before signing in.</p>
           </div>
         </div>
         <div className="acct-modal-footer">
@@ -309,13 +288,13 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
       <div className="acct-confirm-modal">
         <div className="acct-confirm-icon"><IconLock /></div>
         <div>
-          <h3 className="acct-confirm-title">Reset Password</h3>
-          <p className="acct-confirm-desc">Resets {account.name}'s password. Their current password stops working immediately.</p>
+          <h3 className="acct-confirm-title">Set Password</h3>
+          <p className="acct-confirm-desc">Send {account.name} an email to set a new password. Their current password stops working immediately.</p>
         </div>
-        <div className="acct-confirm-notice">{account.name} will be required to set a new password on next login.</div>
+        <div className="acct-confirm-notice">{account.name} will set a new password from the secure email.</div>
         <div className="acct-confirm-actions">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="acct-confirm-btn-proceed" onClick={onConfirm}>Generate New Password</button>
+          <button className="acct-confirm-btn-proceed" onClick={onConfirm}>Set Password</button>
         </div>
       </div>
     </div>
@@ -323,7 +302,7 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
 }
 
 /* ────────────────────────────────────────
-   MODAL: Magic Link Sent
+  MODAL: Email Sent
 ──────────────────────────────────────── */
 function MagicLinkSentModal({ email, onClose }) {
   useEffect(() => {
@@ -340,12 +319,12 @@ function MagicLinkSentModal({ email, onClose }) {
         <div className="acct-magic-sent-body">
           <IconKey />
           <div>
-            <h3 className="acct-confirm-title">Send Magic Link</h3>
-            <p className="acct-confirm-desc">Sends a one-time login link to {email?.split('@')[0].replace(/[^a-zA-Z\s]/g, ' ')}. They click it to set a new password. Any existing session is invalidated.</p>
+            <h3 className="acct-confirm-title">Email Sent</h3>
+            <p className="acct-confirm-desc">A secure email was sent to {email?.split('@')[0].replace(/[^a-zA-Z\s]/g, ' ')} so they can set a password.</p>
           </div>
           <div className="acct-magic-link-box">
-            <p className="acct-magic-link-title">Magic link sent to {email}</p>
-            <p className="acct-magic-link-text">The link lets them log in once and set their own password. It expires in 24 hours. If unused, you can resend it from their account profile.</p>
+            <p className="acct-magic-link-title">Email sent to {email}</p>
+            <p className="acct-magic-link-text">The recipient can use the email to set a password.</p>
           </div>
         </div>
         <div className="acct-magic-sent-footer">
@@ -467,18 +446,49 @@ export default function AccountManagement() {
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [createdAccount, setCreatedAccount] = useState(null)
   const [magicLinkEmail, setMagicLinkEmail] = useState('')
+  const [currentAdminId, setCurrentAdminId] = useState(null)
+  const [currentAdminPrimary, setCurrentAdminPrimary] = useState(false)
   const [createTabInit, setCreateTabInit] = useState('super-admin')
 
-  // Force recompile
+  const [superAdmins, setSuperAdmins] = useState([])
+  const [mallAdmins] = useState([])
+  const [deactSuper, setDeactSuper] = useState([])
+  const [deactMall] = useState([])
+  const [requestError, setRequestError] = useState('')
 
-  const [superAdmins, setSuperAdmins] = useState(INIT_SUPER_ADMINS)
-  const [mallAdmins, setMallAdmins] = useState(INIT_MALL_ADMINS)
-  const [deactSuper, setDeactSuper] = useState(INIT_DEACT_SUPER)
-  const [deactMall, setDeactMall] = useState(INIT_DEACT_MALL)
+  useEffect(() => {
+    loadAccounts()
+  }, [])
+
+  function loadAccounts() {
+    Promise.all([apiRequest('/api/admin-accounts'), apiRequest('/api/auth/me')])
+      .then(([accounts, me]) => {
+        setCurrentAdminId(me.id)
+        const currentAccount = accounts.find(account => account.id === me.id)
+        setCurrentAdminPrimary(me.isPrimary === true || currentAccount?.isPrimary === true)
+        const mapped = accounts.map(account => ({
+          ...account,
+          isPrimary: account.isPrimary === true,
+          status: account.isDeactivated ? 'deactivated' : account.status === 'partial' ? 'pending' : 'active',
+          contact: account.contactNum || '',
+          created: account.createdAt ? formatDate(account.createdAt) : '-',
+          lastUpdated: account.updatedAt ? formatDate(account.updatedAt) : '-',
+          lastLogin: account.lastLogin ? formatDate(account.lastLogin) : 'Never',
+        }))
+        setSuperAdmins(mapped.filter(account => account.status !== 'deactivated'))
+        setDeactSuper(mapped.filter(account => account.status === 'deactivated'))
+      })
+      .catch(error => setRequestError(error.message))
+  }
+
+  useRealtimeRefresh(payload => {
+    if (payload.table === 'admin' || payload.table === 'audit_log') loadAccounts()
+  })
 
   /* ── Computed stats ── */
   const pendingCount = superAdmins.filter(a => a.status === 'pending').length + mallAdmins.filter(a => a.status === 'pending').length
   const deactivatedCount = deactSuper.length + deactMall.length
+  const canManageAccounts = currentAdminPrimary
 
   /* ── Search filter ── */
   function filterList(list) {
@@ -493,35 +503,34 @@ export default function AccountManagement() {
     setModal('create')
   }
 
-  function handleSaveCreate({ role, name, email, jobTitle, contact, mall, isPrimary }) {
-    const now = formatDate(new Date())
-    const newAccount = {
-      id: Date.now(),
-      name, email, jobTitle, contact,
-      created: now,
-      lastUpdated: now,
-      lastLogin: 'Never',
-      status: 'pending',
-      accountStatus: 'partial',
-    }
-    if (role === 'super-admin') {
+  async function handleSaveCreate({ role, name, email, jobTitle, contact, mall, isPrimary }) {
+    if (role !== 'super-admin') return
+    try {
+      const created = await apiRequest('/api/admin-accounts', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.toLowerCase(), name, job_title: jobTitle, contact_num: contact }),
+      })
+      const newAccount = { id: created.id, name: created.name, email: created.email, jobTitle, contact, status: 'pending', created: formatDate(new Date()), lastUpdated: formatDate(new Date()), lastLogin: 'Never' }
       setSuperAdmins(prev => [...prev, newAccount])
-    } else {
-      setMallAdmins(prev => [...prev, { ...newAccount, mall, isPrimary }])
+      setCreatedAccount({ ...newAccount, role, mall, isPrimary })
+      setModal('created')
+    } catch (error) {
+      setRequestError(error.message)
     }
-    setCreatedAccount({ ...newAccount, role, mall, isPrimary })
-    setModal('created')
   }
 
-  function handleSaveEdit({ name, email, jobTitle, contact, mall, isPrimary }) {
-    const now = formatDate(new Date())
-    if (selectedAccount.mall !== undefined) {
-      setMallAdmins(prev => prev.map(a => a.id === selectedAccount.id ? { ...a, name, email, jobTitle, contact, mall, isPrimary, lastUpdated: now } : a))
-    } else {
-      setSuperAdmins(prev => prev.map(a => a.id === selectedAccount.id ? { ...a, name, email, jobTitle, contact, lastUpdated: now } : a))
+  async function handleSaveEdit({ name, jobTitle, contact }) {
+    try {
+      const updated = await apiRequest(`/api/admin-accounts/${selectedAccount.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, job_title: jobTitle, contact_num: contact }),
+      })
+      const now = formatDate(new Date())
+      setSuperAdmins(prev => prev.map(account => account.id === selectedAccount.id ? { ...account, name: updated.name, jobTitle: updated.jobTitle || '', contact: updated.contactNum || '', lastUpdated: now } : account))
+      closeModal()
+    } catch (error) {
+      setRequestError(error.message)
     }
-    setModal(null)
-    setSelectedAccount(null)
   }
 
   function handleResetPassword(account) {
@@ -529,14 +538,25 @@ export default function AccountManagement() {
     setModal('reset')
   }
 
-  function handleConfirmReset() {
-    setMagicLinkEmail(selectedAccount.email)
-    setModal('magic-sent')
+  async function handleConfirmReset() {
+    try {
+      await apiRequest(`/api/admin-accounts/${selectedAccount.id}/reset-password`, { method: 'POST' })
+      setMagicLinkEmail(selectedAccount.email)
+      setModal('magic-sent')
+    } catch (error) {
+      setRequestError(error.message)
+      closeModal()
+    }
   }
 
-  function handleResendLink(account) {
-    setMagicLinkEmail(account.email)
-    setModal('magic-sent')
+  async function handleResendLink(account) {
+    try {
+      await apiRequest(`/api/admin-accounts/${account.id}/resend-invite`, { method: 'POST' })
+      setMagicLinkEmail(account.email)
+      setModal('magic-sent')
+    } catch (error) {
+      setRequestError(error.message)
+    }
   }
 
   function handleDeactivate(account) {
@@ -544,17 +564,16 @@ export default function AccountManagement() {
     setModal('deactivate')
   }
 
-  function handleConfirmDeactivate() {
-    const now = formatDate(new Date())
-    if (selectedAccount.mall !== undefined) {
-      setMallAdmins(prev => prev.filter(a => a.id !== selectedAccount.id))
-      setDeactMall(prev => [...prev, { ...selectedAccount, deactivatedOn: now, status: 'deactivated' }])
-    } else {
-      setSuperAdmins(prev => prev.filter(a => a.id !== selectedAccount.id))
-      setDeactSuper(prev => [...prev, { ...selectedAccount, deactivatedOn: now, status: 'deactivated' }])
+  async function handleConfirmDeactivate() {
+    try {
+      await apiRequest(`/api/admin-accounts/${selectedAccount.id}/deactivate`, { method: 'POST' })
+      const now = formatDate(new Date())
+      setSuperAdmins(prev => prev.filter(account => account.id !== selectedAccount.id))
+      setDeactSuper(prev => [...prev, { ...selectedAccount, status: 'deactivated', deactivatedOn: now }])
+      closeModal()
+    } catch (error) {
+      setRequestError(error.message)
     }
-    setModal(null)
-    setSelectedAccount(null)
   }
 
   function handleReactivate(account) {
@@ -562,18 +581,16 @@ export default function AccountManagement() {
     setModal('reactivate')
   }
 
-  function handleConfirmReactivate() {
-    const now = formatDate(new Date())
-    if (selectedAccount.mall !== undefined) {
-      setDeactMall(prev => prev.filter(a => a.id !== selectedAccount.id))
-      setMallAdmins(prev => [...prev, { ...selectedAccount, status: 'active', lastUpdated: now }])
-    } else {
-      setDeactSuper(prev => prev.filter(a => a.id !== selectedAccount.id))
-      setSuperAdmins(prev => [...prev, { ...selectedAccount, status: 'active', lastUpdated: now }])
+  async function handleConfirmReactivate() {
+    try {
+      await apiRequest(`/api/admin-accounts/${selectedAccount.id}/reactivate`, { method: 'POST' })
+      await loadAccounts()
+      setModal(null)
+      setSelectedAccount(null)
+      setActiveTab('super-admins')
+    } catch (error) {
+      setRequestError(error.message)
     }
-    setModal(null)
-    setSelectedAccount(null)
-    setActiveTab(selectedAccount.mall !== undefined ? 'mall-admins' : 'super-admins')
   }
 
   function closeModal() {
@@ -606,7 +623,7 @@ export default function AccountManagement() {
                 const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
                 return (
                   <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
-                    <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Temp PW</span>}</div></td>
+                    <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Pending</span>}</div></td>
                     <td>{a.email}</td>
                     <td>{a.jobTitle || '-'}</td>
                     <td>{a.contact || '-'}</td>
@@ -618,9 +635,9 @@ export default function AccountManagement() {
                     <div className="acct-actions">
                       <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
                       {a.status === 'pending'
-                        ? <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend Link</button>
-                        : <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset PW</button>}
-                      <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
+                        ? canManageAccounts && <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend invite</button>
+                        : canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
+                      {canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>}
                     </div>
                     </td>
                   </tr>
@@ -643,7 +660,7 @@ export default function AccountManagement() {
                 const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
                 return (
                   <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
-                    <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Temp PW</span>}</div></td>
+                    <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Pending</span>}</div></td>
                     <td>{a.mall}</td>
                     <td>{a.email}</td>
                     <td>{a.jobTitle || '-'}</td>
@@ -657,9 +674,9 @@ export default function AccountManagement() {
                       <div className="acct-actions">
                         <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
                         {a.status === 'pending'
-                          ? <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend Link</button>
-                          : <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset PW</button>}
-                        <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
+                          ? canManageAccounts && <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend invite</button>
+                          : canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
+                        {canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>}
                       </div>
                     </td>
                   </tr>
@@ -688,7 +705,7 @@ export default function AccountManagement() {
                   <td>{a.lastUpdated}</td>
                   <td>{a.lastLogin}</td>
                   <td>{a.deactivatedOn}</td>
-                  <td><button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button></td>
+                  <td>{canManageAccounts && <button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -718,7 +735,7 @@ export default function AccountManagement() {
                     <td>{a.lastLogin}</td>
                     <td>{a.deactivatedOn}</td>
                     <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
-                    <td><button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button></td>
+                    <td>{canManageAccounts && <button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button>}</td>
                   </tr>
                 )
               })}
@@ -829,6 +846,7 @@ export default function AccountManagement() {
       {modal === 'reactivate' && selectedAccount && (
         <ReactivateModal account={selectedAccount} onClose={closeModal} onConfirm={handleConfirmReactivate} />
       )}
+      {requestError && <MessageModal title="Account request failed" message={requestError} onClose={() => setRequestError('')} />}
     </div>
   )
 }

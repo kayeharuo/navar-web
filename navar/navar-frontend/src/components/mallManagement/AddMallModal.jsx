@@ -4,6 +4,12 @@ import FloorInfoModal from './FloorInfoModal'
 import OperatingHoursBuilder from './OperatingHoursBuilder'
 
 const MAX_LOGO_MB = 5
+const MALL_COVERAGE_OPTIONS = [
+  'Less than or equal to 15,000 sqm',
+  'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm',
+  'Greater than 50,000 sqm, but less than or equal to 150,000 sqm',
+  'Greater than 150,000 sqm',
+]
 
 function getLogoUrl(logo) {
   return logo?.startsWith('/')
@@ -20,6 +26,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     province: initialData?.province || '',
     zipCode: initialData?.zipCode || '',
     address: initialData?.address || '',
+    mallCoverageArea: initialData?.mallCoverageArea || '',
     description: initialData?.description || '',
     majorBeacons: initialData?.majorBeacons != null ? String(initialData.majorBeacons) : '1',
     floors: initialData?.floors != null ? String(initialData.floors) : '',
@@ -131,6 +138,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       province: form.province.trim(),
       zipCode: form.zipCode.trim(),
       address: form.address.trim(),
+      mallCoverageArea: form.mallCoverageArea || null,
       description: form.description.trim(),
       majorBeacons: Number(form.majorBeacons),
       floors: parseInt(form.floors),
@@ -214,6 +222,16 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               <label className="mall-field-label">ZIP CODE <span className="mall-field-required">*</span></label>
               <input className={`mall-field-input${errors.zipCode ? ' mall-field-input--error' : ''}`} value={form.zipCode} onChange={e => setField('zipCode', e.target.value)} placeholder="Enter zip code" />
               {errors.zipCode && <p className="mall-field-error">{errors.zipCode}</p>}
+            </div>
+
+            <div className="mall-field-group mall-field-group--full">
+              <label className="mall-field-label">MALL COVERAGE AREA (GFA)</label>
+              <select className="mall-field-input" value={form.mallCoverageArea} onChange={e => setField('mallCoverageArea', e.target.value)}>
+                <option value="">Select coverage area (optional)</option>
+                {MALL_COVERAGE_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
             </div>
 
             {/* No. of Floors */}

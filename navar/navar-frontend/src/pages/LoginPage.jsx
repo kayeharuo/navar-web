@@ -1,13 +1,29 @@
 import { useState } from 'react'
+import { supabase } from '../config/supabase'
+import MessageModal from '../components/ui/MessageModal'
 import '../styles/login/login.css'
 
-export default function LoginPage({ onLogin }) {
-  const [username, setUsername] = useState('')
+export default function LoginPage({ message }) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState(message || '')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    onLogin()
+    setError('')
+    setLoading(true)
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+      if (signInError) setError('Invalid email or password.')
+    } catch {
+      setError('Unable to sign in right now. Check the connection and try again.')
+    }
+    setLoading(false)
   }
 
   return (
@@ -40,22 +56,30 @@ export default function LoginPage({ onLogin }) {
           <form className="login-form" onSubmit={handleSubmit}>
             <input
               className="login-input"
-              type="text"
-              placeholder="Email address or username"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
+              type="email"
+              placeholder="Email address"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
             />
             <input
               className="login-input"
               type="password"
               placeholder="Password"
+              autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              required
             />
-            <button className="login-submit" type="submit">LOGIN</button>
+            <button className="login-submit" type="submit" disabled={loading}>
+              {loading ? <span className="login-spinner" aria-label="Signing in" /> : 'LOGIN'}
+            </button>
           </form>
         </div>
       </div>
+      {notice && <MessageModal title="Password updated" message={notice} onClose={() => setNotice('')} />}
+      {error && <MessageModal title="Sign-in failed" message={error} onClose={() => setError('')} />}
     </div>
   )
 }

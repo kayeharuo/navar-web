@@ -2,24 +2,29 @@ require('dotenv').config()
 
 const Fastify = require('fastify')
 const cors = require('@fastify/cors')
+const helmet = require('@fastify/helmet')
+const rateLimit = require('@fastify/rate-limit')
 const { createClient } = require('@supabase/supabase-js')
 const registerMallManagementRoutes = require('./modules/mallManagement/routes')
+const createAuthGuards = require('./modules/auth/authGuard')
+const registerAccountManagementRoutes = require('./modules/accountManagement/routes')
 
-const app = Fastify({ logger: true })
+const app = Fastify({ logger: true, bodyLimit: 1024 * 1024 })
 
 const port = Number(process.env.PORT || 3000)
 const host = process.env.HOST || '127.0.0.1'
 const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173'
 
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
-if (!process.env.SUPABASE_URL || !supabaseKey) {
-	throw new Error('SUPABASE_URL and a Supabase key must be set in .env')
+if (!process.env.SUPABASE_URL || !secretKey) {
+	throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) must be set in .env')
 }
 
 const supabase = createClient(
 	process.env.SUPABASE_URL,
-	supabaseKey
+	secretKey,
+	{ auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
 )
 
 app.decorate('supabase', supabase)
@@ -29,32 +34,29 @@ app.register(cors, {
 	credentials: true,
 	methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 })
+app.register(helmet)
+app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
+
+app.setErrorHandler((error, request, reply) => {
+	request.log.error({ err: error }, 'Request failed')
+	const statusCode = error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500
+	return reply.code(statusCode).send({ message: 'Something went wrong.' })
+})
 
 app.get('/health', async () => ({
 	status: 'ok',
 	service: 'navar-backend'
 }))
 
-app.get('/api/health', async (request, reply) => {
-	const { error } = await app.supabase.from('users').select('id').limit(1)
+const { requireAuth, requireSuperAdmin, requirePrimarySuperAdmin } = createAuthGuards(supabase)
 
-	if (error && error.code !== 'PGRST205') {
-		request.log.error(error, 'Supabase health check failed')
-		return reply.code(503).send({
-			status: 'error',
-			service: 'navar-backend',
-			database: 'unavailable'
-		})
-	}
-
-	return {
-		status: 'ok',
-		service: 'navar-backend',
-		database: 'connected'
-	}
+app.register(async protectedApp => {
+	protectedApp.addHook('preHandler', requireAuth())
+	protectedApp.addHook('preHandler', requireSuperAdmin)
+	registerMallManagementRoutes(protectedApp)
 })
 
-registerMallManagementRoutes(app)
+registerAccountManagementRoutes(app, { supabase, requireAuth, requireSuperAdmin, requirePrimarySuperAdmin })
 
 const start = async () => {
 	try {

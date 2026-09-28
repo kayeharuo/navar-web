@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import LoginPage from './pages/LoginPage'
+import AuthPasswordPage from './pages/AuthPasswordPage'
 import Dashboard from './pages/Dashboard'
 import MallManagement from './pages/MallManagement'
 import UnitsPage from './pages/UnitsPage'
@@ -19,6 +20,8 @@ import SubscriptionManagement from './pages/SubscriptionManagement'
 import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import { NAV_ITEMS, getActiveNavItem } from './config/navigation'
+import { apiRequest } from './config/api'
+import { supabase } from './config/supabase'
 import './App.css'
 import './styles/panels.css'
 
@@ -72,7 +75,11 @@ function PlaceholderPage({ title }) {
 
 export default function App() {
   const location = useLocation()
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('navar_logged_in') === 'true')
+  const isAuthRoute = location.pathname.startsWith('/auth/')
+  const [authLoading, setAuthLoading] = useState(true)
+  const [session, setSession] = useState(null)
+  const [admin, setAdmin] = useState(null)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [activePanel, setActivePanel]   = useState(null)
   const [showLogout, setShowLogout]     = useState(false)
@@ -80,15 +87,63 @@ export default function App() {
   const [arIncomingProjects, setArIncomingProjects] = useState([])
 
   useEffect(() => {
+    let mounted = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+      setSession(data.session)
+      setAuthLoading(false)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return
+      setSession(nextSession)
+      if (!nextSession) setAdmin(null)
+    })
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (authLoading || !session || isAuthRoute) return
+    let mounted = true
+    setAccessDenied(false)
+    apiRequest('/api/auth/login-complete', { method: 'POST' }).then(() => apiRequest('/api/auth/me')).then(me => {
+      if (mounted) setAdmin(me.role === 'super_admin' ? me : null)
+      if (mounted && me.role !== 'super_admin') setAccessDenied(true)
+    }).catch(async error => {
+      if (!mounted) return
+      if (error.status === 403) setAccessDenied(true)
+      await supabase.auth.signOut()
+    })
+    return () => { mounted = false }
+  }, [authLoading, session, isAuthRoute])
+
+  useEffect(() => {
     setSidebarOpen(false)
     setActivePanel(null)
   }, [location.pathname])
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={() => {
-      localStorage.setItem('navar_logged_in', 'true')
-      setIsLoggedIn(true)
-    }} />
+  if (isAuthRoute) {
+    return (
+      <Routes>
+        <Route path="/auth/set-password" element={<AuthPasswordPage />} />
+        <Route path="/auth/reset-password" element={<AuthPasswordPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
+
+  if (authLoading || (session && !admin && !accessDenied)) {
+    return <div className="login-page" aria-busy="true"><span className="login-spinner login-spinner--dark" aria-label="Loading" /></div>
+  }
+
+  if (accessDenied) {
+    return <div className="login-page"><div className="login-form-panel"><p role="alert">You do not have access to this system.</p></div></div>
+  }
+
+  if (!session || !admin) {
+    return <LoginPage message={location.state?.message} />
   }
 
   const activePage = getActiveNavItem(location.pathname).label
@@ -153,6 +208,7 @@ export default function App() {
           onLogoutClick={() => setShowLogout(true)}
           notifications={notifications}
           onMarkAllRead={handleMarkAllRead}
+          user={admin}
         />
         <main className="app-main">
           <Routes>
@@ -195,7 +251,15 @@ export default function App() {
 
       {/* Profile panel */}
       {activePanel === 'profile' && (
-        <ProfilePanel onClose={() => setActivePanel(null)} />
+        <ProfilePanel
+          onClose={() => setActivePanel(null)}
+          onProfileUpdated={updatedProfile => setAdmin(current => ({
+            ...current,
+            name: updatedProfile.name,
+            jobTitle: updatedProfile.jobTitle,
+            profilePicture: updatedProfile.profilePicture,
+          }))}
+        />
       )}
 
       {/* Logout modal */}
@@ -204,8 +268,7 @@ export default function App() {
           onCancel={() => setShowLogout(false)}
           onConfirm={() => {
             setShowLogout(false)
-            localStorage.removeItem('navar_logged_in')
-            setIsLoggedIn(false)
+            supabase.auth.signOut()
           }}
         />
       )}

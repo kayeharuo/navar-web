@@ -1,4 +1,5 @@
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const defaultMallCoverageArea = 'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm'
 
 const dbColumn = value => value.toLowerCase()
 const lowerKeys = object => Object.fromEntries(Object.entries(object).map(([key, value]) => [key.toLowerCase(), value]))
@@ -86,18 +87,43 @@ function toBrand(row) {
 	}
 }
 
+function toStore(row, brand, units) {
+	const store = upperKeys(row)
+	const assignedUnits = units.filter(unit => String(unit.STORE_ID ?? unit.storeId) === String(store.STORE_ID))
+	return {
+		id: store.STORE_ID,
+		storeName: store.STORE_NAME,
+		storeType: store.STORE_TYPE || 'store',
+		unitNos: assignedUnits.map(unit => unit.UNIT_LABEL ?? unit.unitNo),
+		floorLabel: assignedUnits[0]?.FLOOR_LABEL ?? assignedUnits[0]?.floorLabel ?? '',
+		brandId: store.BRAND_ID,
+		brand: brand?.BRAND_NAME || '',
+		brandLogo: brand?.BRAND_LOGO ? `/api/brands/${brand.BRAND_ID}/logo` : null,
+		category: brand?.BRAND_CATEGORY || '',
+		contactPerson: store.STORE_CONTACT_PERSON || '',
+		contactNo: store.STORE_CONTACT_NUM || '',
+		email: store.STORE_EMAIL || '',
+		status: store.STORE_STATUS === 'inactive' ? 'unmapped' : store.STORE_STATUS || 'unmapped',
+		description: store.STORE_DESCRIPTION || '',
+		active: store.STORE_STATUS !== 'inactive',
+		dateAdded: formatDate(store.STORE_CREATED_AT),
+		lastUpdated: formatDate(store.STORE_UPDATED_AT),
+	}
+}
+
 function mallAgreementStatus(contractStatus) {
 	return !contractStatus ? 'Pending' : contractStatus
 }
 
 function createMallService(supabase) {
 	async function getMall(mallId) {
-		const [mallResult, floorsResult, hoursResult, contractResult, beaconResult] = await Promise.all([
+		const [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult] = await Promise.all([
 			supabase.from('mall').select('*').eq(dbColumn('MALL_ID'), mallId).single(),
 			supabase.from('floor').select('*').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('FLOOR_NUM')),
-			supabase.from('operating_hours').select('*').eq(dbColumn('MALL_ID'), mallId).eq(dbColumn('OPTHRS_IS_MALL'), true).order(dbColumn('OPTHRS_ID')),
+			supabase.from('operating_hours').select('*').eq(dbColumn('MALL_ID'), mallId).eq(dbColumn('OPTHRS_IS_MALL'), true).eq(dbColumn('OPTHRS_IS_INQUIRY'), false).order(dbColumn('OPTHRS_ID')),
 			supabase.from('contract').select('*, subscription_tier(s_tier_label, s_tier_key)').eq(dbColumn('MALL_ID'), mallId).eq(dbColumn('CONTRACT_IS_CURRENT'), true).maybeSingle(),
 			supabase.from('beacon').select('*').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('BEACON_ID')),
+			supabase.from('store').select('*').eq(dbColumn('MALL_ID'), mallId),
 		])
 
 		const mall = upperKeys(mallResult.data)
@@ -124,7 +150,7 @@ function createMallService(supabase) {
 			? await supabase.from('unit').select('*').in('floor_id', floorIds).order('unit_label')
 			: { data: [], error: null }
 		const units = upperKeys(unitsResult.data)
-		const failed = [mallResult, floorsResult, hoursResult, contractResult, applicationResult, arDevelopmentResult, beaconResult, batteryResult, unitsResult].find(result => result.error)
+		const failed = [mallResult, floorsResult, hoursResult, contractResult, applicationResult, arDevelopmentResult, beaconResult, batteryResult, unitsResult, storesResult].find(result => result.error)
 		if (failed) throw failed.error
 		const tier = contract?.SUBSCRIPTION_TIER?.S_TIER_LABEL || 'Pending'
 		const overdueDays = contract?.CONTRACT_END && new Date(contract.CONTRACT_END) < new Date()
@@ -139,6 +165,7 @@ function createMallService(supabase) {
 			zipCode: mall.MALL_ZIPCODE,
 			address: mall.MALL_ADDRESS,
 			description: mall.MALL_DESCRIPTION,
+			mallCoverageArea: mall.MALL_COVERAGE_AREA || defaultMallCoverageArea,
 			majorBeacons: mall.MALL_BEACON_MAJOR,
 			floors: mall.MALL_FLOOR_COUNT,
 			floorDetails: floors.map(floor => ({ floorNo: String(floor.FLOOR_NUM), label: floor.FLOOR_LABEL })),
@@ -159,7 +186,8 @@ function createMallService(supabase) {
 				const floor = floors.find(item => item.FLOOR_ID === unit.FLOOR_ID)
 				return { id: unit.UNIT_ID, floorId: unit.FLOOR_ID, floorNo: String(floor?.FLOOR_NUM ?? ''), unitNo: unit.UNIT_LABEL, status: unit.UNIT_STATUS?.toLowerCase() || 'vacant', isActive: true, storeId: unit.STORE_ID }
 			}),
-			storesCount: new Set(units.map(unit => unit.STORE_ID).filter(Boolean)).size,
+			storesCount: upperKeys(storesResult.data || []).filter(store => store.STORE_STATUS !== 'inactive').length,
+			unitsCount: units.length,
 			beaconCount: beaconRows.length,
 			beacons: beaconRows.map(beacon => {
 				const floor = floors.find(item => item.FLOOR_ID === beacon.FLOOR_ID)
@@ -207,6 +235,7 @@ function createMallService(supabase) {
 			MALL_ADDRESS: payload.address,
 			MALL_FLOOR_COUNT: Number(payload.floors),
 			MALL_DESCRIPTION: payload.description || null,
+			MALL_COVERAGE_AREA: payload.mallCoverageArea || null,
 			MALL_BEACON_MAJOR: Number(payload.majorBeacons),
 			MALL_UPDATED_AT: timestamp,
 		}
@@ -219,7 +248,7 @@ function createMallService(supabase) {
 		const mallResult = mallId
 			? await supabase.from('mall').update(lowerKeys(mallData)).eq(dbColumn('MALL_ID'), mallId).select(dbColumn('MALL_ID')).single()
 			: await supabase.from('mall').insert(lowerKeys(mallData)).select(dbColumn('MALL_ID')).single()
-		if (mallResult.error) return reply.code(400).send({ message: mallResult.error.message })
+		if (mallResult.error) { request.log.error({ code: mallResult.error.code }, 'Mall save failed'); return reply.code(400).send({ message: 'Unable to save mall.' }) }
 		const id = mallId || upperKeys(mallResult.data).MALL_ID
 
 		const floorRows = (payload.floorDetails || []).map((floor, index) => ({
@@ -232,11 +261,11 @@ function createMallService(supabase) {
 		if (mallId) {
 			const floorDelete = await supabase.from('floor').delete().eq(dbColumn('MALL_ID'), id)
 			const hoursDelete = await supabase.from('operating_hours').delete().eq(dbColumn('MALL_ID'), id).eq(dbColumn('OPTHRS_IS_MALL'), true)
-			if (floorDelete.error || hoursDelete.error) return reply.code(500).send({ message: (floorDelete.error || hoursDelete.error).message })
+			if (floorDelete.error || hoursDelete.error) { request.log.error({ code: (floorDelete.error || hoursDelete.error).code }, 'Mall cleanup failed'); return reply.code(500).send({ message: 'Unable to save mall.' }) }
 		}
 		if (floorRows.length) {
 			const floors = await supabase.from('floor').insert(floorRows.map(lowerKeys))
-			if (floors.error) return reply.code(400).send({ message: floors.error.message })
+			if (floors.error) { request.log.error({ code: floors.error.code }, 'Floor save failed'); return reply.code(400).send({ message: 'Unable to save mall.' }) }
 		}
 		const hourRows = (payload.operatingHours || []).flatMap(schedule => schedule.days.map(day => ({
 			OPTHRS_DAY_OF_WEEK: day,
@@ -245,11 +274,13 @@ function createMallService(supabase) {
 			OPTHRS_IS_CLOSED: isClosedNow(schedule.open, schedule.close),
 			OPTHRS_IS_MALL: true,
 			OPTHRS_IS_STORE: false,
+			OPTHRS_IS_INQUIRY: false,
+			INQUIRY_ID: null,
 			MALL_ID: id,
 		})))
 		if (hourRows.length) {
 			const hours = await supabase.from('operating_hours').insert(hourRows.map(lowerKeys))
-			if (hours.error) return reply.code(400).send({ message: hours.error.message })
+			if (hours.error) { request.log.error({ code: hours.error.code }, 'Operating hours save failed'); return reply.code(400).send({ message: 'Unable to save mall.' }) }
 		}
 		return reply.code(mallId ? 200 : 201).send(await getMall(id))
 	}
@@ -260,14 +291,108 @@ function createMallService(supabase) {
 async function registerMallManagementRoutes(app) {
 	const service = createMallService(app.supabase)
 
+	async function getStoresForMall(mallId) {
+		const mall = await service.getMall(mallId)
+		const storesResult = await app.supabase.from('store').select('*').eq('mall_id', mallId).order('store_name')
+		if (storesResult.error) throw storesResult.error
+		const storeRows = upperKeys(storesResult.data || [])
+		const brandIds = [...new Set(storeRows.map(store => store.BRAND_ID).filter(Boolean))]
+		const brandsResult = brandIds.length
+			? await app.supabase.from('brand').select('*').in('brand_id', brandIds)
+			: { data: [], error: null }
+		if (brandsResult.error) throw brandsResult.error
+		const brands = upperKeys(brandsResult.data || [])
+		return storeRows.map(store => toStore(
+			store,
+			brands.find(brand => String(brand.BRAND_ID) === String(store.BRAND_ID)),
+			mall.units || []
+		))
+	}
+
+	async function saveStoresForMall(request, reply) {
+		try {
+			const mallId = request.params.id
+			const mall = await service.getMall(mallId)
+			const payload = Array.isArray(request.body?.stores) ? request.body.stores : []
+			const existingResult = await app.supabase.from('store').select('*').eq('mall_id', mallId)
+			if (existingResult.error) throw existingResult.error
+			const existingRows = upperKeys(existingResult.data || [])
+			const existingIds = new Set(existingRows.map(store => String(store.STORE_ID)))
+			const validUnitByLabel = new Map((mall.units || []).map(unit => [String(unit.unitNo), unit]))
+			const timestamp = now()
+			const savedIds = []
+
+			for (const store of payload) {
+				const unitNos = [...new Set(Array.isArray(store.unitNos) ? store.unitNos.map(String) : [])]
+				const unitRows = unitNos.map(unitNo => validUnitByLabel.get(unitNo))
+				if (unitRows.some(unit => !unit)) throw new Error('Every selected unit must belong to this mall.')
+				if (!store.storeName?.trim()) throw new Error('Store name is required.')
+				if (!store.brandId) throw new Error('A valid brand is required.')
+
+				const row = {
+					store_name: store.storeName.trim(),
+					store_unit_count: unitNos.length,
+					store_contact_person: store.contactPerson?.trim() || null,
+					store_contact_num: store.contactNo?.trim() || null,
+					store_email: store.email?.trim() || null,
+					store_status: store.active === false ? 'inactive' : store.status === 'mapped' ? 'mapped' : 'unmapped',
+					store_updated_at: timestamp,
+					brand_id: store.brandId,
+					store_type: store.storeType === 'stall' ? 'stall' : 'store',
+					store_description: store.description?.trim() || null,
+					mall_id: mallId,
+				}
+				const storeId = store.id && existingIds.has(String(store.id)) ? String(store.id) : null
+				const result = storeId
+					? await app.supabase.from('store').update(row).eq('store_id', storeId).eq('mall_id', mallId).select('*').single()
+					: await app.supabase.from('store').insert({ ...row, store_created_at: timestamp, store_has_cr: false }).select('*').single()
+				if (result.error) throw result.error
+				const savedStore = upperKeys(result.data)
+				savedIds.push(savedStore.STORE_ID)
+			}
+
+			if (existingIds.size) {
+				const cleared = await app.supabase.from('unit').update({ store_id: null, unit_status: 'vacant', unit_updated_at: timestamp }).in('store_id', [...existingIds])
+				if (cleared.error) throw cleared.error
+			}
+
+			for (let index = 0; index < payload.length; index += 1) {
+				const store = payload[index]
+				if (store.active === false) continue
+				const savedStoreId = savedIds[index]
+				const unitIds = [...new Set((store.unitNos || []).map(String).map(unitNo => validUnitByLabel.get(unitNo)?.id).filter(Boolean))]
+				if (!unitIds.length) continue
+				const assigned = await app.supabase.from('unit').update({ store_id: savedStoreId, unit_status: 'occupied', unit_updated_at: timestamp }).in('unit_id', unitIds)
+				if (assigned.error) throw assigned.error
+			}
+
+			return reply.send(await getStoresForMall(mallId))
+		} catch (error) {
+			request.log.error(error, 'Could not save stores')
+			request.log.error({ code: error.code }, 'Could not save stores')
+			return reply.code(400).send({ message: 'Unable to save stores.' })
+		}
+	}
+
+	app.get('/api/malls/:id/stores', async (request, reply) => {
+		try {
+			return await getStoresForMall(request.params.id)
+		} catch (error) {
+			request.log.error({ code: error.code }, 'Could not load stores')
+			return reply.code(500).send({ message: 'Unable to load stores.' })
+		}
+	})
+
+	app.put('/api/malls/:id/stores', (request, reply) => saveStoresForMall(request, reply))
+
 	app.get('/api/malls', async (request, reply) => {
 		const { data, error } = await app.supabase.from('mall').select(dbColumn('MALL_ID')).order(dbColumn('MALL_NAME'))
-		if (error) return reply.code(500).send({ message: error.message })
+		if (error) { request.log.error({ code: error.code }, 'Could not list malls'); return reply.code(500).send({ message: 'Unable to load malls.' }) }
 		try {
 			return await Promise.all(data.map(mall => service.getMall(upperKeys(mall).MALL_ID)))
 		} catch (error) {
 			request.log.error(error, 'Could not load malls')
-			return reply.code(500).send({ message: error.message })
+			return reply.code(500).send({ message: 'Unable to load malls.' })
 		}
 	})
 
@@ -275,13 +400,14 @@ async function registerMallManagementRoutes(app) {
 		try {
 			return await service.getMall(request.params.id)
 		} catch (error) {
-			return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: error.message })
+			request.log.error({ code: error.code }, 'Could not load mall')
+			return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: 'Unable to load mall.' })
 		}
 	})
 
 	app.get('/api/malls/:id/logo', async (request, reply) => {
 		const { data, error } = await app.supabase.from('mall').select('mall_logo').eq('mall_id', request.params.id).single()
-		if (error) return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: error.message })
+		if (error) { request.log.error({ code: error.code }, 'Could not load mall logo'); return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: 'Unable to load logo.' }) }
 		const image = logoBuffer(data.mall_logo)
 		if (!image) return reply.code(404).send({ message: 'Mall logo not found.' })
 		return reply.header('Content-Type', imageContentType(image)).header('Cache-Control', 'private, max-age=300').send(image)
@@ -335,7 +461,8 @@ async function registerMallManagementRoutes(app) {
 			}
 			return reply.code(beaconId ? 200 : 201).send((await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(savedBeaconId)))
 		} catch (error) {
-			return reply.code(400).send({ message: error.message })
+			request.log.error({ code: error.code }, 'Beacon save failed')
+			return reply.code(400).send({ message: 'Unable to save beacon.' })
 		}
 	}
 
@@ -369,7 +496,8 @@ async function registerMallManagementRoutes(app) {
 			const updated = (await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(request.params.beaconId))
 			return updated
 		} catch (error) {
-			return reply.code(400).send({ message: error.message })
+			request.log.error({ code: error.code }, 'Battery creation failed')
+			return reply.code(400).send({ message: 'Unable to save battery.' })
 		}
 	})
 
@@ -383,7 +511,8 @@ async function registerMallManagementRoutes(app) {
 			if (result.error) throw result.error
 			return (await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(request.params.beaconId))
 		} catch (error) {
-			return reply.code(400).send({ message: error.message })
+			request.log.error({ code: error.code }, 'Battery update failed')
+			return reply.code(400).send({ message: 'Unable to save battery.' })
 		}
 	})
 
@@ -416,18 +545,18 @@ async function registerMallManagementRoutes(app) {
 				if (result.error) throw result.error
 			}
 			return (await service.getMall(request.params.id)).units
-		} catch (error) { return reply.code(500).send({ message: error.message }) }
+		} catch (error) { request.log.error({ code: error.code }, 'Unit save failed'); return reply.code(500).send({ message: 'Unable to save units.' }) }
 	})
 
 	app.get('/api/brands', async (request, reply) => {
 		const { data, error } = await app.supabase.from('brand').select('*').order('brand_name')
-		if (error) return reply.code(500).send({ message: error.message })
+		if (error) { request.log.error({ code: error.code }, 'Brand list failed'); return reply.code(500).send({ message: 'Unable to load brands.' }) }
 		return data.map(toBrand)
 	})
 
 	app.get('/api/brands/:id/logo', async (request, reply) => {
 		const { data, error } = await app.supabase.from('brand').select('brand_logo').eq('brand_id', request.params.id).single()
-		if (error) return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: error.message })
+		if (error) { request.log.error({ code: error.code }, 'Could not load brand logo'); return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: 'Unable to load logo.' }) }
 		if (typeof data.brand_logo === 'string' && data.brand_logo.startsWith('data:')) return reply.redirect(data.brand_logo)
 		const image = logoBuffer(data.brand_logo)
 		if (!image) return reply.code(404).send({ message: 'Brand logo not found.' })
@@ -443,7 +572,7 @@ async function registerMallManagementRoutes(app) {
 		const result = brandId
 			? await app.supabase.from('brand').update(row).eq('brand_id', brandId).select('*').single()
 			: await app.supabase.from('brand').insert(row).select('*').single()
-		if (result.error) return reply.code(400).send({ message: result.error.message })
+		if (result.error) { request.log.error({ code: result.error.code }, 'Brand save failed'); return reply.code(400).send({ message: 'Unable to save brand.' }) }
 		return reply.code(brandId ? 200 : 201).send(toBrand(result.data))
 	}
 	app.post('/api/brands', (request, reply) => saveBrand(request, reply))

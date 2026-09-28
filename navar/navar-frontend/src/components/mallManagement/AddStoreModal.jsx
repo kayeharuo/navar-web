@@ -150,12 +150,13 @@ export default function AddStoreModal({
   onSave,
   onChangeBrand,
   isEdit = false,
+  requireUnitAssignment = false,
 }) {
   const isOthers = brand?.isOthers
 
   const [form, setForm] = useState({
     storeName:     initialData?.storeName     || '',
-    storeType:     initialData?.storeType     || 'store', // 'store' or 'stall'
+    storeType:     requireUnitAssignment ? 'store' : (initialData?.storeType || 'store'), // 'store' or 'stall'
     numUnits:      initialData?.unitNos?.length ? String(initialData.unitNos.length) : '',
     contactPerson: initialData?.contactPerson || '',
     contactNo:     initialData?.contactNo     || '',
@@ -237,6 +238,7 @@ export default function AddStoreModal({
     const errs = {}
     if (!form.storeName.trim()) errs.storeName = 'Store name is required.'
     // Only validate units for store type
+    if (requireUnitAssignment && unitNos.length < 1) errs.numUnits = 'Select at least one unit before reactivating.'
     if (form.storeType === 'store' && (form.numUnits === '' || parseInt(form.numUnits) < 1)) errs.numUnits = 'Enter at least one unit.'
     if (form.storeType === 'store' && unitNos.length !== parseInt(form.numUnits)) errs.numUnits = 'Choose the exact number of units requested.'
     if (isOthers && !form.brandName.trim()) errs.brandName = 'Brand name is required.'
@@ -252,6 +254,7 @@ export default function AddStoreModal({
       storeName:     form.storeName.trim(),
       storeType:     form.storeType,
       unitNos:       form.storeType === 'stall' ? [] : unitNos,
+      brandId:        brand?.id || null,
       contactPerson: form.contactPerson.trim(),
       contactNo:     form.contactNo.trim(),
       email:         form.email.trim(),
@@ -340,7 +343,7 @@ export default function AddStoreModal({
                 onChange={e => setField('storeType', e.target.value)}
               >
                 <option value="store">Store</option>
-                <option value="stall">Stall</option>
+                <option value="stall" disabled={requireUnitAssignment}>Stall</option>
               </select>
             </div>
 

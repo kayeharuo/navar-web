@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 // eslint-disable-next-line no-unused-vars
 import { Search, Plus, Pencil, ImageIcon } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -8,6 +8,8 @@ import MallInfoPanel from './MallInfoPanel'
 import InquiriesTab from './InquiriesTab'
 import BeaconTicketsTab from './BeaconTicketsTab'
 import { apiRequest } from '../../config/api'
+import AuthImage from '../ui/AuthImage'
+import { useRealtimeRefresh } from '../../config/realtime'
 import '../../styles/mallManagement/mallModal.css'
 import '../../styles/mallManagement/inquiries.css'
 
@@ -407,17 +409,23 @@ export default function MallsTable() {
   const [editingMall, setEditingMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
 
+  const loadMalls = useCallback(() => {
+    setLoading(true)
+    apiRequest('/api/malls').then(setMalls).catch(showRequestError).finally(() => setLoading(false))
+  }, [])
+
   function showRequestError(error) {
     console.error('Mall Management request failed:', error.details || error)
     window.alert(error.message)
   }
 
   useEffect(() => {
-    apiRequest('/api/malls')
-      .then(setMalls)
-      .catch(showRequestError)
-      .finally(() => setLoading(false))
-  }, [])
+    loadMalls()
+  }, [loadMalls])
+
+  useRealtimeRefresh(payload => {
+    if (['mall', 'floor', 'operating_hours', 'store', 'unit', 'beacon', 'battery', 'brand', 'contract', 'application', 'ar_development'].includes(payload.table)) loadMalls()
+  })
 
   function handleStoresClick(mall) {
     navigate(`/mall-management/stores/${mall.id}`)
@@ -444,9 +452,7 @@ export default function MallsTable() {
   
   function openBrandImage(brand) {
     try {
-      const logoUrl = brand.logo?.startsWith('/')
-        ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${brand.logo}`
-        : brand.logo
+      const logoUrl = brand.logo
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><rect fill="#E5E7EB" width="100%" height="100%"/><text x="50%" y="55%" font-size="360" fill="#9CA3AF" text-anchor="middle" dominant-baseline="middle" font-family="Poppins, sans-serif">${brand.name.charAt(0)}</text></svg>`
       setBrandImage({ name: brand.name, url: logoUrl || `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` })
     // eslint-disable-next-line no-unused-vars
@@ -641,7 +647,7 @@ export default function MallsTable() {
                         <tr key={brand.id} className="mall-table-row">
                           <td>
                             {brand.logo ? (
-                              <img
+                              <AuthImage
                                 src={getBrandLogoUrl(brand)}
                                 alt={brand.name}
                                 className="brand-table-logo brand-table-logo--clickable"
@@ -809,7 +815,9 @@ export default function MallsTable() {
         <div className="logo-lightbox-overlay" onClick={() => setBrandImage(null)} role="presentation">
           <div className="logo-lightbox-content" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`${brandImage.name} logo`}>
             <button className="logo-lightbox-close" onClick={() => setBrandImage(null)} aria-label="Close logo preview">×</button>
-            <img src={brandImage.url} alt={`${brandImage.name} logo`} className="logo-lightbox-img" />
+            {brandImage.url.startsWith('/')
+              ? <AuthImage src={brandImage.url} alt={`${brandImage.name} logo`} className="logo-lightbox-img" />
+              : <img src={brandImage.url} alt={`${brandImage.name} logo`} className="logo-lightbox-img" />}
             <p className="logo-lightbox-name">{brandImage.name}</p>
           </div>
         </div>

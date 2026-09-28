@@ -34,19 +34,21 @@ Each step says what to **do**, what you should **see**, and what to do **if not*
 - The Auth link columns are **`ADMIN.ADMIN_AUTH_USER_ID`** and **`APP_USER.USER_AUTH_USER_ID`** (UUID, NOT NULL, unique, FK to `auth.users(id)`).
 - Emails are stored **lowercase** in the database. The backend must lowercase every email before saving or looking it up.
 - Email is **read-only after an account is created** (see Part 7).
-- One new SQL file, `05_lock_down_public_schema.sql`, turns on Row Level Security everywhere. It must run before any frontend uses a Supabase key.
+- One new SQL file, `05_lock_down_public_schema.sql`, turns on Row Level Security everywhere and then opens **only** what the Unity mobile app needs (Part 12). It must run before any frontend or the mobile app uses a Supabase key.
 - There is no "final cleanup" phase any more. Everything is in `04`.
 
 ### 0.2 Open decisions (defaults are pre-selected so you can keep going)
 
 | # | Decision | Default in this guide | Where it matters |
 |---|---|---|---|
-| 1 | Does the **mobile app query Supabase tables directly**? | **No.** All data goes through the backend. | Part 2 (05 blocks direct access) |
+| 1 | Does the **mobile app query Supabase tables directly**? | **Yes**, but only the tables and rows listed in 05 (deny by default). See Part 12. | Part 2.5 and Part 12 |
 | 2 | Protected logo images (`<img>` tags cannot send a login token) | Fetch logos through the API as blobs (Part 7.9) | Part 6 and 7 |
 | 3 | `AUDIT_LOG.MALL_ID` is NOT NULL, so Super Admin events cannot be logged | Make it nullable in a new `06` file (Part 9) | Part 9 |
 | 4 | Where the web session is stored | Supabase default (browser localStorage), accepted for now | Part 7.2 |
+| 5 | Can Unity **build** map data (nodes, edges, calibration, beacon assignments) during AR development? | **Yes, but only for an active Super Admin.** Delete `05` Part F if Unity will only read. | Part 12 |
+| 6 | Which mobile logins may see malls that are not live yet? | Super Admins (all malls), Mall Admins (their own mall), and users you mark as **testers** | Part 12 |
 
-If your answer to #1 is "yes, the mobile app reads tables directly", **stop before Part 2.5** and tell me. Some tables will need explicit RLS policies first.
+If you later decide the mobile app should go **only** through the backend, keep `05` Part A and B and delete Parts C, D and E from the file before running it.
 
 ### 0.3 Safety rules for the whole guide
 
@@ -97,9 +99,9 @@ WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
 ```
 
 3. To run: click **Run** (bottom right) or press **Ctrl+Enter**.
-4. **You should see:** `0` if nothing is applied yet, or `55` if `01` was already applied.
+4. **You should see:** `0` if nothing is applied yet, or `54` if `01` was already applied (your schema has no separate `BRAND_CATEGORY` table; it's a column on `BRAND` instead).
    - `0`: continue from 2.2.
-   - `55`: skip 2.2, but check whether 02 and 03 were applied (ask me if unsure).
+   - `54`: skip 2.2, but check whether 02 and 03 were applied (ask me if unsure).
    - Any other number: stop and ask.
 
 ### 2.2 Run 01, 02, 03
@@ -168,13 +170,16 @@ WHERE schemaname = 'public'
 
 You should see both names.
 
-### 2.5 Run 05 (lock down direct access)
+### 2.5 Run 05 (lock down, then open only what the mobile app needs)
 
-> Only continue if decision #1 in Part 0.2 is "No, the mobile app does not read tables directly." Otherwise stop.
-
-1. **[VS CODE]** Read the comment block at the top of `05_lock_down_public_schema.sql`. This is a permissions change, so `CONTEXT.md` requires you to understand its effect first: after it runs, only the backend (secret/service_role key) can reach your tables.
-2. Copy the whole file, **[SUPABASE]** paste in a new query, **Run**.
-3. **You should see:** success.
+1. **[VS CODE]** Read the comment block at the top of `05_lock_down_public_schema.sql`. This is a permissions change, so `CONTEXT.md` requires you to understand its effect first. In short: everything is denied by default; the backend is unaffected; the mobile app can read map/store data for live malls and read/write its own user's rows, nothing else.
+2. **[VS CODE]** Find the three places marked `SETTING` and make sure they match reality:
+   - `app_private.is_public_status()` lists the AR statuses the **public** may see. It is `'Live'`. This must equal the exact text your admin panel stores in `AR_DEVELOPMENT_STATUS` when a mall is live. If it does not match, the public sees **no** map data (it fails closed, so nothing leaks). To let the public also see a testing stage, add it to the list, for example `IN ('Live', 'Navigation Testing')`.
+   - `register_app_user()` uses `v_role := 'user'`. Change it to the `USER_ROLE` value you want normal mobile users to have.
+   - `app_private.is_tester()` uses `'tester'` as the `USER_ROLE` that marks a tester (see Part 12.4).
+3. Copy the whole file, **[SUPABASE]** paste in a new query, **Run**.
+4. **You should see:** success. (The file can be re-run safely if you edit a setting.)
+5. **[SUPABASE]** Open **Project Settings**, then **Data API**, and check **Exposed schemas**. It must list `public` only. If `app_private` appears, remove it and save.
 
 ### 2.6 Verify 05
 
@@ -188,23 +193,34 @@ WHERE n.nspname = 'public' AND c.relkind = 'r'
 ORDER BY c.relname;
 ```
 
-Every row must say `true` (55 rows).
+Every row must say `true` (54 rows).
 
-**Public roles have no table access:**
+**The logged-out role has no access at all:**
 
 ```sql
-SELECT grantee, table_name, privilege_type
-FROM information_schema.role_table_grants
-WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated')
-LIMIT 20;
+SELECT count(*) FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND grantee = 'anon';
 ```
 
-You should see **no rows**.
+You should see `0`.
+
+**Logged-in users can touch only the intended tables:**
+
+```sql
+SELECT table_name, string_agg(DISTINCT privilege_type, ', ' ORDER BY privilege_type) AS privileges
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND grantee = 'authenticated'
+GROUP BY table_name ORDER BY table_name;
+```
+
+You should see exactly **18 tables** (whole-table grants): `accessibility_preference`, `beacon_node_assigment`, `beacon_scan_log`, `edge`, `floor`, `floor_calibration`, `mall`, `navigation_plan`, `navigation_plan_destination`, `navigation_session`, `node`, `notif_preference`, `operating_hours`, `promotion_interaction`, `store_visit`, `unit`, `user_mall_visit`, `user_session`.
+
+Four of them (`node`, `edge`, `floor_calibration`, `beacon_node_assigment`) show `DELETE, INSERT, SELECT, UPDATE`. That is correct: the database only lets an active Super Admin use those write rights (Part 12). Ten more tables (`app_user`, `application_entry_point`, `application_floor_plan`, `ar_development`, `beacon`, `brand`, `promotion`, `store`, `store_additional_info`, `system_settings`) are granted **only specific columns**, so they do not appear in this list on purpose. If you see `admin`, `audit_log`, `contract`, `payment`, or any other table, stop and ask.
 
 **Security Advisor:**
 
 1. **[SUPABASE]** Sidebar, **Advisors** (or **Database**, then **Advisors**), tab **Security Advisor**, click **Refresh** if offered.
-2. **You should see:** no "RLS disabled in public" errors. You will likely see informational notes like "RLS enabled, no policy". That is expected. It means deny-by-default.
+2. **You should see:** no "RLS disabled in public" errors. Notes like "RLS enabled, no policy" on backend-only tables are expected. That is deny-by-default.
 
 ---
 
@@ -251,14 +267,30 @@ On the same **Sign In / Providers** page, find **Allow new users to sign up**.
 
 Supabase's built-in email sender is meant for trying things out. It has a **very low hourly limit**, and it may only deliver to addresses that belong to members of your Supabase organization. If invites to other addresses never arrive, that is why.
 
-For testing, you can:
+You have two options:
 
-- Use your own email address and a second address you control (use a plus-address like `you+admin2@gmail.com`; remember emails must be stored **lowercase**), or
-- Set up **custom SMTP**:
-  1. **[SUPABASE]** **Authentication**, then **Emails**, tab **SMTP Settings** (or **Project Settings**, then **Authentication**, **SMTP Settings**).
-  2. Turn on **Enable custom SMTP**.
-  3. Fill **Host**, **Port** (587 or 465), **Username**, **Password**, **Sender email**, **Sender name** from an email provider (for example Resend, Brevo, SendGrid). Free-tier rules and domain-verification requirements differ per provider and change, so check the provider's current rules first.
-  4. **Save**, then send yourself a test invite (Part 5).
+- **Use your own email address and a second address you control** (a plus-address like `you+admin2@gmail.com` works for this, since Gmail treats it as the same inbox; remember emails must be stored **lowercase** in the database, so store it as `you+admin2@gmail.com` not with capitals). This needs no setup, but you stay on Supabase's low hourly limit.
+- **Set up custom SMTP** (recommended once you're inviting anyone other than yourself). Below is the setup for **Brevo**, picked because its free plan (300 emails/day, no credit card) works without owning a domain — most competitors (Resend included) restrict free sending to your own signup address until a domain is verified, which breaks inviting a second admin.
+
+**Setting up Brevo:**
+
+1. **[BROWSER]** Go to https://www.brevo.com and click **Sign up free**. Create the account with your own email; no credit card is asked for.
+2. **[BROWSER]** Once logged in, click your profile icon (or account name) in the top-right corner, then find **SMTP & API** (on some accounts this sits under **Senders, Domains & Dedicated IPs**, then a **SMTP & API** tab — the exact wording has changed between Brevo updates, so look for either).
+3. Click **Generate a new SMTP key**. Give it a name (e.g. `NavAR`) and click **Generate**. **Copy the key immediately and save it in a password manager** — Brevo shows it only once.
+4. Note your **SMTP login**, shown on the same page: it's the email address you signed up with.
+5. **[SUPABASE]** Sidebar, **Authentication**, then **Emails**, tab **SMTP Settings** (or **Project Settings**, then **Authentication**, **SMTP Settings**).
+6. Turn on **Enable Custom SMTP**.
+7. Fill in exactly:
+   - **Sender email:** the address you want recipients to see as the sender (can be any address for now — see the note below about what actually gets shown).
+   - **Sender name:** `NavAR`
+   - **Host:** `smtp-relay.brevo.com`
+   - **Port:** `587`
+   - **Username:** your Brevo account email (from step 4)
+   - **Password:** the SMTP key from step 3 (**not** your Brevo account password — this is the single most common mistake here)
+8. Click **Save**.
+9. Send yourself a test invite (Part 5) to confirm delivery.
+
+**One thing to expect:** since you haven't verified a domain in Brevo, it will actually send from a substitute address (something like `nnnnnnn@brevosend.com`) instead of the sender email you typed, so mail still delivers reliably. Recipients may see a "via brevosend.com" note next to the sender name in some email clients (Gmail, for instance, shows this). This is cosmetic — it doesn't affect delivery or functionality — but if your capstone panel will see these emails and you want your own domain name to show up cleanly with no "via" notice, that requires owning a domain and verifying it with Brevo (adding DNS TXT/CNAME records they provide), which is a separate step you can do later if you end up buying one.
 
 ### 3.6 Leave these on defaults for now, revisit later
 
@@ -823,5 +855,80 @@ Super Admins have no self-service "forgot password". Recovery paths, in order:
 - **Custom SMTP on your own domain** with SPF/DKIM.
 - **HttpOnly cookie sessions** instead of browser storage.
 - **Mall Admin:** assign malls, enforce mall ownership on every `/api/malls/:id/...` route, and add a trigger so a Store Admin's `MALL_ID` matches their store's mall.
-- **Mobile app:** if it ever queries tables directly, write explicit per-table RLS policies and matching grants. Keep everything else denied.
+- **Mobile app:** see Part 12. To open one more table, copy a block from `05` Part D or E, grant only the columns needed, and write a policy. Never `GRANT ALL`.
 - **Key rotation** after any suspicion that a key was exposed (Project Settings, API Keys).
+
+---
+
+## Part 12: Unity mobile app talks to Supabase directly
+
+Do this after Parts 1 to 5 (the database and Auth are ready). It needs no backend code.
+
+### 12.1 How it works
+
+- The Unity app signs users up and in with Supabase Auth, then reads and writes tables directly. Every request carries two headers: `apikey: <publishable key>` and `Authorization: Bearer <the user's access token>`.
+- `05` decides what that logged-in person can do, based on **who they are in the database** (a normal user, a tester, a Mall Admin, or a Super Admin), never on what the app claims. Everything else is denied by the database itself.
+- The publishable key is **not a secret**. Anyone can extract it from the app build. The database rules are the protection.
+- The secret key must **never** be in Unity.
+
+### 12.2 Who can see and do what
+
+| Who is logged in | Can read | Can write |
+|---|---|---|
+| Not logged in | Nothing | Nothing |
+| Normal mobile user | Map, stores, beacons, entry points, floor plans, promotions, hours, brands, **only for malls whose AR status is public** (default `'Live'`) | Their own profile fields (name, gender, date of birth, last login) and their own plans, sessions, preferences, visits, scans |
+| **Tester** (a mobile user you mark) | The same data for **every** mall at **any** AR stage | Same as a normal user: only their own rows |
+| Mall Admin (activated, active) | Public malls **plus their own mall** at any stage | Nothing |
+| **Super Admin** (activated, active) | Every mall at any stage | **Map-building tables only:** `node`, `edge`, `floor_calibration`, `beacon_node_assigment` |
+
+Always hidden from the app: store contact person/phone/email, beacon status and maintenance data, and every admin, billing, contract, audit and log table. Other users' data is never readable, even by guessing IDs.
+
+**Why two kinds of "not live" access?** During AR development (Node Mapping, Navigation Testing, Ready for activation) Unity must work on a mall the public cannot see yet. Building the map is done as a **Super Admin**. Testing navigation, which needs a normal user record to store sessions and scans, is done as a **tester**.
+
+### 12.3 Steps outside the IDE (Supabase)
+
+1. **[SUPABASE]** **Authentication, Sign In / Providers**: leave **Confirm email** ON (Part 3.1). Registration requires a confirmed email.
+2. **[SUPABASE]** Same page: make sure **Allow anonymous sign-ins** is OFF. Anonymous users count as logged in.
+3. **[SUPABASE]** **Project Settings, Data API**: **Exposed schemas** must be `public` only (Part 2.5 step 5).
+4. **[SUPABASE]** **Authentication, URL Configuration**: mobile email links need a deep link back into the app. Add the app's deep-link URL there when you build password reset and email confirmation for mobile.
+5. **[SUPABASE]** **Authentication, Rate Limits / Attack Protection**: review before public launch. Turn on CAPTCHA for sign-ups if bots appear.
+
+### 12.4 What the Unity developer needs to know
+
+1. **Registration flow:** sign up with Supabase Auth, the user confirms their email, then the app calls:
+   `POST https://YOUR-PROJECT-REF.supabase.co/rest/v1/rpc/register_app_user`
+   with a JSON body such as `{"p_name":"Alice","p_gender":"F","p_dob":"2000-05-05"}` and the two headers from 12.1. It returns the new user id. The app **cannot** choose its role or email.
+2. **Always list columns by name.** `select=*` is refused on `store`, `beacon`, `brand`, `promotion`, `store_additional_info`, `system_settings`, and `app_user` because private columns exist. Example:
+   `GET /rest/v1/store?select=store_id,store_name,store_status,brand_id`
+3. **Own rows:** when inserting into a user-owned table, `user_id` must be the caller's own `USER_ID` (get it from `GET /rest/v1/app_user?select=user_id`). Any other value is rejected.
+4. **Deleting an account:** the app cannot delete rows. Account deletion needs a backend endpoint (or a small database function) later.
+5. **Storing tokens:** keep the refresh token in the platform's secure storage (iOS Keychain / Android Keystore via a plugin), not in plain `PlayerPrefs`.
+6. **Building the map (AR development):** log in inside Unity with a **Super Admin** web account (same email and password). The app then sees every mall and can insert, update and delete rows in `node`, `edge`, `floor_calibration` and `beacon_node_assigment`. A Super Admin has no `APP_USER` record, so Unity cannot save navigation sessions for that login. That is expected.
+7. **Testing navigation on a mall that is not live:** log in with a **tester** account. Create it like any mobile user (sign up, confirm email, call `register_app_user`), then the project owner runs this once in the Supabase SQL Editor:
+   `UPDATE app_user SET user_role = 'tester' WHERE user_email = 'them@example.com';`
+   Users cannot promote themselves: the app has no permission to change `USER_ROLE`. To remove tester access, set the role back to `'user'`.
+8. **Mall Admins** (once you build them) will see their own mall before it goes live without any extra setup.
+
+### 12.5 Tests to run (needs a normal test user)
+
+1. **[SUPABASE]** **Authentication, Users, Add user, Create new user**: `mobile-test@example.com`, a throwaway password, **Auto Confirm User** ticked. Do not create an `ADMIN` row.
+2. **[TERMINAL]** Get its token (as in Part 8.1 Test C, step 2) and copy the `access_token`.
+3. Register: `curl.exe -i -X POST "https://YOUR-PROJECT-REF.supabase.co/rest/v1/rpc/register_app_user" -H "apikey: YOUR_PUBLISHABLE_KEY" -H "Authorization: Bearer USER_TOKEN" -H "Content-Type: application/json" -d "{\"p_name\":\"Test User\"}"`. Expect a number.
+4. Repeat step 3. Expect an error saying already registered.
+5. Read a protected table: `curl.exe -i "https://YOUR-PROJECT-REF.supabase.co/rest/v1/admin?select=*" -H "apikey: YOUR_PUBLISHABLE_KEY" -H "Authorization: Bearer USER_TOKEN"`. Expect **permission denied**.
+6. Read contact details: `.../rest/v1/store?select=store_contact_num` with the same headers. Expect **permission denied**.
+7. Try to promote yourself: `curl.exe -i -X PATCH "https://YOUR-PROJECT-REF.supabase.co/rest/v1/app_user?user_id=eq.1" -H "apikey: YOUR_PUBLISHABLE_KEY" -H "Authorization: Bearer USER_TOKEN" -H "Content-Type: application/json" -d "{\"user_role\":\"admin\"}"`. Expect **permission denied**.
+8. With **no** Authorization header (only the apikey), read `mall`. Expect **permission denied**.
+9. **Tester check.** Read `mall` with the test token (`.../rest/v1/mall?select=mall_id,mall_name`). You should see **only live malls**. In the SQL Editor run the `UPDATE ... 'tester'` line from 12.4 for `mobile-test@example.com`, then repeat the request. You should now see **every mall**.
+10. **Map-tampering check.** With the same token, try to add a node: `curl.exe -i -X POST "https://YOUR-PROJECT-REF.supabase.co/rest/v1/node" -H "apikey: YOUR_PUBLISHABLE_KEY" -H "Authorization: Bearer USER_TOKEN" -H "Content-Type: application/json" -d "{\"node_type\":\"junction\",\"node_x_coordinate\":0,\"node_y_coordinate\":0,\"node_is_store_entrance\":false,\"node_is_accessible\":true,\"node_created_at\":\"2026-01-01T00:00:00\",\"node_updated_at\":\"2026-01-01T00:00:00\",\"floor_id\":1}"`. Expect a **row-level security** error, even for a tester.
+11. Clean up: delete `mobile-test@example.com` in **Authentication, Users** after removing its `app_user` row (SQL Editor: `DELETE FROM app_user WHERE user_email = 'mobile-test@example.com';`).
+
+### 12.6 Risks you are accepting with direct access
+
+- **Anyone who signs up can read all live-mall map data.** That is what the app shows anyway, but it also means someone could copy it. Supabase does not throttle per user. The backend route would allow that.
+- **Beacon identifiers are readable to logged-in users.** The app needs them to work, and someone could use them to imitate a beacon.
+- **Users can falsify their own activity records** (visits, scans, sessions, visit counts). If those feed revenue or analytics, move the writes behind the backend later.
+- **A Super Admin login inside Unity can change map data directly.** Those writes skip the backend, so they are not audit-logged and skip backend validation. Anyone who steals that token can edit maps until the session ends. Use Super Admin logins in Unity only on development builds, never in the public app build.
+- **Testers see every mall's unreleased map.** Mark only trusted team members as testers, and keep the number small.
+- **`NOTIFICATION` is not open.** `NOTIF_RECIPIENT` does not say whether it holds an admin id or a user id. Decide that before allowing access.
+- **Column lists are the guard.** Whenever you add a column to a table the app reads, decide whether it is private before granting it.
