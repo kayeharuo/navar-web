@@ -63,6 +63,7 @@ export default function ChatInboxPanel({ onClose, onOpenThread }) {
       if (e.key === 'Escape') onClose()
     }
     function handleOutsideClick(e) {
+      if (e.target.closest('.chat-inbox-trigger')) return
       if (panelRef.current && !panelRef.current.contains(e.target)) onClose()
     }
     document.addEventListener('keydown', handleEsc)

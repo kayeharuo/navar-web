@@ -440,6 +440,7 @@ export default function MallsTable() {
   }
 
   const [brands, setBrands] = useState([])
+  const [brandsLoading, setBrandsLoading] = useState(false)
   const [showBrandModal, setShowBrandModal] = useState(false)
   const [editingBrand, setEditingBrand] = useState(null)
   const [brandSearch, setBrandSearch] = useState('')
@@ -447,7 +448,9 @@ export default function MallsTable() {
 
   useEffect(() => {
     if (activeTab !== 'Brands') return
+    setBrandsLoading(true)
     apiRequest('/api/brands').then(setBrands).catch(showRequestError)
+      .finally(() => setBrandsLoading(false))
   }, [activeTab])
   
   function openBrandImage(brand) {
@@ -462,9 +465,7 @@ export default function MallsTable() {
   }
 
   function getBrandLogoUrl(brand) {
-    return brand.logo?.startsWith('/')
-      ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${brand.logo}`
-      : brand.logo
+    return brand.logo
   }
 
   async function handleAddSave(data) {
@@ -641,7 +642,9 @@ export default function MallsTable() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredBrands.length === 0 ? (
+                      {brandsLoading ? (
+                        <tr><td colSpan={7} className="mall-table-empty"><span className="table-loading"><span className="table-loading-spinner" />Loading brands...</span></td></tr>
+                      ) : filteredBrands.length === 0 ? (
                         <tr><td colSpan={7} className="mall-table-empty">No brands found.</td></tr>
                       ) : filteredBrands.map(brand => (
                         <tr key={brand.id} className="mall-table-row">
@@ -714,7 +717,7 @@ export default function MallsTable() {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={9} className="mall-table-empty">Loading malls...</td></tr>
+                      <tr><td colSpan={9} className="mall-table-empty mall-table-loading"><span className="table-loading"><span className="table-loading-spinner" />Loading malls...</span></td></tr>
                     ) : filteredMalls.length === 0 ? (
                       <tr><td colSpan={9} className="mall-table-empty">No malls found.</td></tr>
                     ) : filteredMalls.map(mall => (

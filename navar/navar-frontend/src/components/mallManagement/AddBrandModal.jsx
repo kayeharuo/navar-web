@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, ImageIcon } from 'lucide-react'
+import BusyButton from '../ui/BusyButton'
 
 const BRAND_CATEGORIES = [
   'Fashion & Apparel',
@@ -73,7 +74,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   function handleSave() {
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
-    onSave({
+    return onSave({
       name:        form.name.trim(),
       category:    form.category,
       description: form.description.trim(),
@@ -179,9 +180,9 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={handleSave}>
+          <BusyButton className="mall-modal-save-btn" onClick={handleSave}>
             {isEdit ? 'Save Changes' : 'Add Brand'}
-          </button>
+          </BusyButton>
         </div>
       </div>
     </>

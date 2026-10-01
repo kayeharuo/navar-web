@@ -127,7 +127,14 @@ export default function BeaconsPage() {
     navigate('/mall-management')
   }
 
-  if (!mall) return null
+  if (!mall) {
+    return (
+      <div className="stores-page-loading" role="status" aria-live="polite">
+        <span className="stores-page-spinner" aria-hidden="true" />
+        <span>Loading beacons...</span>
+      </div>
+    )
+  }
 
   return (
     <BeaconManager

@@ -18,7 +18,17 @@ export default function UnitsPage() {
     setMall(current => ({ ...current, units: saved }))
   }
 
-  if (!mall) return <MallManagement />
+  if (!mall) {
+    return (
+      <>
+        <MallManagement />
+        <div className="stores-page-loading" role="status" aria-live="polite">
+          <span className="stores-page-spinner" aria-hidden="true" />
+          <span>Loading units...</span>
+        </div>
+      </>
+    )
+  }
   return (
     <>
       <MallManagement />

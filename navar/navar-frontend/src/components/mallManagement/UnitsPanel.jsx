@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Plus, Pencil, Trash2 } from 'lucide-react'
+import BusyButton from '../ui/BusyButton'
 
 let nextUnitId = 1000
 
@@ -174,9 +175,9 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
             <button className="units-footer-btn units-footer-btn--cancel" onClick={onClose}>
               Cancel
             </button>
-            <button className="units-footer-btn units-footer-btn--save" onClick={handleSave}>
+            <BusyButton className="units-footer-btn units-footer-btn--save" onClick={handleSave}>
               Save
-            </button>
+            </BusyButton>
           </div>
         </div>
       </aside>

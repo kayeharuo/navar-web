@@ -3,6 +3,7 @@ import { Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
 import AddStoreModal from './AddStoreModal'
 import { apiRequest } from '../../config/api'
+import BusyButton from '../ui/BusyButton'
 
 const CATEGORIES = [
   'All',
@@ -46,12 +47,12 @@ function ConfirmModal({ type, onCancel, onConfirm }) {
         </p>
         <div className="confirm-modal-actions">
           <button className="confirm-modal-cancel" onClick={onCancel}>Cancel</button>
-          <button
+          <BusyButton
             className={`confirm-modal-confirm confirm-modal-confirm--${type}`}
             onClick={onConfirm}
           >
             {isDe ? 'Deactivate' : 'Reactivate'}
-          </button>
+          </BusyButton>
         </div>
       </div>
     </>

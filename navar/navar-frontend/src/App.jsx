@@ -11,6 +11,7 @@ import StoresPage from './pages/StoresPage'
 import BeaconsPage from './pages/BeaconsPage'
 import ApplicationManagement from './pages/ApplicationManagement'
 import ARDevelopment from './pages/ARDevelopment'
+import NodeEditorPage from './pages/NodeEditorPage'
 import Analytics from './pages/Analytics'
 import AccountManagement from './pages/AccountManagement'
 import EmailLogs from './pages/EmailLogs'
@@ -144,6 +145,14 @@ export default function App() {
 
   if (!session || !admin) {
     return <LoginPage message={location.state?.message} />
+  }
+
+  if (location.pathname.startsWith('/ar-development/editor/')) {
+    return (
+      <Routes>
+        <Route path="/ar-development/editor/:projectId" element={<NodeEditorPage />} />
+      </Routes>
+    )
   }
 
   const activePage = getActiveNavItem(location.pathname).label

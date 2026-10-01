@@ -220,6 +220,16 @@
   background: #fff;
 }
 
+.acct-table-loading {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 0.5px solid #e8ecf2;
+  background: #fff;
+}
+
 .acct-mgmt-table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

@@ -73,7 +73,14 @@ export default function StoresPage() {
     navigate('/mall-management')
   }
 
-  if (!mall) return null
+  if (!mall) {
+    return (
+      <div className="stores-page-loading" role="status" aria-live="polite">
+        <span className="stores-page-spinner" aria-hidden="true" />
+        <span>Loading stores...</span>
+      </div>
+    )
+  }
 
   return (
     <StoresPanel

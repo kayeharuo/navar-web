@@ -5,7 +5,7 @@ import ThreadModal from './ThreadModal'
 import PublishModal from './PublishModal'
 import ARDevDetail from './ARDevDetail'
 import ToBeAddedStallsModal from './ToBeAddedStallsModal'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const TIER_ORDER = { Premium: 0, Standard: 1, Basic: 2 }
 
@@ -184,6 +184,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   const [detailProject, setDetailProject] = useState(null)
   const [stallsModalProject, setStallsModalProject] = useState(null)
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const projectId = Number(searchParams.get('projectId'))
@@ -444,8 +445,8 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
                     <div className="ar-dev-action-cell">
                       <button
                         className="ar-dev-action-btn ar-dev-action-btn--edit-map"
-                        onClick={() => {}}
-                        title="Edit Map (not yet available)"
+                        onClick={() => navigate(`/ar-development/editor/${project.id}`, { state: { mallName: project.mallName } })}
+                        title="Open the node editor"
                       >
                         Edit Map
                       </button>

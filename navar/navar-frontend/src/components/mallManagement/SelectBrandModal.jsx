@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
+import AuthImage from '../ui/AuthImage'
 
 export const BRANDS = []
 
@@ -10,8 +11,8 @@ function getLogoUrl(logo) {
 }
 
 function BrandLogo({ brand }) {
-  const logoUrl = getLogoUrl(brand.logo)
-  if (logoUrl) return <img src={logoUrl} alt="" className="brand-card-logo" />
+  if (brand.logo?.startsWith('data:')) return <img src={brand.logo} alt="" className="brand-card-logo" />
+  if (brand.logo) return <AuthImage src={brand.logo} alt="" className="brand-card-logo" />
   return (
     <div className="brand-card-initial-box">
       <span className="brand-card-initial">{brand.name.charAt(0).toUpperCase()}</span>

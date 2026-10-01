@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Search } from 'lucide-react'
 import AddBeaconModal from './AddBeaconModal'
 import { apiRequest } from '../../config/api'
+import BusyButton from '../ui/BusyButton'
 
 // Placeholder UUID — will be replaced by real value from backend
 const SYSTEM_UUID = 'F7826DA6-4FA2-4E98-8024-BC5B71E0893E'
@@ -82,7 +83,7 @@ function FaultyModal({ onCancel, onConfirm }) {
           {issueErr && <p className="mall-field-error">{issueErr}</p>}
         </div>
         <div className="bcn-modal-field">
-          <label className="bcn-modal-label">NOTES <span className="bcn-modal-label-required">*</span></label>
+            <label className="bcn-modal-label">DESCRIPTION <span className="bcn-modal-label-required">*</span></label>
           <textarea
             className={`bcn-modal-notes${noteErr ? ' bcn-modal-notes--error' : ''}`}
             placeholder="Notes..."
@@ -94,7 +95,7 @@ function FaultyModal({ onCancel, onConfirm }) {
         </div>
         <div className="bcn-modal-actions">
           <button className="bcn-modal-cancel" onClick={onCancel}>Cancel</button>
-          <button className="bcn-modal-yes bcn-modal-yes--faulty" onClick={handleConfirm}>Yes</button>
+          <BusyButton className="bcn-modal-yes bcn-modal-yes--faulty" onClick={handleConfirm}>Yes</BusyButton>
         </div>
       </div>
     </>
@@ -151,7 +152,7 @@ function BatteryForm({ initialData = null, onCancel, onSave, isReplacement = fal
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onCancel}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={handleSubmit}>{isReplacement ? 'Replace Battery' : 'Save Changes'}</button>
+          <BusyButton className="mall-modal-save-btn" onClick={handleSubmit}>{isReplacement ? 'Replace Battery' : 'Save Changes'}</BusyButton>
         </div>
       </div>
     </div>
@@ -271,6 +272,8 @@ function TicketHistoryModal({ beacon, onClose }) {
 }
 
 function ReactivateModal({ onCancel, onConfirm }) {
+  const [remarks, setRemarks] = useState('')
+  const [error, setError] = useState('')
   useEffect(() => {
     function handleEsc(e) {
       if (e.key === 'Escape') onCancel()
@@ -287,9 +290,23 @@ function ReactivateModal({ onCancel, onConfirm }) {
           <path d="M35.6612 17.7138C35.8384 17.8909 35.979 18.1011 36.075 18.3325C36.1709 18.5639 36.2203 18.812 36.2203 19.0625C36.2203 19.313 36.1709 19.5611 36.075 19.7925C35.979 20.0239 35.8384 20.2341 35.6612 20.4112L22.3174 33.7549C22.1404 33.9322 21.9302 34.0728 21.6987 34.1687C21.4673 34.2646 21.2193 34.314 20.9688 34.314C20.7183 34.314 20.4702 34.2646 20.2388 34.1687C20.0074 34.0728 19.7971 33.9322 19.6201 33.7549L13.9013 28.0362C13.5436 27.6785 13.3427 27.1933 13.3427 26.6875C13.3427 26.1817 13.5436 25.6965 13.9013 25.3388C14.259 24.9811 14.7442 24.7802 15.25 24.7802C15.7559 24.7802 16.241 24.9811 16.5987 25.3388L20.9688 29.7113L32.9638 17.7138C33.1409 17.5366 33.3511 17.396 33.5825 17.3001C33.8139 17.2041 34.062 17.1548 34.3125 17.1548C34.563 17.1548 34.8111 17.2041 35.0425 17.3001C35.2739 17.396 35.4841 17.5366 35.6612 17.7138ZM49.5625 24.7812C49.5625 29.6825 48.1091 34.4737 45.3861 38.549C42.6631 42.6242 38.7928 45.8005 34.2646 47.6761C29.7365 49.5518 24.7538 50.0425 19.9467 49.0863C15.1396 48.1301 10.724 45.77 7.25827 42.3042C3.79255 38.8385 1.43237 34.4229 0.476176 29.6158C-0.480014 24.8087 0.0107373 19.8261 1.88637 15.2979C3.76201 10.7697 6.93828 6.89939 11.0135 4.17639C15.0888 1.45339 19.88 0 24.7813 0C31.3515 0.00693832 37.6507 2.62004 42.2966 7.26592C46.9425 11.9118 49.5556 18.211 49.5625 24.7812ZM45.75 24.7812C45.75 20.634 44.5202 16.5799 42.2161 13.1316C39.9121 9.68334 36.6372 6.99573 32.8057 5.40865C28.9741 3.82158 24.758 3.40632 20.6905 4.21541C16.6229 5.02449 12.8866 7.02157 9.95412 9.95411C7.02158 12.8866 5.0245 16.6229 4.21542 20.6905C3.40634 24.758 3.82159 28.9741 5.40866 32.8056C6.99574 36.6372 9.68335 39.9121 13.1316 42.2161C16.5799 44.5202 20.634 45.75 24.7813 45.75C30.3406 45.7437 35.6704 43.5325 39.6014 39.6014C43.5325 35.6704 45.7437 30.3406 45.75 24.7812Z" fill="#16A34A"/>
         </svg>
         <h3 className="bcn-modal-title">Are you sure you want to reactivate this Beacon?</h3>
+        <div className="bcn-modal-field">
+          <label className="bcn-modal-label">REMARKS <span className="bcn-modal-label-required">*</span></label>
+          <textarea
+            className={`bcn-modal-notes${error ? ' bcn-modal-notes--error' : ''}`}
+            placeholder="Describe what was done before reactivation..."
+            value={remarks}
+            onChange={e => { setRemarks(e.target.value); setError('') }}
+            rows={4}
+          />
+          {error && <p className="mall-field-error">{error}</p>}
+        </div>
         <div className="bcn-modal-actions">
           <button className="bcn-modal-cancel" onClick={onCancel}>Cancel</button>
-          <button className="bcn-modal-yes bcn-modal-yes--reactivate" onClick={onConfirm}>Reactivate</button>
+          <BusyButton className="bcn-modal-yes bcn-modal-yes--reactivate" onClick={() => {
+            if (!remarks.trim()) { setError('Please enter reactivation remarks.'); return }
+            onConfirm(remarks.trim())
+          }}>Reactivate</BusyButton>
         </div>
       </div>
     </>
@@ -347,18 +364,30 @@ export default function BeaconManager({ mall, onClose, onSave }) {
     }
   }
 
-  function handleSetFaulty(issue, note) {
-    setBeacons(prev => prev.map(b =>
-      b.id === faultyTarget.id ? { ...b, status: 'faulty', faultyIssue: issue, faultyNote: note } : b
-    ))
-    setFaulty(null)
+  async function handleSetFaulty(issue, note) {
+    try {
+      const updated = await apiRequest(`/api/malls/${mall.id}/beacons/${faultyTarget.id}/fault-ticket`, {
+        method: 'POST',
+        body: JSON.stringify({ issue, description: note }),
+      })
+      setBeacons(prev => prev.map(b => b.id === faultyTarget.id ? updated : b))
+      setFaulty(null)
+    } catch (error) {
+      window.alert(error.message)
+    }
   }
 
-  function handleReactivate() {
-    setBeacons(prev => prev.map(b =>
-      b.id === reactTarget.id ? { ...b, status: 'placed', faultyNote: '' } : b
-    ))
-    setReact(null)
+  async function handleReactivate(remarks) {
+    try {
+      const updated = await apiRequest(`/api/malls/${mall.id}/beacons/${reactTarget.id}/reactivate`, {
+        method: 'POST',
+        body: JSON.stringify({ remarks }),
+      })
+      setBeacons(prev => prev.map(b => b.id === reactTarget.id ? updated : b))
+      setReact(null)
+    } catch (error) {
+      window.alert(error.message)
+    }
   }
 
   function handleClose() {

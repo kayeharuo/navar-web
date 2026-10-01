@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
+import BusyButton from '../ui/BusyButton'
 
 export default function FloorInfoModal({ floorCount, initialDetails, onSave, onClose }) {
   const [details, setDetails] = useState(() => {
@@ -48,7 +49,7 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
       setErrors(errs)
       return
     }
-    onSave(details)
+    return onSave(details)
   }
 
   return (
@@ -97,7 +98,7 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
 
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Close</button>
-          <button className="mall-modal-save-btn" onClick={handleSave}>Save</button>
+          <BusyButton className="mall-modal-save-btn" onClick={handleSave}>Save</BusyButton>
         </div>
       </div>
     </>

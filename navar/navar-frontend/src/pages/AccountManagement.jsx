@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import '../styles/accountManagement/accountManagement.css'
 import { apiRequest } from '../config/api'
 import MessageModal from '../components/ui/MessageModal'
+import BusyButton from '../components/ui/BusyButton'
 import { useRealtimeRefresh } from '../config/realtime'
 
 /* ─── SVG Icons ─── */
@@ -102,7 +103,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
   function handleSubmit() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    onSave({
+    return onSave({
       role: roleTab,
       name: form.name.trim(),
       email: form.email.trim(),
@@ -212,7 +213,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
         </div>
         <div className="acct-modal-footer">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="acct-modal-btn-primary" onClick={handleSubmit}>{isEdit ? 'Save Changes' : 'Create Account'}</button>
+          <BusyButton className="acct-modal-btn-primary" onClick={handleSubmit}>{isEdit ? 'Save Changes' : 'Create Account'}</BusyButton>
         </div>
       </div>
     </div>
@@ -294,7 +295,7 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
         <div className="acct-confirm-notice">{account.name} will set a new password from the secure email.</div>
         <div className="acct-confirm-actions">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="acct-confirm-btn-proceed" onClick={onConfirm}>Set Password</button>
+          <BusyButton className="acct-confirm-btn-proceed" onClick={onConfirm}>Set Password</BusyButton>
         </div>
       </div>
     </div>
@@ -362,7 +363,7 @@ function DeactivateModal({ account, onClose, onConfirm }) {
         </div>
         <div className="acct-confirm-actions">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="acct-confirm-btn-deactivate" onClick={onConfirm}>Deactivate</button>
+          <BusyButton className="acct-confirm-btn-deactivate" onClick={onConfirm}>Deactivate</BusyButton>
         </div>
       </div>
     </div>
@@ -391,7 +392,7 @@ function ReactivateModal({ account, onClose, onConfirm }) {
         </div>
         <div className="acct-confirm-actions">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="acct-confirm-btn-reactivate" onClick={onConfirm}>Reactivate</button>
+          <BusyButton className="acct-confirm-btn-reactivate" onClick={onConfirm}>Reactivate</BusyButton>
         </div>
       </div>
     </div>
@@ -455,12 +456,14 @@ export default function AccountManagement() {
   const [deactSuper, setDeactSuper] = useState([])
   const [deactMall] = useState([])
   const [requestError, setRequestError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadAccounts()
   }, [])
 
   function loadAccounts() {
+    setLoading(true)
     Promise.all([apiRequest('/api/admin-accounts'), apiRequest('/api/auth/me')])
       .then(([accounts, me]) => {
         setCurrentAdminId(me.id)
@@ -479,6 +482,7 @@ export default function AccountManagement() {
         setDeactSuper(mapped.filter(account => account.status === 'deactivated'))
       })
       .catch(error => setRequestError(error.message))
+      .finally(() => setLoading(false))
   }
 
   useRealtimeRefresh(payload => {
@@ -607,6 +611,9 @@ export default function AccountManagement() {
   ]
 
   function renderTable() {
+    if (loading) {
+      return <div className="acct-table-loading" role="status"><span className="table-loading"><span className="table-loading-spinner" />Loading accounts...</span></div>
+    }
     const superList = filterList(superAdmins)
     const mallList = filterList(mallAdmins)
     const deactSuperList = filterList(deactSuper)

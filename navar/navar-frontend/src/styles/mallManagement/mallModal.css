@@ -274,6 +274,13 @@
   padding: 32px 0;
 }
 
+.mall-table-loading {
+  padding: 32px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-style: normal;
+}
+
 /* ─── Brand description textarea ─────────────────────────── */
 .brand-description-input {
   height: auto !important;

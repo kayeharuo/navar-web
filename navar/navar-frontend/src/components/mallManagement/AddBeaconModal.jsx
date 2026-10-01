@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, ChevronDown } from 'lucide-react'
+import BusyButton from '../ui/BusyButton'
 
 function getARVersions(maxVersion) {
   return Array.from({ length: Math.max(1, maxVersion) }, (_, index) => ({
@@ -109,9 +110,9 @@ function NodeSelectModal({ versions, numNodes, mallNodes, selectedNodeConfig, on
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={() => onSave(localConfig)}>
+          <BusyButton className="mall-modal-save-btn" onClick={() => onSave(localConfig)}>
             Save
-          </button>
+          </BusyButton>
         </div>
       </div>
     </>
@@ -221,7 +222,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
             const ver = arVersions.find(v => v.id === nc.versionId)
       return `${ver?.name}: ${nc.nodeId}`
     })
-    onSave({
+    return onSave({
       beaconCode:      isEdit ? form.beaconCode.trim() : '',
       floorNo:         form.floorNo,
       floorLabel:      floorDetail?.label || form.floorNo,
@@ -467,9 +468,9 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={handleSave}>
+          <BusyButton className="mall-modal-save-btn" onClick={handleSave}>
             {isEdit ? 'Save Changes' : 'Add Beacon'}
-          </button>
+          </BusyButton>
         </div>
       </div>
 

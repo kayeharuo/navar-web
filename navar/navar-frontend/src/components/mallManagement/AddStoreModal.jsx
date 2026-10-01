@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, ImageIcon } from 'lucide-react'
+import AuthImage from '../ui/AuthImage'
+import BusyButton from '../ui/BusyButton'
 
 const CATEGORIES = [
   'Fashion & Apparel',
@@ -15,12 +17,6 @@ const CATEGORIES = [
 ]
 
 const MAX_LOGO_MB = 2
-
-function getLogoUrl(logo) {
-  return logo?.startsWith('/')
-    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
-    : logo
-}
 
 function UnitAssignModal({ count, units, selected, onSave, onClose }) {
   const [localSelected, setLocalSelected] = useState(selected || [])
@@ -133,9 +129,9 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={() => onSave(localSelected)} disabled={isSaveDisabled}>
+          <BusyButton className="mall-modal-save-btn" onClick={() => onSave(localSelected)} disabled={isSaveDisabled}>
             Save
-          </button>
+          </BusyButton>
         </div>
       </div>
     </>
@@ -250,7 +246,7 @@ export default function AddStoreModal({
   function handleSave() {
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
-    onSave({
+    return onSave({
       storeName:     form.storeName.trim(),
       storeType:     form.storeType,
       unitNos:       form.storeType === 'stall' ? [] : unitNos,
@@ -288,8 +284,10 @@ export default function AddStoreModal({
           {!isOthers && brand && (
             <div className="brand-selected-row">
               <div className="brand-selected-logo-box">
-                {getLogoUrl(brand.logo) ? (
-                  <img src={getLogoUrl(brand.logo)} alt="" className="brand-selected-logo" />
+                {brand.logo?.startsWith('data:') ? (
+                  <img src={brand.logo} alt="" className="brand-selected-logo" />
+                ) : brand.logo ? (
+                  <AuthImage src={brand.logo} alt="" className="brand-selected-logo" />
                 ) : (
                   <span className="brand-card-initial">{brand.name?.charAt(0)}</span>
                 )}
@@ -492,9 +490,9 @@ export default function AddStoreModal({
         <div className="mall-modal-divider" />
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={handleSave}>
+          <BusyButton className="mall-modal-save-btn" onClick={handleSave}>
             {isEdit ? 'Save' : 'Add Store'}
-          </button>
+          </BusyButton>
         </div>
       </div>
 

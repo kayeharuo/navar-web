@@ -23,3 +23,43 @@ body {
 .font-data {
   font-family: var(--font-mono);
 }
+
+.busy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.busy-button-spinner {
+  flex-shrink: 0;
+  animation: busy-button-spin 0.7s linear infinite;
+}
+
+.table-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  color: #9B9C9C;
+}
+
+.table-loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #D9E2F2;
+  border-top-color: #155DFC;
+  border-radius: 50%;
+  animation: table-loading-spin 0.7s linear infinite;
+}
+
+@keyframes table-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes busy-button-spin {
+  to { transform: rotate(360deg); }
+}

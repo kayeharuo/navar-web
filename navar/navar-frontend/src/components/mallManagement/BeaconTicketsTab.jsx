@@ -1,9 +1,10 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react'
 import { Search } from 'lucide-react'
+import { apiRequest } from '../../config/api'
 import '../../styles/mallManagement/beaconTickets.css'
 
-const STATUS_FILTERS = ['All', 'Faulty', 'Investigating', 'Under Maintenance', 'Resolved']
+const STATUS_FILTERS = ['All', 'Pending', 'Faulty', 'Investigating', 'Under Maintenance', 'Resolved']
 
 const initialTickets = [
   {
@@ -207,6 +208,7 @@ const initialTickets = [
 ]
 
 const STATUS_CONFIG = {
+  pending:      { label: 'pending',           color: '#64748B', bg: '#F1F5F9', dotBg: '#F1F5F9', icon: '?' },
   faulty:       { label: 'faulty',            color: '#EC5252', bg: '#FFF2F2', dotBg: '#FFF2F2', icon: '!' },
   investigating:{ label: 'investigating',      color: '#FF9233', bg: '#FFF8F1', dotBg: '#FFF8F1', icon: '!' },
   maintenance:  { label: 'under maintenance', color: '#5B5BFF', bg: '#F0F0FF', dotBg: '#F0F0FF', icon: '!' },
@@ -284,11 +286,13 @@ function TimelineDot({ status }) {
 
 function getTimelineStatus(action) {
   if (action.toLowerCase().includes('resolved')) return 'resolved'
+  if (action.toLowerCase().includes('pending')) return 'pending'
   if (action.toLowerCase().includes('investigating') || action.toLowerCase().includes('reopen')) return 'investigating'
   return 'faulty'
 }
 
 function TicketDetailPanel({ ticket, onClose, onAction }) {
+  const canApprove = ticket.status === 'pending'
   const canInvestigate = ticket.status === 'faulty' || ticket.status === 'resolved'
   const canMaintenance = ticket.status === 'investigating'
   const canResolve = ticket.status === 'investigating' || ticket.status === 'maintenance'
@@ -386,6 +390,14 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
         </div>
 
         <div className="bkt-detail-footer">
+          {canApprove && (
+            <button
+              className="bkt-action-btn bkt-action-btn--investigate"
+              onClick={() => onAction('faulty')}
+            >
+              Mark as Faulty
+            </button>
+          )}
           {canInvestigate && (
             <button
               className="bkt-action-btn bkt-action-btn--investigate"
@@ -421,6 +433,7 @@ function ActionModal({ type, onCancel, onConfirm }) {
   const [assignedToErr, setAssignedToErr] = useState('')
   const [note, setNote] = useState('')
   const [noteErr, setNoteErr] = useState('')
+  const [teamMembers, setTeamMembers] = useState([])
 
   useEffect(() => {
     function handleEsc(e) {
@@ -430,12 +443,19 @@ function ActionModal({ type, onCancel, onConfirm }) {
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onCancel])
 
+  useEffect(() => {
+    if (type !== 'investigating' && type !== 'investigating-reopen') return
+    apiRequest('/api/admin-accounts')
+      .then(accounts => setTeamMembers(accounts.filter(account => account.status !== 'deactivated')))
+      .catch(() => setTeamMembers([]))
+  }, [type])
+
   const isReopen = type === 'investigating-reopen'
   const effectiveType = isReopen ? 'investigating' : type
-  const teamMembers = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams']
-
   const title = isReopen
     ? 'Reopen ticket as investigating?'
+    : effectiveType === 'faulty'
+    ? 'Approve ticket as faulty?'
     : effectiveType === 'investigating'
     ? 'Mark ticket as investigating?'
     : effectiveType === 'maintenance'
@@ -445,6 +465,8 @@ function ActionModal({ type, onCancel, onConfirm }) {
   const showAssignmentFields = effectiveType === 'investigating'
   const placeholder = isReopen
     ? 'Notes... — Why are you reopening this ticket?'
+    : effectiveType === 'faulty'
+    ? 'Notes... — Why is this beacon being approved as faulty?'
     : effectiveType === 'investigating'
     ? 'Notes... — What are you investigating?'
     : effectiveType === 'maintenance'
@@ -473,9 +495,8 @@ function ActionModal({ type, onCancel, onConfirm }) {
                 onChange={e => { setAssignedTo(e.target.value); setAssignedToErr('') }}
               >
                 <option value="">-- Select team member --</option>
-                {teamMembers.map(member => <option key={member} value={member}>{member}</option>)}
+                {teamMembers.map(member => <option key={member.id} value={member.name}>{member.name}</option>)}
               </select>
-              {assignedToErr && <p className="bkt-modal-error">{assignedToErr}</p>}
               {assignedToErr && <p className="bkt-modal-error">{assignedToErr}</p>}
             </div>
           </>
@@ -508,11 +529,19 @@ function ActionModal({ type, onCancel, onConfirm }) {
 let nextTicketId = initialTickets.length + 1
 
 export default function BeaconTicketsTab() {
-  const [tickets, setTickets] = useState(initialTickets)
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [actionModal, setActionModal] = useState(null)
+
+  useEffect(() => {
+    apiRequest('/api/beacon-tickets')
+      .then(setTickets)
+      .catch(error => window.alert(error.message))
+      .finally(() => setLoading(false))
+  }, [])
 
   const selectedTicket = tickets.find(t => t.id === selectedId) || null
 
@@ -526,6 +555,7 @@ export default function BeaconTicketsTab() {
   })
 
   const counts = {
+    pending: tickets.filter(t => t.status === 'pending').length,
     faulty: tickets.filter(t => t.status === 'faulty').length,
     investigating: tickets.filter(t => t.status === 'investigating').length,
     maintenance: tickets.filter(t => t.status === 'maintenance').length,
@@ -539,8 +569,17 @@ export default function BeaconTicketsTab() {
     setActionModal(isReopen ? 'investigating-reopen' : type)
   }
 
-  function handleConfirmAction(note, effectiveType, assignedTo) {
+  async function handleConfirmAction(note, effectiveType, assignedTo) {
     if (!selectedTicket) return
+    try {
+      await apiRequest(`/api/beacon-tickets/${selectedTicket.id}/actions`, {
+        method: 'POST',
+        body: JSON.stringify({ status: effectiveType, note, assignedTo: assignedTo || null }),
+      })
+    } catch (error) {
+      window.alert(error.message)
+      return
+    }
     const now = new Date()
     const dateStr = now.toLocaleString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
@@ -551,6 +590,8 @@ export default function BeaconTicketsTab() {
 
     const actionLabel = isReopen
       ? 'Reopened — Marked as investigating'
+      : effectiveType === 'faulty'
+      ? 'Approved — Marked as faulty'
       : effectiveType === 'investigating'
       ? 'Marked as investigating'
       : effectiveType === 'maintenance'
@@ -590,6 +631,10 @@ export default function BeaconTicketsTab() {
 
       {/* Summary cards */}
       <div className="bkt-stat-grid">
+        <div className="bkt-stat-card">
+          <span className="bkt-stat-num">{counts.pending}</span>
+          <span className="bkt-stat-label">Pending</span>
+        </div>
         <div className="bkt-stat-card">
           <span className="bkt-stat-num bkt-stat-num--faulty">{counts.faulty}</span>
           <span className="bkt-stat-label">Faulty</span>
@@ -639,7 +684,9 @@ export default function BeaconTicketsTab() {
 
       {/* Ticket list */}
       <div className="bkt-list">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="bkt-empty"><span className="table-loading"><span className="table-loading-spinner" />Loading tickets...</span></p>
+        ) : filtered.length === 0 ? (
           <p className="bkt-empty">No tickets found.</p>
         ) : filtered.map(ticket => (
           <TicketItem

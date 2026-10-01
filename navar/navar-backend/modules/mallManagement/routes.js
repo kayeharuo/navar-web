@@ -152,6 +152,15 @@ function createMallService(supabase) {
 		const units = upperKeys(unitsResult.data)
 		const failed = [mallResult, floorsResult, hoursResult, contractResult, applicationResult, arDevelopmentResult, beaconResult, batteryResult, unitsResult, storesResult].find(result => result.error)
 		if (failed) throw failed.error
+		const ticketRowsResult = beaconRows.length
+			? await supabase.from('beacon_ticket').select('*').in('beacon_id', beaconRows.map(beacon => beacon.BEACON_ID)).order('ticket_reported_at', { ascending: true })
+			: { data: [], error: null }
+		const ticketRows = upperKeys(ticketRowsResult.data || [])
+		const ticketLogsResult = ticketRows.length
+			? await supabase.from('beacon_ticket_log').select('*').in('ticket_id', ticketRows.map(ticket => ticket.TICKET_ID)).order('ticket_log_changed_at', { ascending: true })
+			: { data: [], error: null }
+		const ticketLogs = upperKeys(ticketLogsResult.data || [])
+		if (ticketRowsResult.error || ticketLogsResult.error) throw ticketRowsResult.error || ticketLogsResult.error
 		const tier = contract?.SUBSCRIPTION_TIER?.S_TIER_LABEL || 'Pending'
 		const overdueDays = contract?.CONTRACT_END && new Date(contract.CONTRACT_END) < new Date()
 			? Math.ceil((Date.now() - new Date(contract.CONTRACT_END).getTime()) / 86400000)
@@ -184,13 +193,14 @@ function createMallService(supabase) {
 			note: ['Grace Period', 'Suspended'].includes(status) && overdueDays > 0 ? `${overdueDays} days overdue` : null,
 			units: units.map(unit => {
 				const floor = floors.find(item => item.FLOOR_ID === unit.FLOOR_ID)
-				return { id: unit.UNIT_ID, floorId: unit.FLOOR_ID, floorNo: String(floor?.FLOOR_NUM ?? ''), unitNo: unit.UNIT_LABEL, status: unit.UNIT_STATUS?.toLowerCase() || 'vacant', isActive: true, storeId: unit.STORE_ID }
+				return { id: unit.UNIT_ID, floorId: unit.FLOOR_ID, floorNo: String(floor?.FLOOR_NUM ?? ''), unitNo: unit.UNIT_LABEL, status: unit.STORE_ID == null ? 'vacant' : unit.UNIT_STATUS?.toLowerCase() || 'occupied', isActive: true, storeId: unit.STORE_ID }
 			}),
 			storesCount: upperKeys(storesResult.data || []).filter(store => store.STORE_STATUS !== 'inactive').length,
 			unitsCount: units.length,
 			beaconCount: beaconRows.length,
 			beacons: beaconRows.map(beacon => {
 				const floor = floors.find(item => item.FLOOR_ID === beacon.FLOOR_ID)
+				const beaconTickets = ticketRows.filter(ticket => ticket.BEACON_ID === beacon.BEACON_ID)
 				const history = batteries.filter(battery => battery.BEACON_ID === beacon.BEACON_ID).map(battery => ({
 					id: battery.BATTERY_ID,
 					batteryId: battery.BATTERY_CODE,
@@ -215,6 +225,21 @@ function createMallService(supabase) {
 					dateInstalled: beacon.BEACON_INSTALLED_AT?.slice(0, 10),
 					lastMaintenanceDate: beacon.BEACON_MAINTAINED_AT?.slice(0, 10),
 					batteryHistory: history,
+					ticketHistory: beaconTickets.map(ticket => ({
+						id: ticket.TICKET_ID,
+						ticketId: `TKT-${String(ticket.TICKET_ID).padStart(4, '0')}`,
+						status: ticket.TICKET_CURRENT_STATUS?.toLowerCase() || 'faulty',
+						reason: ticket.TICKET_ISSUE || '',
+						note: ticketLogs.find(log => log.TICKET_ID === ticket.TICKET_ID)?.TICKET_LOG_NOTES || '',
+						timeline: ticketLogs.filter(log => log.TICKET_ID === ticket.TICKET_ID).map(log => ({
+							id: log.TICKET_LOG_ID,
+							date: new Date(log.TICKET_LOG_CHANGED_AT).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
+							action: log.TICKET_LOG_STATUS,
+							source: 'admin',
+							by: `Admin #${log.TICKET_LOG_CHANGED_BY}`,
+							note: log.TICKET_LOG_NOTES || null,
+						})),
+					})),
 					nodeConfig: [],
 					nodeConfigDisplay: '—',
 				}
@@ -468,6 +493,153 @@ async function registerMallManagementRoutes(app) {
 
 	app.post('/api/malls/:id/beacons', (request, reply) => saveBeacon(request, reply))
 	app.put('/api/malls/:id/beacons/:beaconId', (request, reply) => saveBeacon(request, reply, request.params.beaconId))
+
+	async function addTicketLog(ticketId, status, notes, adminId) {
+		const result = await app.supabase.from('beacon_ticket_log').insert({
+			ticket_id: ticketId,
+			ticket_log_status: status,
+			ticket_log_notes: notes || null,
+			ticket_log_changed_at: now(),
+			ticket_log_changed_by: adminId,
+		})
+		if (result.error) throw result.error
+	}
+
+	app.post('/api/malls/:id/beacons/:beaconId/fault-ticket', async (request, reply) => {
+		try {
+			await getBeaconForMall(request.params.id, request.params.beaconId)
+			const { issue, description, status = 'faulty' } = request.body || {}
+			if (!issue?.trim() || !description?.trim()) return reply.code(400).send({ message: 'Issue and description are required.' })
+			const ticketStatus = status === 'pending' ? 'pending' : 'faulty'
+			const created = await app.supabase.from('beacon_ticket').insert({
+				ticket_current_status: ticketStatus,
+				ticket_reported_at: now(),
+				ticket_reported_by: request.admin.id,
+				ticket_assigned_to: null,
+				beacon_id: request.params.beaconId,
+				ticket_issue: issue.trim(),
+			}).select('ticket_id').single()
+			if (created.error) throw created.error
+			await addTicketLog(created.data.ticket_id, ticketStatus === 'pending' ? 'Marked as pending' : 'Marked as faulty', description.trim(), request.admin.id)
+			if (ticketStatus === 'faulty') {
+				const updated = await app.supabase.from('beacon').update({ beacon_status: 'faulty' }).eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id)
+				if (updated.error) throw updated.error
+			}
+			return reply.code(201).send((await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(request.params.beaconId)))
+		} catch (error) {
+			request.log.error({ code: error.code }, 'Beacon ticket creation failed')
+			return reply.code(400).send({ message: 'Unable to create beacon ticket.' })
+		}
+	})
+
+	app.post('/api/malls/:id/beacons/:beaconId/reactivate', async (request, reply) => {
+		try {
+			await getBeaconForMall(request.params.id, request.params.beaconId)
+			const remarks = request.body?.remarks?.trim()
+			if (!remarks) return reply.code(400).send({ message: 'Reactivation remarks are required.' })
+			const active = await app.supabase.from('beacon_ticket').select('ticket_id, ticket_issue').eq('beacon_id', request.params.beaconId).neq('ticket_current_status', 'resolved').order('ticket_reported_at', { ascending: false }).limit(1).maybeSingle()
+			if (active.error) throw active.error
+			const updatedBeacon = await app.supabase.from('beacon').update({ beacon_status: 'placed' }).eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id)
+			if (updatedBeacon.error) throw updatedBeacon.error
+			if (active.data) {
+				const updatedTicket = await app.supabase.from('beacon_ticket').update({ ticket_current_status: 'resolved', ticket_assigned_to: request.admin.id }).eq('ticket_id', active.data.ticket_id)
+				if (updatedTicket.error) throw updatedTicket.error
+				await addTicketLog(active.data.ticket_id, 'Marked as resolved', `Beacon reactivated in Beacon Management. ${remarks}`, request.admin.id)
+			}
+			return reply.send((await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(request.params.beaconId)))
+		} catch (error) {
+			request.log.error({ code: error.code }, 'Beacon reactivation failed')
+			return reply.code(400).send({ message: 'Unable to reactivate beacon.' })
+		}
+	})
+
+	app.get('/api/beacon-tickets', async (request, reply) => {
+		try {
+			const ticketsResult = await app.supabase.from('beacon_ticket').select('*').order('ticket_reported_at', { ascending: false })
+			if (ticketsResult.error) throw ticketsResult.error
+			const tickets = upperKeys(ticketsResult.data || [])
+			const beaconIds = [...new Set(tickets.map(ticket => ticket.BEACON_ID))]
+			const [beaconsResult, adminsResult] = await Promise.all([
+				beaconIds.length ? app.supabase.from('beacon').select('beacon_id, beacon_code, beacon_location, mall_id, floor_id').in('beacon_id', beaconIds) : { data: [], error: null },
+				app.supabase.from('admin').select('admin_id, admin_full_name'),
+			])
+			if (beaconsResult.error || adminsResult.error) throw beaconsResult.error || adminsResult.error
+			const beacons = upperKeys(beaconsResult.data || [])
+			const admins = upperKeys(adminsResult.data || [])
+			const mallIds = [...new Set(beacons.map(beacon => beacon.MALL_ID))]
+			const floorIds = [...new Set(beacons.map(beacon => beacon.FLOOR_ID))]
+			const [mallsResult, floorsResult, logsResult] = await Promise.all([
+				mallIds.length ? app.supabase.from('mall').select('mall_id, mall_name').in('mall_id', mallIds) : { data: [], error: null },
+				floorIds.length ? app.supabase.from('floor').select('floor_id, floor_num, floor_label').in('floor_id', floorIds) : { data: [], error: null },
+				tickets.length ? app.supabase.from('beacon_ticket_log').select('*').in('ticket_id', tickets.map(ticket => ticket.TICKET_ID)).order('ticket_log_changed_at', { ascending: true }) : { data: [], error: null },
+			])
+			if (mallsResult.error || floorsResult.error || logsResult.error) throw mallsResult.error || floorsResult.error || logsResult.error
+			const malls = upperKeys(mallsResult.data || [])
+			const floors = upperKeys(floorsResult.data || [])
+			const logs = upperKeys(logsResult.data || [])
+			const adminName = id => admins.find(admin => String(admin.ADMIN_ID) === String(id))?.ADMIN_FULL_NAME || `Admin #${id}`
+			return tickets.map(ticket => {
+				const beacon = beacons.find(item => item.BEACON_ID === ticket.BEACON_ID) || {}
+				const floor = floors.find(item => item.FLOOR_ID === beacon.FLOOR_ID) || {}
+				const mall = malls.find(item => item.MALL_ID === beacon.MALL_ID) || {}
+				return {
+					id: ticket.TICKET_ID,
+					ticketId: `TKT-${String(ticket.TICKET_ID).padStart(4, '0')}`,
+					beaconCode: beacon.BEACON_CODE,
+					mall: mall.MALL_NAME,
+					floor: floor.FLOOR_LABEL || `Floor ${floor.FLOOR_NUM || ''}`,
+					location: beacon.BEACON_LOCATION,
+					status: ticket.TICKET_CURRENT_STATUS?.toLowerCase() || 'faulty',
+					reason: ticket.TICKET_ISSUE || '',
+					description: logs.find(log => log.TICKET_ID === ticket.TICKET_ID)?.TICKET_LOG_NOTES || '',
+					assignedTo: ticket.TICKET_ASSIGNED_TO ? adminName(ticket.TICKET_ASSIGNED_TO) : null,
+					timeAgo: new Date(ticket.TICKET_REPORTED_AT).toLocaleString(),
+					timeline: logs.filter(log => log.TICKET_ID === ticket.TICKET_ID).map(log => ({
+						id: log.TICKET_LOG_ID,
+						date: new Date(log.TICKET_LOG_CHANGED_AT).toLocaleString(),
+						action: log.TICKET_LOG_STATUS,
+						source: 'admin',
+						by: adminName(log.TICKET_LOG_CHANGED_BY),
+						note: log.TICKET_LOG_NOTES || null,
+					})),
+				}
+			})
+		} catch (error) {
+			request.log.error({ code: error.code }, 'Beacon ticket list failed')
+			return reply.code(500).send({ message: 'Unable to load beacon tickets.' })
+		}
+	})
+
+	app.post('/api/beacon-tickets/:ticketId/actions', async (request, reply) => {
+		try {
+			const { status, note, assignedTo } = request.body || {}
+			const allowed = ['faulty', 'investigating', 'maintenance', 'resolved']
+			if (!allowed.includes(status)) return reply.code(400).send({ message: 'Invalid ticket status.' })
+			const ticket = await app.supabase.from('beacon_ticket').select('ticket_id, beacon_id, ticket_current_status, ticket_issue').eq('ticket_id', request.params.ticketId).single()
+			if (ticket.error) throw ticket.error
+			if (status === 'investigating' && !assignedTo) return reply.code(400).send({ message: 'Please select who to assign.' })
+			let assignedAdminId = null
+			if (status === 'investigating') {
+				const assigned = await app.supabase.from('admin').select('admin_id').eq('admin_full_name', assignedTo).eq('admin_is_deactivated', false).maybeSingle()
+				if (assigned.error || !assigned.data) return reply.code(400).send({ message: 'Please select a valid assignee.' })
+				assignedAdminId = assigned.data.admin_id
+			}
+			const updates = { ticket_current_status: status }
+			if (status === 'investigating') updates.ticket_assigned_to = assignedAdminId
+			const updated = await app.supabase.from('beacon_ticket').update(updates).eq('ticket_id', request.params.ticketId)
+			if (updated.error) throw updated.error
+			const labels = { faulty: 'Marked as faulty', investigating: 'Marked as investigating', maintenance: 'Marked as under maintenance', resolved: 'Marked as resolved' }
+			await addTicketLog(request.params.ticketId, labels[status], note, request.admin.id)
+			if (status === 'faulty') {
+				const beacon = await app.supabase.from('beacon').update({ beacon_status: 'faulty' }).eq('beacon_id', ticket.data.beacon_id)
+				if (beacon.error) throw beacon.error
+			}
+			return reply.send({ message: 'Ticket updated.' })
+		} catch (error) {
+			request.log.error({ code: error.code }, 'Beacon ticket action failed')
+			return reply.code(400).send({ message: 'Unable to update beacon ticket.' })
+		}
+	})
 
 	async function getBeaconForMall(mallId, beaconId) {
 		const result = await app.supabase.from('beacon').select('beacon_id').eq('beacon_id', beaconId).eq('mall_id', mallId).single()

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, Upload, ImageIcon } from 'lucide-react'
 import FloorInfoModal from './FloorInfoModal'
 import OperatingHoursBuilder from './OperatingHoursBuilder'
+import BusyButton from '../ui/BusyButton'
 
 const MAX_LOGO_MB = 5
 const MALL_COVERAGE_OPTIONS = [
@@ -132,7 +133,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
         })
       : null
 
-    onSave({
+    return onSave({
       name: form.mallName.trim(),
       city: form.city.trim(),
       province: form.province.trim(),
@@ -338,7 +339,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
         {/* Footer */}
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="mall-modal-save-btn" onClick={handleSave}>Save</button>
+          <BusyButton className="mall-modal-save-btn" onClick={handleSave}>Save</BusyButton>
         </div>
       </div>
 
