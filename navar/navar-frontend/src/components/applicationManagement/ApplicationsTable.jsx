@@ -1,173 +1,6 @@
 import { useState, useEffect } from 'react'
 import FlowDiagrams from './FlowDiagrams'
-
-const INITIAL_APPLICATIONS = [
-  {
-    id: 1,
-    mallName: 'SM Seaside City Cebu',
-    city: 'Cebu City',
-    adminName: 'Jose Dela Cruz',
-    adminEmail: 'jdelacruz@smseaside.ph',
-    version: 1,
-    floors: 3,
-    address: 'SRP, South Road Properties, Cebu City',
-    cityProvince: 'Cebu City, Cebu',
-    storesCount: 4,
-    operatingHours: '10:00 AM – 9:00 PM',
-    logo: 'www.smsupermalls.com/logo',
-    agreement: 'Setup',
-    applicationStatus: 'Submitted',
-    arDevelopment: '-',
-    submittedDate: 'August 15, 2025',
-    lastUpdated: 'September 1, 2025',
-    floorPlans: [
-      { floor: 'Floor 1', filename: 'floor_1_plan.pdf', size: '4.2 MB' },
-      { floor: 'Floor 2', filename: 'floor_2_plan.pdf', size: '4.2 MB' },
-      { floor: 'Floor 3', filename: 'floor_3_plan.pdf', size: '3.5 MB' },
-    ],
-    scaleReference: {
-      referenceLine: 'Main corridor from Entrance A sliding doors to center fountain',
-      lengthInMeters: '25 m',
-      floor: 'Floor 1',
-    },
-    accessibilityRoutes: [
-      { floor: 'Floor 1', description: 'Ramp at Main Entrance North, accessible elevator bank near center atrium' },
-    ],
-    emergencyExits: [
-      { floor: 'Floor 1', description: 'Emergency Exit A', note: 'Near Starbucks, facing the SRP road' },
-    ],
-    entryPoints: [
-      { name: 'South Wing Entrance', note: 'Near the parking ramp', floor: 'Floor 1' },
-      { name: 'Parking Level 1', note: 'Elevator lobby entrance', floor: 'Floor 2' },
-    ],
-    thread: [],
-  },
-  {
-    id: 2,
-    mallName: 'Ayala Center Cebu',
-    city: 'Cebu City',
-    adminName: 'Maria Santos',
-    adminEmail: 'msantos@ayalacebu.ph',
-    version: 1,
-    floors: 3,
-    address: 'Cebu Business Park, Ayala Center, Cebu City',
-    cityProvince: 'Cebu City, Cebu',
-    storesCount: 6,
-    operatingHours: '10:00 AM – 9:00 PM',
-    logo: 'www.ayalamalls.com/logo',
-    agreement: 'Active',
-    applicationStatus: 'Approved',
-    arDevelopment: 'Live',
-    submittedDate: 'March 1, 2026',
-    lastUpdated: 'March 1, 2026',
-    floorPlans: [],
-    scaleReference: { referenceLine: '', lengthInMeters: '', floor: '' },
-    accessibilityRoutes: [],
-    emergencyExits: [],
-    entryPoints: [],
-    thread: [],
-  },
-  {
-    id: 3,
-    mallName: 'Pacific Mall Cebu',
-    city: 'Mandaue City',
-    adminName: 'Lea Tan',
-    adminEmail: 'ltan@pacificmall.ph',
-    version: 1,
-    floors: 2,
-    address: 'A.S. Fortuna St., Bakilid, Mandaue City',
-    cityProvince: 'Mandaue City, Cebu',
-    storesCount: 3,
-    operatingHours: '10:00 AM – 8:00 PM',
-    logo: 'www.pacificmall.ph/logo',
-    agreement: 'Setup',
-    applicationStatus: 'For Revision',
-    arDevelopment: '-',
-    submittedDate: 'March 1, 2026',
-    lastUpdated: 'March 1, 2026',
-    floorPlans: [],
-    scaleReference: { referenceLine: '', lengthInMeters: '', floor: '' },
-    accessibilityRoutes: [],
-    emergencyExits: [],
-    entryPoints: [],
-    thread: [],
-  },
-  {
-    id: 4,
-    mallName: 'Gaisano Grand Liloan',
-    city: 'Liloan, Cebu',
-    adminName: 'Anna Cruz',
-    adminEmail: 'acruz@gaisano.ph',
-    version: 1,
-    floors: 2,
-    address: 'National Highway, Liloan, Cebu',
-    cityProvince: 'Liloan, Cebu',
-    storesCount: 2,
-    operatingHours: '9:00 AM – 8:00 PM',
-    logo: 'www.gaisano.ph/logo',
-    agreement: 'Setup',
-    applicationStatus: 'Draft',
-    arDevelopment: '-',
-    submittedDate: '-',
-    lastUpdated: '-',
-    floorPlans: [],
-    scaleReference: { referenceLine: '', lengthInMeters: '', floor: '' },
-    accessibilityRoutes: [],
-    emergencyExits: [],
-    entryPoints: [],
-    thread: [],
-  },
-  {
-    id: 5,
-    mallName: 'SM City Cebu',
-    city: 'Cebu City',
-    adminName: 'Carlos Reyes',
-    adminEmail: 'creyes@smcebu.ph',
-    version: 1,
-    floors: 5,
-    address: 'Juan Luna Ave., Cebu City',
-    cityProvince: 'Cebu City, Cebu',
-    storesCount: 10,
-    operatingHours: '10:00 AM – 9:00 PM',
-    logo: 'www.smsupermalls.com/smcity/logo',
-    agreement: 'Active',
-    applicationStatus: 'Approved',
-    arDevelopment: 'Node Mapping',
-    submittedDate: 'January 10, 2026',
-    lastUpdated: 'January 15, 2026',
-    floorPlans: [],
-    scaleReference: { referenceLine: '', lengthInMeters: '', floor: '' },
-    accessibilityRoutes: [],
-    emergencyExits: [],
-    entryPoints: [],
-    thread: [],
-  },
-  ...Array.from({ length: 12 }, (_, i) => ({
-    id: 6 + i,
-    mallName: `Mall ${6 + i}`,
-    city: 'Cebu City',
-    adminName: `Admin ${6 + i}`,
-    adminEmail: `admin${6 + i}@mall.ph`,
-    version: 1,
-    floors: 2 + (i % 3),
-    address: `Address ${6 + i}`,
-    cityProvince: 'Cebu City, Cebu',
-    storesCount: 3 + (i % 4),
-    operatingHours: '10:00 AM – 9:00 PM',
-    logo: '-',
-    agreement: 'Active',
-    applicationStatus: 'Approved',
-    arDevelopment: ['Live', 'Testing', 'Ready', 'Node Mapping'][i % 4],
-    submittedDate: 'January 2026',
-    lastUpdated: 'January 2026',
-    floorPlans: [],
-    scaleReference: { referenceLine: '', lengthInMeters: '', floor: '' },
-    accessibilityRoutes: [],
-    emergencyExits: [],
-    entryPoints: [],
-    thread: [],
-  })),
-]
+import { apiRequest } from '../../config/api'
 
 function SearchIcon() {
   return (
@@ -182,14 +15,36 @@ const STATUS_FILTERS = ['All', 'Submitted', 'For Revision', 'Approved', 'Draft']
 
 // eslint-disable-next-line no-unused-vars
 export default function ApplicationsTable({ applications, onApplicationsChange, onReviewApp }) {
-  // eslint-disable-next-line no-unused-vars
-  const [apps, setApps] = useState(INITIAL_APPLICATIONS)
+  const [apps, setApps] = useState(applications || [])
+  const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    onApplicationsChange(apps)
-  }, [apps, onApplicationsChange])
+    let cancelled = false
+    async function loadApplications() {
+      try {
+        const data = await apiRequest('/api/applications')
+        if (!cancelled) {
+          setApps(data)
+          onApplicationsChange(data)
+          setLoadError('')
+        }
+      } catch (error) {
+        console.error('Application Management request failed:', error)
+        if (!cancelled) setLoadError(error.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    loadApplications()
+    return () => { cancelled = true }
+  }, [onApplicationsChange])
+
+  useEffect(() => {
+    if (applications) setApps(applications)
+  }, [applications])
 
   function getFilterCount(filter) {
     if (filter === 'All') return apps.length
@@ -222,6 +77,11 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
 
   return (
     <>
+      {loadError && (
+        <div className="app-mgmt-callout app-mgmt-callout--error" role="alert">
+          {loadError}
+        </div>
+      )}
       {/* Pending count message */}
       {pendingCount > 0 && (
         <div style={{ marginBottom: '16px' }}>
@@ -281,11 +141,17 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
               </tr>
             </thead>
             <tbody>
-              {sorted.map(app => (
+              {loading ? (
+                <tr>
+                  <td colSpan={11} className="app-mgmt-table-empty app-mgmt-table-loading">
+                    <span className="table-loading"><span className="table-loading-spinner" />Loading applications...</span>
+                  </td>
+                </tr>
+              ) : sorted.map(app => (
                 <tr
                   key={app.id}
                   className={app.applicationStatus === 'Approved' ? 'row--approved' : ''}
-                  onClick={() => onReviewApp(app)}
+                  onClick={() => !app.draft && onReviewApp(app)}
                 >
                   <td>
                     <div className="app-mgmt-mall-name">{app.mallName}</div>
@@ -313,14 +179,15 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
                   <td>
                     <button
                       className="app-mgmt-review-btn"
-                      onClick={e => { e.stopPropagation(); onReviewApp(app) }}
+                      disabled={app.draft}
+                      onClick={e => { e.stopPropagation(); if (!app.draft) onReviewApp(app) }}
                     >
-                      Review
+                      {app.draft ? 'Not submitted' : 'Review'}
                     </button>
                   </td>
                 </tr>
               ))}
-              {sorted.length === 0 && (
+              {!loading && sorted.length === 0 && (
                 <tr>
                   <td colSpan={11} style={{ textAlign: 'center', color: '#9B9C9C', padding: '32px', fontFamily: 'Poppins' }}>
                     No applications found.

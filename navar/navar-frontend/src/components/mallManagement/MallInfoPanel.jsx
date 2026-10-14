@@ -95,6 +95,8 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
           <InfoRow label="Address" value={mall.address} />
           <InfoRow label="City, Province" value={cityProvince || '—'} />
           <InfoRow label="Zip Code" value={mall.zipCode} />
+          <InfoRow label="Latitude" value={mall.latitude ?? '—'} />
+          <InfoRow label="Longitude" value={mall.longitude ?? '—'} />
           <InfoRow label="Floors" value={mall.floors} />
           <InfoRow label="Coverage Area (GFA)" value={coverageArea} />
           <InfoRow label="Stores" value={mall.storesCount} />

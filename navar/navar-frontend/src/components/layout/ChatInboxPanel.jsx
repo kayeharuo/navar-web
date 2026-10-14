@@ -1,70 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, X } from 'lucide-react'
-
-const THREADS = [
-  {
-    id: 'application-1',
-    module: 'Application Management',
-    moduleKey: 'application',
-    mallName: 'SM Seaside City Cebu',
-    counterpart: 'Jose Dela Cruz',
-    preview: 'Initial AR development application is awaiting review.',
-    time: 'Sep 1, 2025',
-    unread: true,
-    path: '/application-management?applicationId=1&type=new&view=thread',
-  },
-  {
-    id: 'stall-101',
-    module: 'Application Management',
-    moduleKey: 'stall',
-    mallName: 'Ayala Center Cebu',
-    counterpart: 'Maria Santos',
-    preview: 'Stall application and store-list verification are ready for review.',
-    time: 'Apr 1, 2026',
-    unread: true,
-    path: '/application-management?applicationId=101&type=stall&view=thread',
-  },
-  {
-    id: 'ar-1',
-    module: 'AR Development',
-    moduleKey: 'ar',
-    mallName: 'SM Seaside City Cebu',
-    counterpart: 'Jose Dela Cruz',
-    preview: 'Confirmation request sent with the map summary.',
-    time: 'Sep 20, 2025',
-    unread: true,
-    path: '/ar-development?projectId=1',
-  },
-  {
-    id: 'ar-4',
-    module: 'AR Development',
-    moduleKey: 'ar',
-    mallName: 'Gaisano Grand Minglanilla',
-    counterpart: 'Lily Cruz',
-    preview: 'Map preview reviewed and approved for activation.',
-    time: 'Dec 10, 2025',
-    unread: false,
-    path: '/ar-development?projectId=4',
-  },
-]
-
-const MODULE_LABELS = {
-  application: 'APP',
-  stall: 'STALL',
-  ar: 'AR DEV',
-}
+import { apiRequest } from '../../config/api'
 
 export default function ChatInboxPanel({ onClose, onOpenThread }) {
   const [activeFilter, setActiveFilter] = useState('All')
+  const [threads, setThreads] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const panelRef = useRef(null)
 
   useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
+    let mounted = true
+    apiRequest('/api/conversations')
+      .then(result => {
+        if (mounted) setThreads(result)
+      })
+      .catch(requestError => {
+        if (mounted) setError(requestError.message)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    function handleEsc(event) {
+      if (event.key === 'Escape') onClose()
     }
-    function handleOutsideClick(e) {
-      if (e.target.closest('.chat-inbox-trigger')) return
-      if (panelRef.current && !panelRef.current.contains(e.target)) onClose()
+    function handleOutsideClick(event) {
+      if (event.target.closest('.chat-inbox-trigger')) return
+      if (panelRef.current && !panelRef.current.contains(event.target)) onClose()
     }
     document.addEventListener('keydown', handleEsc)
     document.addEventListener('mousedown', handleOutsideClick)
@@ -74,10 +40,10 @@ export default function ChatInboxPanel({ onClose, onOpenThread }) {
     }
   }, [onClose])
 
-  const filteredThreads = THREADS.filter(thread => {
+  const filteredThreads = threads.filter(thread => {
     if (activeFilter === 'Unread') return thread.unread
-    if (activeFilter === 'Application Management') return thread.module === activeFilter
-    if (activeFilter === 'AR Development') return thread.module === activeFilter
+    if (activeFilter === 'Applications') return thread.moduleKey === 'application' || thread.moduleKey === 'stall'
+    if (activeFilter === 'AR Development') return thread.moduleKey === 'ar'
     return true
   })
 
@@ -94,19 +60,21 @@ export default function ChatInboxPanel({ onClose, onOpenThread }) {
       </div>
 
       <div className="chat-inbox-filters">
-        {['All', 'Unread', 'Application Management', 'AR Development'].map(filter => (
+        {['All', 'Unread', 'Applications', 'AR Development'].map(filter => (
           <button
             key={filter}
             className={`chat-inbox-filter${activeFilter === filter ? ' chat-inbox-filter--active' : ''}`}
             onClick={() => setActiveFilter(filter)}
           >
-            {filter === 'Application Management' ? 'Applications' : filter}
+            {filter}
           </button>
         ))}
       </div>
 
       <div className="chat-inbox-list">
-        {filteredThreads.map(thread => (
+        {loading && <p className="chat-inbox-empty">Loading conversations...</p>}
+        {!loading && error && <p className="chat-inbox-empty">{error}</p>}
+        {!loading && !error && filteredThreads.map(thread => (
           <button
             key={thread.id}
             className={`chat-inbox-thread${thread.unread ? ' chat-inbox-thread--unread' : ''}`}
@@ -118,18 +86,17 @@ export default function ChatInboxPanel({ onClose, onOpenThread }) {
             <span className="chat-inbox-thread-body">
               <span className="chat-inbox-thread-topline">
                 <strong>{thread.mallName}</strong>
-                <span>{thread.time}</span>
+                <span>{new Date(thread.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </span>
               <span className="chat-inbox-thread-meta">
-                <span className={`chat-inbox-module chat-inbox-module--${thread.moduleKey}`}>{MODULE_LABELS[thread.moduleKey]}</span>
-                <span>with {thread.counterpart}</span>
+                <span className={`chat-inbox-module chat-inbox-module--${thread.moduleKey}`}>{thread.moduleLabel}</span>
               </span>
               <span className="chat-inbox-preview">{thread.preview}</span>
             </span>
             {thread.unread && <span className="chat-inbox-unread-dot" />}
           </button>
         ))}
-        {filteredThreads.length === 0 && <p className="chat-inbox-empty">No conversations in this view.</p>}
+        {!loading && !error && filteredThreads.length === 0 && <p className="chat-inbox-empty">No conversations in this view.</p>}
       </div>
 
       <div className="chat-inbox-footer">Select a conversation to open its module entry.</div>

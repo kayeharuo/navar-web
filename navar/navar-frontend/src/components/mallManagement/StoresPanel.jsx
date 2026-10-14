@@ -346,15 +346,8 @@ export default function StoresPanel({ mall, onClose, onSave }) {
                     className={`stores-table-row${!store.active ? ' stores-table-row--inactive' : ''}`}
                   >
                     <td className="stores-td-name">{store.storeName}</td>
-                    <td>
-                      <span style={{
-                        fontSize: '12px',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        background: store.storeType === 'stall' ? '#E8F3FF' : '#F0F0F0',
-                        color: store.storeType === 'stall' ? '#0066CC' : '#666',
-                        fontWeight: '500'
-                      }}>
+                    <td className="stores-td-type">
+                      <span className={`stores-type-badge stores-type-badge--${store.storeType === 'stall' ? 'stall' : 'store'}`}>
                         {store.storeType === 'stall' ? 'Stall' : 'Store'}
                       </span>
                     </td>
@@ -365,13 +358,13 @@ export default function StoresPanel({ mall, onClose, onSave }) {
                     <td>{store.contactPerson || '—'}</td>
                     <td>{store.contactNo || '—'}</td>
                     <td>{store.email || '—'}</td>
-                    <td>
+                    <td className="stores-td-status">
                       <span className={`stores-status-badge stores-status-badge--${store.status}`}>
                         {store.status === 'mapped' ? 'Mapped' : 'Unmapped'}
                       </span>
                     </td>
                     <td className="stores-td-desc">{store.description || '—'}</td>
-                    <td>
+                    <td className="stores-td-action">
                       <div className="stores-action-row">
                         {store.active ? (
                           <>

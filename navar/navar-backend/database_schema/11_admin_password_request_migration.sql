@@ -4,20 +4,20 @@
 BEGIN;
 
 CREATE TABLE public.admin_password_request (
-    request_fingerprint CHAR(64) PRIMARY KEY,
-    auth_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    request_kind VARCHAR(10) NOT NULL CHECK (request_kind IN ('invite', 'reset')),
-    issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at TIMESTAMPTZ NOT NULL,
-    claimed_at TIMESTAMPTZ,
-    superseded_at TIMESTAMPTZ
+    apr_request_fingerprint CHAR(64) PRIMARY KEY,
+    apr_auth_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    apr_request_kind VARCHAR(10) NOT NULL CHECK (apr_request_kind IN ('invite', 'reset')),
+    apr_issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    apr_expires_at TIMESTAMPTZ NOT NULL,
+    apr_claimed_at TIMESTAMPTZ,
+    apr_superseded_at TIMESTAMPTZ
 );
 
 ALTER TABLE public.admin_password_request ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX ix_admin_password_request_user_active
-    ON public.admin_password_request (auth_user_id, issued_at DESC)
-    WHERE claimed_at IS NULL AND superseded_at IS NULL;
+    ON public.admin_password_request (apr_auth_user_id, apr_issued_at DESC)
+    WHERE apr_claimed_at IS NULL AND apr_superseded_at IS NULL;
 
 CREATE OR REPLACE FUNCTION public.issue_admin_password_request(
     p_auth_user_id UUID,
@@ -32,16 +32,16 @@ SET search_path = public
 AS $$
 BEGIN
     UPDATE public.admin_password_request
-    SET superseded_at = now()
-    WHERE auth_user_id = p_auth_user_id
-      AND claimed_at IS NULL
-      AND superseded_at IS NULL;
+        SET apr_superseded_at = now()
+        WHERE apr_auth_user_id = p_auth_user_id
+            AND apr_claimed_at IS NULL
+            AND apr_superseded_at IS NULL;
 
     INSERT INTO public.admin_password_request (
-        request_fingerprint,
-        auth_user_id,
-        request_kind,
-        expires_at
+        apr_request_fingerprint,
+        apr_auth_user_id,
+        apr_request_kind,
+        apr_expires_at
     ) VALUES (
         p_request_fingerprint,
         p_auth_user_id,
@@ -64,13 +64,13 @@ DECLARE
     claimed_kind VARCHAR(10);
 BEGIN
     UPDATE public.admin_password_request
-    SET claimed_at = now()
-    WHERE request_fingerprint = p_request_fingerprint
-      AND auth_user_id = p_auth_user_id
-      AND claimed_at IS NULL
-      AND superseded_at IS NULL
-      AND expires_at > now()
-    RETURNING request_kind INTO claimed_kind;
+        SET apr_claimed_at = now()
+        WHERE apr_request_fingerprint = p_request_fingerprint
+            AND apr_auth_user_id = p_auth_user_id
+            AND apr_claimed_at IS NULL
+            AND apr_superseded_at IS NULL
+            AND apr_expires_at > now()
+        RETURNING apr_request_kind INTO claimed_kind;
 
     RETURN claimed_kind;
 END;
@@ -88,11 +88,11 @@ AS $$
     SELECT EXISTS (
         SELECT 1
         FROM public.admin_password_request
-        WHERE auth_user_id = p_auth_user_id
-          AND request_fingerprint = p_request_fingerprint
-          AND claimed_at IS NULL
-          AND superseded_at IS NULL
-          AND expires_at > now()
+                WHERE apr_auth_user_id = p_auth_user_id
+                    AND apr_request_fingerprint = p_request_fingerprint
+                    AND apr_claimed_at IS NULL
+                    AND apr_superseded_at IS NULL
+                    AND apr_expires_at > now()
     );
 $$;
 

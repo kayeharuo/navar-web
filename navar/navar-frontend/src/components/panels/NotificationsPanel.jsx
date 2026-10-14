@@ -1,40 +1,49 @@
 import { useEffect, useState } from 'react'
-import { Building2 } from 'lucide-react'
+import { Archive, Bell, Building2, ExternalLink, X } from 'lucide-react'
 
-export const INITIAL_NOTIFICATIONS = [
-  { id: 1, mallName: 'Parkmall Cebu', text: 'submitted proof of payment. Please verify and confirm in Subscription Management.', time: '2 minutes ago', group: 'today', read: false },
-  { id: 2, mallName: 'SM City Consolacion Cebu', text: 'resubmitted their application after revision. Ready for your review.', time: '1 hour ago', group: 'today', read: false },
-  { id: 3, mallName: 'Robinsons Galleria Cebu', text: 'subscription expires in 7 days. Consider following up on payment.', time: '3 hours ago', group: 'today', read: false },
-  { id: 4, mallName: 'Gaisano Grand Mall', text: 'confirmed their AR map. You may now set the map to Live.', time: 'Yesterday, 2:14 PM', group: 'yesterday', read: true },
-  { id: 5, mallName: 'SM Seaside City Cebu', text: 'AR map was published and is now live. Subscription period has started.', time: 'Yesterday, 9:00 AM', group: 'yesterday', read: true },
-  { id: 6, mallName: 'Ayala Center Cebu', text: 'submitted their Annual Renewal request. Please review when available.', time: 'Mar 10, 10:22 AM', group: 'earlier', read: true },
-]
+function relativeTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+  if (seconds < 60) return 'Just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
+  return date.toLocaleString()
+}
 
-function NotifCard({ notif, onMark }) {
+function NotifCard({ notif, onArchive, onOpen }) {
   return (
     <div
       className={`notif-card${!notif.read ? ' notif-card--unread' : ''}`}
-      onClick={() => onMark(notif.id)}
+      onClick={() => onOpen(notif)}
     >
       <div className="notif-card-icon">
-        <Building2 size={20} strokeWidth={1.5} />
+        {notif.sourceType === 'beacon_ticket' || notif.sourceType === 'beacon'
+          ? <Bell size={20} strokeWidth={1.5} />
+          : <Building2 size={20} strokeWidth={1.5} />}
       </div>
       <div className="notif-card-content">
         <p className="notif-card-text">
-          <strong>{notif.mallName}</strong> {notif.text}
+          <strong>{notif.title}</strong> {notif.message}
         </p>
-        <p className="notif-card-time">{notif.time}</p>
+        <p className="notif-card-time">{relativeTime(notif.createdAt)}</p>
       </div>
       <div className="notif-card-right">
-        {notif.read
-          ? <span className="notif-card-read-dot" />
-          : <span className="notif-card-dot" />}
+        {!notif.read && <span className="notif-card-dot" />}
+        {notif.actionUrl && (
+          <button type="button" title={notif.actionLabel || 'Open'} onClick={event => { event.stopPropagation(); onOpen(notif) }}>
+            <ExternalLink size={15} />
+          </button>
+        )}
+        <button type="button" title="Archive" onClick={event => { event.stopPropagation(); onArchive(notif.id) }}>
+          <Archive size={15} />
+        </button>
       </div>
     </div>
   )
 }
 
-export default function NotificationsPanel({ notifications, onClose, onUpdate }) {
+export default function NotificationsPanel({ notifications, archivedNotifications, onClose, onMarkRead, onMarkAllRead, onArchive, onOpenNotification }) {
   const [tab, setTab] = useState('all')
 
   useEffect(() => {
@@ -47,21 +56,18 @@ export default function NotificationsPanel({ notifications, onClose, onUpdate })
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  function markAll() {
-    onUpdate(notifications.map(n => ({ ...n, read: true })))
-  }
-
-  function markOne(id) {
-    onUpdate(notifications.map(n => n.id === id ? { ...n, read: true } : n))
-  }
-
-  const displayed = tab === 'unread' ? notifications.filter(n => !n.read) : notifications
-
-  const groups = [
-    { key: 'today',     label: 'Today' },
-    { key: 'yesterday', label: 'Yesterday' },
-    { key: 'earlier',   label: 'Earlier' },
-  ]
+  const displayed = tab === 'archived'
+    ? archivedNotifications
+    : tab === 'unread'
+      ? notifications.filter(n => !n.read)
+      : notifications
+  const groups = displayed.reduce((result, notification) => {
+    const key = new Date(notification.createdAt).toDateString()
+    const existing = result.find(group => group.key === key)
+    if (existing) existing.items.push(notification)
+    else result.push({ key, label: key === new Date().toDateString() ? 'Today' : 'Earlier', items: [notification] })
+    return result
+  }, [])
 
   return (
     <>
@@ -72,7 +78,7 @@ export default function NotificationsPanel({ notifications, onClose, onUpdate })
           <div className="panel-header-info">
             <h2 className="panel-title">Notifications</h2>
           </div>
-          <button className="panel-close" onClick={onClose}>X</button>
+          <button className="panel-close" onClick={onClose} aria-label="Close notifications"><X size={18} /></button>
         </div>
 
         {/* Tabs */}
@@ -89,8 +95,14 @@ export default function NotificationsPanel({ notifications, onClose, onUpdate })
           >
             Unread ({unreadCount})
           </button>
+          <button
+            className={`notif-panel-tab${tab === 'archived' ? ' notif-panel-tab--active' : ''}`}
+            onClick={() => setTab('archived')}
+          >
+            Archived ({archivedNotifications.length})
+          </button>
           {unreadCount > 0 && (
-            <button className="notif-mark-all" onClick={markAll}>
+            <button className="notif-mark-all" onClick={onMarkAllRead}>
               Mark all as read
             </button>
           )}
@@ -100,15 +112,13 @@ export default function NotificationsPanel({ notifications, onClose, onUpdate })
 
         {/* Notification list */}
         <div className="notif-panel-body">
-          {groups.map(({ key, label }) => {
-            const items = displayed.filter(n => n.group === key)
-            if (items.length === 0) return null
+          {groups.map(({ key, label, items }) => {
             return (
               <div key={key} className="notif-panel-group">
                 <p className="notif-group-label">{label}</p>
                 <div className="notif-card-group">
                   {items.map(n => (
-                    <NotifCard key={n.id} notif={n} onMark={markOne} />
+                  <NotifCard key={n.id} notif={n} onArchive={onArchive} onOpen={onOpenNotification} />
                   ))}
                 </div>
               </div>
@@ -116,7 +126,7 @@ export default function NotificationsPanel({ notifications, onClose, onUpdate })
           })}
           {displayed.length === 0 && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#9CA3AF', fontFamily: 'Poppins' }}>
-              No {tab === 'unread' ? 'unread' : ''} notifications.
+              No {tab === 'unread' ? 'unread' : tab === 'archived' ? 'archived' : ''} notifications.
             </div>
           )}
         </div>

@@ -22,10 +22,14 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose])
 
-  function handleRevisionSubmit(notes) {
-    setShowRevisionModal(false)
-    onRequestRevision(app.id, notes)
-    setActiveTab('thread')
+  async function handleRevisionSubmit(notes) {
+    try {
+      await onRequestRevision(app.id, notes)
+      setShowRevisionModal(false)
+      setActiveTab('thread')
+    } catch (error) {
+      console.error('Revision request failed:', error)
+    }
   }
 
   function handleApproveConfirm() {
@@ -116,18 +120,20 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
           <div className="review-panel-body">
             {activeTab === 'submission'
               ? <SubmissionTab app={app} isStallApplication={isStallApplication} />
-              : <ThreadTab app={app} onSendNote={(note) => onSendNote(app.id, note)} />
+              : <ThreadTab app={app} onSendNote={(note, attachments) => onSendNote(app.id, note, attachments)} />
             }
           </div>
 
-          {!isApproved && !isStallApplication && (
+          {!isStallApplication && (
             <div className="review-panel-footer">
               <button className="review-footer-btn review-footer-btn--revision" onClick={() => setShowRevisionModal(true)}>
                 Request Revision
               </button>
-              <button className="review-footer-btn review-footer-btn--approve" onClick={() => setShowApproveModal(true)}>
-                Approve Application
-              </button>
+              {!isApproved && (
+                <button className="review-footer-btn review-footer-btn--approve" onClick={() => setShowApproveModal(true)}>
+                  Approve Application
+                </button>
+              )}
             </div>
           )}
 

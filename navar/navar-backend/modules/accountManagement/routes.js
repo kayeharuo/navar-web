@@ -2,8 +2,10 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const crypto = require('crypto')
+const nodemailer = require('nodemailer')
+const { uploadImage, signedImageUrl } = require('../storage/imageStorage')
 
-const accountFields = 'admin_id, admin_role, admin_email, admin_full_name, admin_contact_num, admin_job_title, admin_is_primary, admin_account_status, admin_is_deactivated, admin_deactivated_on, admin_last_login, admin_created_at, admin_updated_at, admin_profile_picture'
+const accountFields = 'admin_id, admin_role, admin_email, admin_full_name, admin_contact_num, admin_job_title, admin_is_primary, admin_account_status, admin_is_deactivated, admin_deactivated_on, admin_last_login, admin_created_at, admin_updated_at, admin_profile_picture, admin_profile_picture_path'
 const genericFailure = 'Something went wrong.'
 const profilePicturePattern = '^data:image\\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$'
 const passwordLinkBody = {
@@ -35,6 +37,47 @@ function createPublishableClient() {
 	if (!key) throw new Error('SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) must be set in .env')
 	return createClient(process.env.SUPABASE_URL, key, {
 		auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+	})
+}
+
+async function sendInviteEmail(email, actionLink) {
+	const user = process.env.SMTP_USER
+	const pass = process.env.SMTP_PASS
+	if (!user || !pass) throw new Error('SMTP_USER and SMTP_PASS are required to resend invites.')
+	const transporter = nodemailer.createTransport({
+		host: process.env.SMTP_HOST || 'smtp.gmail.com',
+		port: Number(process.env.SMTP_PORT || 465),
+		secure: (process.env.SMTP_SECURE || 'true') === 'true',
+		auth: { user, pass },
+	})
+	await transporter.sendMail({
+		from: `${process.env.SMTP_FROM_NAME || 'NavAR'} <${process.env.SMTP_FROM || user}>`,
+		to: email,
+		subject: "You've been invited to NavAR",
+		text: `You've been invited to NavAR. Set your password using this link: ${actionLink}`,
+		html: `<!DOCTYPE html>
+<html lang="en">
+	<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>You've been invited to NavAR</title></head>
+	<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+		<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;"><tr><td align="center">
+			<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+				<tr><td align="center" style="background-color:#cfe8ff;padding:32px 24px;">
+					<img src="https://kblobarjzrloqjikpbun.supabase.co/storage/v1/object/public/branding/navar-icon-png.png" width="44" height="44" alt="NavAR" style="display:block;margin:0 auto 12px auto;" />
+					<img src="https://kblobarjzrloqjikpbun.supabase.co/storage/v1/object/public/branding/navar-wordmark-png.png" width="140" alt="NavAR" style="display:block;margin:0 auto;height:auto;" />
+				</td></tr>
+				<tr><td style="padding:32px 32px 8px 32px;">
+					<p style="margin:0 0 16px 0;font-size:20px;line-height:28px;color:#0f172a;font-weight:bold;">You've been invited to NavAR</p>
+					<p style="margin:0 0 24px 0;font-size:15px;line-height:24px;color:#374151;">An administrator has created an account for you on NavAR. To get started, click the button below to set your password. This link can only be used once.</p>
+				</td></tr>
+				<tr><td align="center" style="padding:0 32px 32px 32px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" style="border-radius:8px;background-color:#0f172a;"><a href="${actionLink}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">Set your password</a></td></tr></table></td></tr>
+				<tr><td style="padding:0 32px 32px 32px;"><p style="margin:0 0 8px 0;font-size:13px;line-height:20px;color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p><p style="margin:0;font-size:13px;line-height:20px;word-break:break-all;"><a href="${actionLink}" style="color:#2563eb;">${actionLink}</a></p></td></tr>
+				<tr><td style="padding:0 32px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
+				<tr><td style="padding:24px 32px 32px 32px;"><p style="margin:0;font-size:12px;line-height:18px;color:#9ca3af;">If you weren't expecting this invitation, you can safely ignore this email. Your account will not be activated unless this link is used.</p></td></tr>
+			</table>
+			<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;"><tr><td align="center" style="padding:20px 8px;"><p style="margin:0;font-size:12px;color:#9ca3af;">NavAR &middot; Indoor navigation, augmented</p></td></tr></table>
+		</td></tr></table>
+	</body>
+</html>`,
 	})
 }
 
@@ -111,7 +154,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 			request.log.error({ code: existing.error.code }, 'Admin account lookup failed')
 			return reply.code(500).send({ message: genericFailure })
 		}
-		if (existing.data) return reply.code(400).send({ message: 'This account cannot be created.' })
+		if (existing.data) return reply.code(409).send({ message: 'An account with this email already exists.' })
 
 		const requestId = crypto.randomUUID()
 		const invited = await supabase.auth.admin.inviteUserByEmail(email, {
@@ -179,14 +222,32 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		const target = await supabase.from('admin').select('admin_auth_user_id, admin_email').eq('admin_id', request.params.id).eq('admin_role', 'super_admin').eq('admin_account_status', 'partial').maybeSingle()
 		if (target.error || !target.data) return reply.code(404).send({ message: genericFailure })
 		const requestId = crypto.randomUUID()
-		const result = await supabase.auth.admin.inviteUserByEmail(target.data.admin_email, { redirectTo: passwordLinkRedirect('/auth/set-password', requestId) })
-		if (result.error) {
-			request.log.error({ code: result.error.code }, 'Invite resend failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
 		const requestRecord = await issuePasswordRequest(supabase, target.data.admin_auth_user_id, 'invite', requestId)
 		if (requestRecord.error) {
 			request.log.error({ code: requestRecord.error.code }, 'Invite resend request record failed')
+			return reply.code(400).send({ message: genericFailure })
+		}
+		let generated = await supabase.auth.admin.generateLink({
+			type: 'invite',
+			email: target.data.admin_email,
+			options: { redirectTo: passwordLinkRedirect('/auth/set-password', requestId) },
+		})
+		if (generated.error) {
+			request.log.warn({ code: generated.error.code }, 'Invite link rejected; generating setup link for existing Auth user')
+			generated = await supabase.auth.admin.generateLink({
+				type: 'recovery',
+				email: target.data.admin_email,
+				options: { redirectTo: passwordLinkRedirect('/auth/reset-password', requestId) },
+			})
+		}
+		if (generated.error || !generated.data?.properties?.action_link) {
+			request.log.error({ code: generated.error?.code }, 'Setup link generation failed')
+			return reply.code(400).send({ message: genericFailure })
+		}
+		try {
+			await sendInviteEmail(target.data.admin_email, generated.data.properties.action_link)
+		} catch (error) {
+			request.log.error({ message: error.message }, 'Invite resend email failed')
 			return reply.code(400).send({ message: genericFailure })
 		}
 		return { message: 'Invitation sent' }
@@ -228,9 +289,9 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 	})
 
 	app.post('/api/auth/password-link/complete', { preHandler: requireAuth({ allowPartial: true }), schema: { body: passwordLinkBody } }, async (request, reply) => {
-		const requestRecord = await supabase.from('admin_password_request').select('request_kind').eq('request_fingerprint', requestFingerprint(request.body.request_id)).eq('auth_user_id', request.admin.authUserId).not('claimed_at', 'is', null).maybeSingle()
+		const requestRecord = await supabase.from('admin_password_request').select('apr_request_kind').eq('apr_request_fingerprint', requestFingerprint(request.body.request_id)).eq('apr_auth_user_id', request.admin.authUserId).not('apr_claimed_at', 'is', null).maybeSingle()
 		if (requestRecord.error || !requestRecord.data) return reply.code(400).send({ message: genericFailure })
-		if (requestRecord.data.request_kind === 'invite' && request.admin.status === 'partial') {
+		if (requestRecord.data.apr_request_kind === 'invite' && request.admin.status === 'partial') {
 			if (!request.admin.usedPassword) return reply.code(400).send({ message: genericFailure })
 			const completed = await supabase.from('admin').update({ admin_account_status: 'official', admin_last_login: new Date().toISOString(), admin_updated_at: new Date().toISOString() }).eq('admin_id', request.admin.id).eq('admin_account_status', 'partial').select('admin_id').maybeSingle()
 			if (completed.error || !completed.data) return reply.code(400).send({ message: genericFailure })
@@ -321,13 +382,28 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		if (request.body.name !== undefined) updates.admin_full_name = request.body.name.trim()
 		if (request.body.job_title !== undefined) updates.admin_job_title = request.body.job_title.trim() || null
 		if (request.body.contact_num !== undefined) updates.admin_contact_num = request.body.contact_num.trim() || null
-		if (request.body.profile_picture !== undefined) updates.admin_profile_picture = request.body.profile_picture
+		if (request.body.profile_picture !== undefined) {
+			if (request.body.profile_picture === null) updates.admin_profile_picture_path = null
+			else {
+				const picturePath = `admins/${request.admin.id}/profile`
+				try {
+					await uploadImage(supabase, picturePath, request.body.profile_picture)
+					updates.admin_profile_picture_path = picturePath
+					updates.admin_profile_picture = null
+				} catch (storageError) {
+					request.log.error({ message: storageError.message }, 'Profile picture storage upload failed')
+					return reply.code(400).send({ message: genericFailure })
+				}
+			}
+		}
 		const result = await supabase.from('admin').update(updates).eq('admin_id', request.admin.id).select(accountFields).single()
 		if (result.error) {
 			request.log.error({ code: result.error.code }, 'Profile update failed')
 			return reply.code(400).send({ message: genericFailure })
 		}
-		return accountResponse(result.data)
+		const response = accountResponse(result.data)
+		if (result.data.admin_profile_picture_path) response.profilePicture = await signedImageUrl(supabase, result.data.admin_profile_picture_path)
+		return response
 	})
 }
 

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Pencil, Upload, ImageIcon } from 'lucide-react'
+import { X, Pencil, Upload, ImageIcon, AlertTriangle } from 'lucide-react'
 import FloorInfoModal from './FloorInfoModal'
 import OperatingHoursBuilder from './OperatingHoursBuilder'
 import BusyButton from '../ui/BusyButton'
+import MallLocationPicker from './MallLocationPicker'
 
 const MAX_LOGO_MB = 5
 const MALL_COVERAGE_OPTIONS = [
@@ -31,6 +32,8 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     description: initialData?.description || '',
     majorBeacons: initialData?.majorBeacons != null ? String(initialData.majorBeacons) : '1',
     floors: initialData?.floors != null ? String(initialData.floors) : '',
+    latitude: initialData?.latitude ?? null,
+    longitude: initialData?.longitude ?? null,
   })
 
   const [logo, setLogo] = useState(null)
@@ -39,6 +42,9 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
 
   const [floorDetails, setFloorDetails] = useState(initialData?.floorDetails || [])
   const [floorsSaved, setFloorsSaved] = useState(isEdit && (initialData?.floors ?? 0) > 0)
+  const [showValidationWarning, setShowValidationWarning] = useState(false)
+  const [shakingFields, setShakingFields] = useState([])
+  const fieldRefs = useRef({})
   const [showFloorModal, setShowFloorModal] = useState(false)
 
   const [operatingHours, setOperatingHours] = useState(initialData?.operatingHours || [])
@@ -103,6 +109,26 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     setShowFloorModal(false)
   }
 
+  function handleLocationConfirm(location) {
+    setForm(current => ({
+      ...current,
+      address: location.address,
+      city: location.city || current.city,
+      province: location.province || current.province,
+      zipCode: location.zipCode || current.zipCode,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }))
+    setErrors(current => ({
+      ...current,
+      location: undefined,
+      address: location.address ? undefined : current.address,
+      city: location.city ? undefined : current.city,
+      province: location.province ? undefined : current.province,
+      zipCode: location.zipCode ? undefined : current.zipCode,
+    }))
+  }
+
   function validate() {
     const errs = {}
     if (!form.mallName.trim()) errs.mallName = 'Mall name is required.'
@@ -110,19 +136,35 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     if (!form.province.trim()) errs.province = 'State/Province is required.'
     if (!form.zipCode.trim()) errs.zipCode = 'Zip code is required.'
     if (!form.address.trim()) errs.address = 'Address is required.'
+    if (form.latitude == null || form.longitude == null) errs.location = 'Confirm the mall location on the map.'
     if (!form.majorBeacons || Number(form.majorBeacons) < 1) errs.majorBeacons = 'Beacon major must be at least 1.'
     if (!form.floors || parseInt(form.floors) < 1)
       errs.floors = 'At least 1 floor is required.'
+    else if (!floorsSaved)
+      errs.floors = 'Floor details are required.'
     if (operatingHours.length === 0)
       errs.operatingHours = 'At least one operating schedule is required.'
     if (!isEdit && !logo && !logoPreview) errs.logo = 'Logo is required.'
     return errs
   }
 
+  function focusFirstInvalidField(errs) {
+    const invalidFields = Object.keys(errs)
+    setShakingFields(invalidFields)
+    window.setTimeout(() => {
+      const firstField = fieldRefs.current[invalidFields[0]]
+      firstField?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      firstField?.querySelector('input, select, textarea, button')?.focus({ preventScroll: true })
+    }, 0)
+    window.setTimeout(() => setShakingFields([]), 600)
+  }
+
   async function handleSave() {
     const errs = validate()
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
+      setShowValidationWarning(true)
+      focusFirstInvalidField(errs)
       return
     }
     const logoDataUrl = logo
@@ -139,6 +181,8 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       province: form.province.trim(),
       zipCode: form.zipCode.trim(),
       address: form.address.trim(),
+      latitude: form.latitude,
+      longitude: form.longitude,
       mallCoverageArea: form.mallCoverageArea || null,
       description: form.description.trim(),
       majorBeacons: Number(form.majorBeacons),
@@ -172,7 +216,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
         <div className="mall-modal-body">
           <div className="mall-modal-grid">
             {/* Mall Name */}
-            <div className="mall-field-group">
+            <div ref={element => { fieldRefs.current.mallName = element }} className={`mall-field-group${shakingFields.includes('mallName') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">
                 MALL NAME <span className="mall-field-required">*</span>
               </label>
@@ -185,44 +229,50 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               {errors.mallName && <p className="mall-field-error">{errors.mallName}</p>}
             </div>
 
-            {/* City */}
-            <div className="mall-field-group">
-              <label className="mall-field-label">
-                CITY <span className="mall-field-required">*</span>
-              </label>
-              <input
-                className={`mall-field-input${errors.city ? ' mall-field-input--error' : ''}`}
-                value={form.city}
-                onChange={e => setField('city', e.target.value)}
-                placeholder="Enter city"
+            <div ref={element => { fieldRefs.current.location = element }} className={`mall-field-group mall-field-group--full${shakingFields.includes('location') ? ' mall-field-group--shake' : ''}`}>
+              <MallLocationPicker
+                query={form.mallName}
+                address={form.address}
+                latitude={form.latitude}
+                longitude={form.longitude}
+                onConfirm={handleLocationConfirm}
               />
-              {errors.city && <p className="mall-field-error">{errors.city}</p>}
+              {errors.location && <p className="mall-field-error">{errors.location}</p>}
             </div>
 
             {/* Address */}
-            <div className="mall-field-group mall-field-group--full">
-              <label className="mall-field-label">
-                ADDRESS <span className="mall-field-required">*</span>
-              </label>
-              <input
-                className={`mall-field-input${errors.address ? ' mall-field-input--error' : ''}`}
-                value={form.address}
-                onChange={e => setField('address', e.target.value)}
-                placeholder="Enter full address"
-              />
+            <div ref={element => { fieldRefs.current.address = element }} className={`mall-field-group mall-field-group--full${shakingFields.includes('address') ? ' mall-field-group--shake' : ''}`}>
+              <label className="mall-field-label">FULL ADDRESS <span className="mall-field-required">*</span></label>
+              <input className={`mall-field-input${errors.address ? ' mall-field-input--error' : ''}`} value={form.address} onChange={e => setField('address', e.target.value)} placeholder="Confirm a location on the map" />
               {errors.address && <p className="mall-field-error">{errors.address}</p>}
             </div>
 
-            <div className="mall-field-group">
+            {/* City */}
+            <div ref={element => { fieldRefs.current.city = element }} className={`mall-field-group${shakingFields.includes('city') ? ' mall-field-group--shake' : ''}`}>
+              <label className="mall-field-label">CITY <span className="mall-field-required">*</span></label>
+              <input className={`mall-field-input${errors.city ? ' mall-field-input--error' : ''}`} value={form.city} onChange={e => setField('city', e.target.value)} placeholder="e.g. Cebu City" />
+              {errors.city && <p className="mall-field-error">{errors.city}</p>}
+            </div>
+
+            <div ref={element => { fieldRefs.current.province = element }} className={`mall-field-group${shakingFields.includes('province') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">STATE / PROVINCE <span className="mall-field-required">*</span></label>
-              <input className={`mall-field-input${errors.province ? ' mall-field-input--error' : ''}`} value={form.province} onChange={e => setField('province', e.target.value)} placeholder="Enter state or province" />
+              <input className={`mall-field-input${errors.province ? ' mall-field-input--error' : ''}`} value={form.province} onChange={e => setField('province', e.target.value)} placeholder="e.g. Cebu" />
               {errors.province && <p className="mall-field-error">{errors.province}</p>}
             </div>
 
-            <div className="mall-field-group">
+            <div ref={element => { fieldRefs.current.zipCode = element }} className={`mall-field-group${shakingFields.includes('zipCode') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">ZIP CODE <span className="mall-field-required">*</span></label>
-              <input className={`mall-field-input${errors.zipCode ? ' mall-field-input--error' : ''}`} value={form.zipCode} onChange={e => setField('zipCode', e.target.value)} placeholder="Enter zip code" />
+              <input className={`mall-field-input${errors.zipCode ? ' mall-field-input--error' : ''}`} value={form.zipCode} onChange={e => setField('zipCode', e.target.value)} placeholder="e.g. 6000" />
               {errors.zipCode && <p className="mall-field-error">{errors.zipCode}</p>}
+            </div>
+
+            <div ref={element => { fieldRefs.current.floors = element }} className={`mall-field-group${shakingFields.includes('floors') ? ' mall-field-group--shake' : ''}`}>
+              <label className="mall-field-label">LATITUDE</label>
+              <input className="mall-field-input" value={form.latitude ?? ''} readOnly placeholder="Select a location on the map" />
+            </div>
+            <div ref={element => { fieldRefs.current.majorBeacons = element }} className={`mall-field-group${shakingFields.includes('majorBeacons') ? ' mall-field-group--shake' : ''}`}>
+              <label className="mall-field-label">LONGITUDE</label>
+              <input className="mall-field-input" value={form.longitude ?? ''} readOnly placeholder="Select a location on the map" />
             </div>
 
             <div className="mall-field-group mall-field-group--full">
@@ -236,7 +286,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
             </div>
 
             {/* No. of Floors */}
-            <div className="mall-field-group">
+            <div ref={element => { fieldRefs.current.logo = element }} className={`mall-field-group${shakingFields.includes('logo') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">
                 NO. OF FLOORS <span className="mall-field-required">*</span>
               </label>
@@ -269,7 +319,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               )}
             </div>
 
-            <div className="mall-field-group">
+            <div ref={element => { fieldRefs.current.operatingHours = element }} className={`mall-field-group${shakingFields.includes('operatingHours') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">BEACON MAJOR <span className="mall-field-required">*</span></label>
               <input type="number" min="1" className={`mall-field-input${errors.majorBeacons ? ' mall-field-input--error' : ''}`} value={form.majorBeacons} onChange={e => setField('majorBeacons', e.target.value)} />
               {errors.majorBeacons && <p className="mall-field-error">{errors.majorBeacons}</p>}
@@ -350,6 +400,24 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
           onSave={handleFloorSave}
           onClose={() => setShowFloorModal(false)}
         />
+      )}
+
+      {showValidationWarning && (
+        <div className="confirm-modal-overlay" role="presentation">
+          <div className="confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="mall-validation-warning-title">
+            <div className="confirm-modal-icon">
+              <AlertTriangle size={66} color="#D51D1D" strokeWidth={1.8} />
+            </div>
+            <h3 id="mall-validation-warning-title" className="confirm-modal-title">Complete the mall details</h3>
+            <p className="confirm-modal-text">Please complete the following required fields:</p>
+            <ul className="confirm-modal-list">
+              {Object.values(errors).map(error => <li key={error}>{error}</li>)}
+            </ul>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setShowValidationWarning(false)}>Okay</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

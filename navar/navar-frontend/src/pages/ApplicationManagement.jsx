@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import ApplicationsTable from '../components/applicationManagement/ApplicationsTable'
 import StallApplicationsTable from '../components/applicationManagement/StallApplicationsTable'
 import ReviewPanel from '../components/applicationManagement/ReviewPanel'
+import { apiRequest } from '../config/api'
 import '../styles/applicationManagement/applicationManagementLayout.css'
 import '../styles/applicationManagement/applicationManagement.css'
 
@@ -30,10 +31,20 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
 
     if (!source) return
     setActiveTab(isStallApplication ? 'stall' : 'new')
-    setReviewingApp(source)
-  }, [applications, location.search, stallApplications])
+    if (isStallApplication) setReviewingApp(source)
+    else if (reviewingApp?.id !== applicationId || reviewingApp.scaleReference === undefined) handleReviewApp(source)
+  }, [applications, location.search, reviewingApp, stallApplications])
 
   const openThread = new URLSearchParams(location.search).get('view') === 'thread'
+
+  async function handleReviewApp(app) {
+    if (app.draft) return
+    try {
+      setReviewingApp(await apiRequest(`/api/applications/${app.id}`))
+    } catch (error) {
+      console.error('Application detail request failed:', error)
+    }
+  }
 
   const liveProjects = useMemo(() => {
     const approvedLiveApps = (applications || [])
@@ -62,42 +73,19 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
     })
   }, [applications, arProjects])
 
-  function handleRequestRevision(id, notes, isStallApplication = false) {
-    const now = new Date()
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    const threadMsg = {
-      id: Date.now(),
-      sender: 'admin',
-      name: 'Delicious B.',
-      isAdmin: true,
-      date: dateStr,
-      message: notes,
-    }
-
-    if (isStallApplication) {
-      setStallApplications(prev => prev.map(app => {
-        if (app.id !== id) return app
-        return {
-          ...app,
-          applicationStatus: 'For Revision',
-          lastUpdated: dateStr,
-          thread: [...app.thread, threadMsg],
-        }
-      }))
-    } else {
-      setApplications(prev => prev.map(app => {
-        if (app.id !== id) return app
-        return {
-          ...app,
-          applicationStatus: 'For Revision',
-          lastUpdated: dateStr,
-          thread: [...app.thread, threadMsg],
-        }
-      }))
-    }
+  async function handleRequestRevision(id, notes, isStallApplication = false) {
+    if (isStallApplication) return
+    await apiRequest(`/api/applications/${id}/revision`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes }),
+    })
+    const nextApplications = await apiRequest('/api/applications')
+    setApplications(nextApplications)
+    setReviewingApp(await apiRequest(`/api/applications/${id}`))
   }
 
-  function handleApprove(id, isStallApplication = false) {
+  async function handleApprove(id, isStallApplication = false) {
     if (isStallApplication) {
       const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
       const approvedStallApp = stallApplications?.find(a => a.id === id)
@@ -118,54 +106,28 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
         })
       }
     } else {
-      setApplications(prev => prev.map(app => {
-        if (app.id !== id) return app
-        const approved = {
-          ...app,
-          applicationStatus: 'Approved',
-          arDevelopment: 'AR: Pending',
-          lastUpdated: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-        }
-        if (onAppApproved) onAppApproved(approved)
-        return approved
-      }))
+      await apiRequest(`/api/applications/${id}/approve`, { method: 'POST' })
+      const next = await apiRequest('/api/applications')
+      setApplications(next)
+      const approved = next.find(app => app.id === id)
+      if (onAppApproved && approved) onAppApproved(approved)
     }
   }
 
-  function handleSendNote(id, note, isStallApplication = false) {
-    const now = new Date()
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    const threadMsg = {
-      id: Date.now(),
-      sender: 'admin',
-      name: 'Delicious B.',
-      isAdmin: true,
-      date: dateStr,
-      message: note,
-    }
-
-    if (isStallApplication) {
-      setStallApplications(prev => prev.map(app => {
-        if (app.id !== id) return app
-        return {
-          ...app,
-          thread: [...app.thread, threadMsg],
-        }
-      }))
-    } else {
-      setApplications(prev => prev.map(app => {
-        if (app.id !== id) return app
-        return {
-          ...app,
-          thread: [...app.thread, threadMsg],
-        }
-      }))
-    }
+  async function handleSendNote(id, note, attachments = [], isStallApplication = false) {
+    if (isStallApplication) return
+    const sentMessage = await apiRequest(`/api/applications/${id}/thread`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: note, attachments }),
+    })
+    setApplications(await apiRequest('/api/applications'))
+    setReviewingApp(current => current?.id === id
+      ? { ...current, thread: [...(current.thread || []), sentMessage] }
+      : current)
   }
 
-  const currentReviewApp = reviewingApp && applications
-    ? applications.find(a => a.id === reviewingApp.id) ?? null
-    : null
+  const currentReviewApp = reviewingApp && applications ? reviewingApp : null
 
   const currentReviewStallApp = reviewingApp && stallApplications
     ? stallApplications.find(a => a.id === reviewingApp.id) ?? null
@@ -200,7 +162,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
           <ApplicationsTable
             applications={applications}
             onApplicationsChange={setApplications}
-            onReviewApp={setReviewingApp}
+            onReviewApp={handleReviewApp}
           />
         ) : (
           <StallApplicationsTable
@@ -218,7 +180,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
           onClose={() => setReviewingApp(null)}
           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, false)}
           onApprove={(id) => handleApprove(id, false)}
-          onSendNote={(id, note) => handleSendNote(id, note, false)}
+          onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, false)}
           initialTab={openThread ? 'thread' : 'submission'}
         />
       )}
@@ -229,7 +191,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
           onClose={() => setReviewingApp(null)}
           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, true)}
           onApprove={(id) => handleApprove(id, true)}
-          onSendNote={(id, note) => handleSendNote(id, note, true)}
+          onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, true)}
           isStallApplication={true}
           initialTab={openThread ? 'thread' : 'submission'}
         />

@@ -1,7 +1,10 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { apiRequest } from '../../config/api'
+import BusyButton from '../ui/BusyButton'
+import { playNotificationSound } from '../../utils/notificationSound'
 import '../../styles/mallManagement/beaconTickets.css'
 
 const STATUS_FILTERS = ['All', 'Pending', 'Faulty', 'Investigating', 'Under Maintenance', 'Resolved']
@@ -258,6 +261,27 @@ function getTicketId(ticket) {
   return ticket.ticketId || `TKT-${String(ticket.id).padStart(4, '0')}`
 }
 
+const TICKET_STATUS_ORDER = {
+  pending: 0,
+  faulty: 1,
+  investigating: 2,
+  maintenance: 3,
+  resolved: 4,
+}
+
+function ticketTimestamp(ticket) {
+  const value = ticket.updatedAt || ticket.createdAt || ticket.date
+  const timestamp = value ? new Date(value).getTime() : 0
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
+function sortTickets(tickets) {
+  return [...tickets].sort((a, b) => {
+    const statusDifference = (TICKET_STATUS_ORDER[a.status] ?? 99) - (TICKET_STATUS_ORDER[b.status] ?? 99)
+    return statusDifference || ticketTimestamp(b) - ticketTimestamp(a)
+  })
+}
+
 function TicketItem({ ticket, isSelected, onClick }) {
   return (
     <button
@@ -434,6 +458,10 @@ function ActionModal({ type, onCancel, onConfirm }) {
   const [note, setNote] = useState('')
   const [noteErr, setNoteErr] = useState('')
   const [teamMembers, setTeamMembers] = useState([])
+  const [memberSearch, setMemberSearch] = useState('')
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false)
+  const [teamMembersLoading, setTeamMembersLoading] = useState(false)
+  const [teamMembersError, setTeamMembersError] = useState('')
 
   useEffect(() => {
     function handleEsc(e) {
@@ -445,9 +473,20 @@ function ActionModal({ type, onCancel, onConfirm }) {
 
   useEffect(() => {
     if (type !== 'investigating' && type !== 'investigating-reopen') return
+    setTeamMembersLoading(true)
+    setTeamMembersError('')
     apiRequest('/api/admin-accounts')
-      .then(accounts => setTeamMembers(accounts.filter(account => account.status !== 'deactivated')))
-      .catch(() => setTeamMembers([]))
+      .then(accounts => {
+        const activeAccounts = (Array.isArray(accounts) ? accounts : []).filter(account =>
+          !account.isDeactivated && account.status !== 'deactivated'
+        )
+        setTeamMembers(activeAccounts)
+      })
+      .catch(error => {
+        setTeamMembers([])
+        setTeamMembersError(error.message || 'Unable to load team members.')
+      })
+      .finally(() => setTeamMembersLoading(false))
   }, [type])
 
   const isReopen = type === 'investigating-reopen'
@@ -463,6 +502,12 @@ function ActionModal({ type, onCancel, onConfirm }) {
     : 'Mark ticket as resolved?'
 
   const showAssignmentFields = effectiveType === 'investigating'
+  const normalizedMemberSearch = memberSearch.trim().toLowerCase()
+  const filteredTeamMembers = teamMembers.filter(member => {
+    const name = String(member.name || '').toLowerCase()
+    const email = String(member.email || '').toLowerCase()
+    return !normalizedMemberSearch || name.includes(normalizedMemberSearch) || email.includes(normalizedMemberSearch)
+  })
   const placeholder = isReopen
     ? 'Notes... — Why are you reopening this ticket?'
     : effectiveType === 'faulty'
@@ -473,12 +518,12 @@ function ActionModal({ type, onCancel, onConfirm }) {
     ? 'Notes... — Maintenance details...'
     : 'Notes... — What was done to resolve this?'
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (showAssignmentFields) {
       if (!assignedTo) { setAssignedToErr('Please select who to assign.'); return }
       setAssignedToErr('')
     }
-    onConfirm(note.trim(), effectiveType, assignedTo)
+    await onConfirm(note.trim(), effectiveType, assignedTo)
   }
 
   return (
@@ -489,14 +534,55 @@ function ActionModal({ type, onCancel, onConfirm }) {
           <>
             <div className="bkt-modal-field">
               <label className="bkt-modal-label">ASSIGN TO <span className="bkt-modal-label-required">*</span></label>
-              <select
-                className={`bkt-modal-select${assignedToErr ? ' bkt-modal-select--error' : ''}`}
-                value={assignedTo}
-                onChange={e => { setAssignedTo(e.target.value); setAssignedToErr('') }}
-              >
-                <option value="">-- Select team member --</option>
-                {teamMembers.map(member => <option key={member.id} value={member.name}>{member.name}</option>)}
-              </select>
+              <div className="bkt-member-combobox">
+                <input
+                  className={`bkt-modal-member-search${assignedToErr ? ' bkt-modal-select--error' : ''}`}
+                  type="search"
+                  role="combobox"
+                  aria-expanded={memberPickerOpen}
+                  aria-controls="bkt-team-member-options"
+                  placeholder={teamMembersLoading ? 'Loading team members...' : 'Select or search team member'}
+                  value={memberSearch}
+                  onFocus={() => setMemberPickerOpen(true)}
+                  onChange={e => {
+                    setMemberSearch(e.target.value)
+                    setAssignedTo('')
+                    setAssignedToErr('')
+                    setMemberPickerOpen(true)
+                  }}
+                  disabled={teamMembersLoading || Boolean(teamMembersError)}
+                />
+                {memberPickerOpen && !teamMembersLoading && !teamMembersError && filteredTeamMembers.length > 0 && (
+                  <div id="bkt-team-member-options" className="bkt-member-options" role="listbox">
+                    {filteredTeamMembers.map(member => (
+                      <button
+                        key={member.id}
+                        type="button"
+                        className="bkt-member-option"
+                        role="option"
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => {
+                          setAssignedTo(member.name)
+                          setMemberSearch(member.name)
+                          setAssignedToErr('')
+                          setMemberPickerOpen(false)
+                        }}
+                      >
+                        <strong>{member.name}</strong>
+                        {member.email && <span>{member.email}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {teamMembersLoading && <p className="bkt-modal-help">Loading team members...</p>}
+              {!teamMembersLoading && !teamMembersError && teamMembers.length === 0 && (
+                <p className="bkt-modal-help">No active team members found.</p>
+              )}
+              {!teamMembersLoading && !teamMembersError && teamMembers.length > 0 && filteredTeamMembers.length === 0 && (
+                <p className="bkt-modal-help">No team members match your search.</p>
+              )}
+              {teamMembersError && <p className="bkt-modal-error">{teamMembersError}</p>}
               {assignedToErr && <p className="bkt-modal-error">{assignedToErr}</p>}
             </div>
           </>
@@ -514,12 +600,12 @@ function ActionModal({ type, onCancel, onConfirm }) {
         </div>
         <div className="bkt-modal-actions">
           <button className="bkt-modal-cancel" onClick={onCancel}>Cancel</button>
-          <button
+          <BusyButton
             className="bkt-modal-confirm"
             onClick={handleConfirm}
           >
             Yes
-          </button>
+          </BusyButton>
         </div>
       </div>
     </div>
@@ -529,6 +615,7 @@ function ActionModal({ type, onCancel, onConfirm }) {
 let nextTicketId = initialTickets.length + 1
 
 export default function BeaconTicketsTab() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
@@ -542,6 +629,14 @@ export default function BeaconTicketsTab() {
       .catch(error => window.alert(error.message))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    const ticketId = Number(searchParams.get('ticketId'))
+    if (ticketId && tickets.some(ticket => ticket.id === ticketId)) {
+      setSelectedId(ticketId)
+      setSearchParams({}, { replace: true })
+    }
+  }, [tickets, searchParams, setSearchParams])
 
   const selectedTicket = tickets.find(t => t.id === selectedId) || null
 
@@ -576,6 +671,7 @@ export default function BeaconTicketsTab() {
         method: 'POST',
         body: JSON.stringify({ status: effectiveType, note, assignedTo: assignedTo || null }),
       })
+      if (effectiveType === 'investigating') playNotificationSound('notification')
     } catch (error) {
       window.alert(error.message)
       return
@@ -619,9 +715,9 @@ export default function BeaconTicketsTab() {
       updatedTicket.assignedBy = 'NavAR Admin'
     }
 
-    setTickets(prev => prev.map(t =>
+    setTickets(prev => sortTickets(prev.map(t =>
       t.id === selectedTicket.id ? updatedTicket : t
-    ))
+    )))
     setActionModal(null)
   }
 
@@ -688,7 +784,7 @@ export default function BeaconTicketsTab() {
           <p className="bkt-empty"><span className="table-loading"><span className="table-loading-spinner" />Loading tickets...</span></p>
         ) : filtered.length === 0 ? (
           <p className="bkt-empty">No tickets found.</p>
-        ) : filtered.map(ticket => (
+        ) : sortTickets(filtered).map(ticket => (
           <TicketItem
             key={ticket.id}
             ticket={ticket}

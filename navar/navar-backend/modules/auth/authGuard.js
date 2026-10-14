@@ -1,4 +1,5 @@
 'use strict'
+const { signedImageUrl } = require('../storage/imageStorage')
 
 function tokenUsedPassword(token) {
 	try {
@@ -19,19 +20,33 @@ function createAuthGuards(supabase) {
 			const { data, error } = await supabase.auth.getUser(token)
 			if (error || !data?.user) return reply.code(401).send({ message: 'Authentication required.' })
 
-			const { data: admin, error: adminError } = await supabase
+			let { data: admin, error: adminError } = await supabase
 				.from('admin')
-				.select('admin_id, admin_role, admin_email, admin_full_name, admin_account_status, admin_is_deactivated, admin_is_primary, admin_job_title, admin_contact_num, admin_profile_picture, mall_id, store_id')
+				.select('admin_id, admin_role, admin_email, admin_full_name, admin_account_status, admin_is_deactivated, admin_is_primary, admin_job_title, admin_contact_num, admin_profile_picture, admin_profile_picture_path, mall_id, store_id')
 				.eq('admin_auth_user_id', data.user.id)
 				.maybeSingle()
 
+			if (adminError?.code === '42703') {
+				const fallback = await supabase
+					.from('admin')
+					.select('admin_id, admin_role, admin_email, admin_full_name, admin_account_status, admin_is_deactivated, admin_is_primary, admin_job_title, admin_contact_num, admin_profile_picture, mall_id, store_id')
+					.eq('admin_auth_user_id', data.user.id)
+					.maybeSingle()
+				admin = fallback.data
+				adminError = fallback.error
+			}
+
 			if (adminError) {
-				request.log.error({ code: adminError.code }, 'Admin lookup failed')
+				request.log.error({ code: adminError.code, message: adminError.message, details: adminError.details, hint: adminError.hint }, 'Admin lookup failed')
 				return reply.code(500).send({ message: 'Something went wrong.' })
 			}
 			if (!admin || admin.admin_is_deactivated) return reply.code(403).send({ message: 'Access denied.' })
 			if (admin.admin_account_status !== 'official' && !allowPartial) return reply.code(403).send({ message: 'Access denied.' })
 
+			let profilePicture = admin.admin_profile_picture || null
+			if (admin.admin_profile_picture_path) {
+				try { profilePicture = await signedImageUrl(supabase, admin.admin_profile_picture_path) } catch { profilePicture = null }
+			}
 			request.admin = {
 				id: admin.admin_id,
 				role: admin.admin_role,
@@ -39,7 +54,7 @@ function createAuthGuards(supabase) {
 				name: admin.admin_full_name,
 				jobTitle: admin.admin_job_title,
 				contactNum: admin.admin_contact_num,
-				profilePicture: admin.admin_profile_picture,
+				profilePicture,
 				isPrimary: admin.admin_is_primary,
 				status: admin.admin_account_status,
 				mallId: admin.mall_id,

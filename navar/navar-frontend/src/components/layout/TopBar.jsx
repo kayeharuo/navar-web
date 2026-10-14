@@ -5,6 +5,7 @@ import ChatInboxPanel from './ChatInboxPanel'
 import '../../styles/layout/topbar.css'
 import '../../styles/panels.css'
 import { Building2 as BuildingIcon } from 'lucide-react'
+import { apiRequest } from '../../config/api'
 
 const pageIconMap = {
   'Dashboard':              LayoutDashboard,
@@ -34,6 +35,7 @@ export default function TopBar({
   onMenuClick,
   activePage = 'Dashboard',
   onOpenNotifications,
+  onOpenNotification,
   onOpenProfile,
   onLogoutClick,
   notifications = [],
@@ -44,6 +46,7 @@ export default function TopBar({
   const [showAccount, setShowAccount] = useState(false)
   const [showNotifDropdown, setShowNotifDropdown] = useState(false)
   const [showChatInbox, setShowChatInbox] = useState(false)
+  const [conversationUnreadCount, setConversationUnreadCount] = useState(0)
   const navigate = useNavigate()
 
   const accountRef = useRef(null)
@@ -51,6 +54,16 @@ export default function TopBar({
 
   useOutsideClick(accountRef, () => setShowAccount(false))
   useOutsideClick(notifRef,   () => setShowNotifDropdown(false))
+
+  useEffect(() => {
+    let mounted = true
+    apiRequest('/api/conversations')
+      .then(threads => {
+        if (mounted) setConversationUnreadCount(threads.filter(thread => thread.unread).length)
+      })
+      .catch(error => console.error('Conversation count request failed:', error))
+    return () => { mounted = false }
+  }, [])
 
   const unreadCount = notifications.filter(n => !n.read).length
   const recentNotifs = notifications.slice(0, 4)
@@ -89,7 +102,7 @@ export default function TopBar({
             onClick={() => setShowChatInbox(s => !s)}
           >
             <MessageCircle size={18} strokeWidth={1.75} />
-            <span className="chat-inbox-count">3</span>
+            {conversationUnreadCount > 0 && <span className="chat-inbox-count">{conversationUnreadCount}</span>}
           </button>
           {showChatInbox && (
             <ChatInboxPanel
@@ -133,18 +146,26 @@ export default function TopBar({
               <div className="notif-mini-divider" />
               <div className="notif-mini-list">
                 {recentNotifs.map(n => (
-                  <div key={n.id} className={`notif-mini-item${!n.read ? ' notif-mini-item--unread' : ''}`}>
+                  <button
+                    key={n.id}
+                    type="button"
+                    className={`notif-mini-item${!n.read ? ' notif-mini-item--unread' : ''}`}
+                    onClick={() => {
+                      setShowNotifDropdown(false)
+                      onOpenNotification(n)
+                    }}
+                  >
                     <div className="notif-mini-icon">
                       <BuildingIcon size={16} strokeWidth={1.5} />
                     </div>
                     <div className="notif-mini-body">
                       <p className="notif-mini-text">
-                        <strong>{n.mallName}</strong> {n.text}
+                        <strong>{n.title || n.mallName}</strong> {n.message || n.text}
                       </p>
-                      <p className="notif-mini-time">{n.time}</p>
+                      <p className="notif-mini-time">{n.time || new Date(n.createdAt).toLocaleString()}</p>
                     </div>
                     {!n.read && <span className="notif-mini-unread-dot" />}
-                  </div>
+                  </button>
                 ))}
                 {notifications.length === 0 && (
                   <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '13px', fontFamily: 'Poppins' }}>

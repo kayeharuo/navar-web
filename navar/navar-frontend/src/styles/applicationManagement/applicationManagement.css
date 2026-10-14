@@ -2,6 +2,76 @@
    APPLICATION MANAGEMENT — Component Styles
    ===================================================== */
 
+.review-info-value--multiline {
+  white-space: pre-line;
+}
+
+.review-mall-logo {
+  display: block;
+  width: 100px;
+  height: 72px;
+  object-fit: contain;
+  border: 0.5px solid #E2E8F0;
+  border-radius: 5px;
+  background: #fff;
+  padding: 6px;
+}
+
+.review-floor-card-preview {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.review-floor-card-preview:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.review-floor-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.review-floor-preview-overlay img {
+  max-width: min(1100px, 95vw);
+  max-height: 90vh;
+  object-fit: contain;
+  background: #fff;
+}
+
+.app-mgmt-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 80px;
+  color: #979797;
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+}
+
+.app-mgmt-table-loading,
+.ar-dev-table-loading {
+  padding: 32px;
+  text-align: center;
+  color: #9B9C9C;
+  font-family: Poppins, sans-serif;
+  font-size: 13px;
+}
+
 /* Application Type Tabs */
 .app-mgmt-tabs {
   display: flex;
@@ -943,6 +1013,21 @@
   line-height: 1.5;
 }
 
+.thread-msg-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.thread-msg-attachment-preview {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+}
+
 /* Note input area */
 .review-note-area {
   display: flex;
@@ -969,8 +1054,53 @@
 
 .review-note-textarea::placeholder { color: #9B9C9C; }
 
+.review-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-note-attach-btn {
+  border: 1px solid #2563EB;
+  border-radius: 3px;
+  color: #2563EB;
+  font-family: Poppins, sans-serif;
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.thread-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.thread-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+}
+
+.thread-attachment-chip button {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.review-note-error {
+  color: #b91c1c;
+  font-size: 11px;
+}
+
 .review-note-send-btn {
-  align-self: flex-end;
   border-radius: 3px;
   background: #2563EB;
   color: #fff;

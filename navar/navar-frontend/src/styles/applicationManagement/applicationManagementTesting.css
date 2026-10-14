@@ -1,0 +1,17 @@
+.application-testing { max-width: 900px; margin: 0 auto; font-family: Poppins, sans-serif; color: #1F384C; }
+.application-testing h1 { margin-bottom: 8px; }
+.application-testing-warning { padding: 12px; border-radius: 8px; background: #FFF8E1; color: #8A5A00; }
+.application-testing form { display: grid; gap: 18px; }
+.application-testing label, .application-testing fieldset { display: grid; gap: 7px; font-size: 13px; font-weight: 600; }
+.application-testing select, .application-testing input, .application-testing textarea { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 7px; font: 13px Poppins, sans-serif; }
+.application-testing textarea { min-height: 70px; resize: vertical; }
+.application-testing fieldset { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; }
+.application-testing-check { display: flex !important; align-items: center; font-weight: 500 !important; }
+.application-testing-check input { width: auto; }
+.application-testing-floor { display: grid; gap: 12px; padding: 18px; border: 1px solid #E2E8F0; border-radius: 10px; background: #FFF; }
+.application-testing-floor h2 { margin: 0; font-size: 18px; }
+.application-testing-entry { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+.application-testing button { width: fit-content; padding: 9px 14px; border: 1px solid #2563EB; border-radius: 7px; background: #FFF; color: #2563EB; cursor: pointer; font: 600 12px Poppins, sans-serif; }
+.application-testing .application-testing-submit { width: 100%; background: #2563EB; color: #FFF; }
+.application-testing button:disabled { opacity: .6; cursor: not-allowed; }
+.application-testing-message { margin-top: 18px; font-weight: 600; }

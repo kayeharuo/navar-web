@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Pencil, Trash2 } from 'lucide-react'
+import { X, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import BusyButton from '../ui/BusyButton'
 
 let nextUnitId = 1000
@@ -10,8 +10,20 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
   const [addUnitNo, setAddUnitNo] = useState('')
   const [addError, setAddError] = useState('')
   const [editingUnit, setEditingUnit] = useState(null)
+  const [showExitWarning, setShowExitWarning] = useState(false)
 
   const floors = mall.floorDetails || []
+  const initialUnits = mall.units || []
+  const unitsChanged = JSON.stringify(units.map(({ id, floorNo, unitNo, status, storeId }) => ({ id, floorNo, unitNo, status, storeId }))) !==
+    JSON.stringify(initialUnits.map(({ id, floorNo, unitNo, status, storeId }) => ({ id, floorNo, unitNo, status, storeId })))
+
+  function requestClose() {
+    if (unitsChanged || editingUnit) {
+      setShowExitWarning(true)
+      return
+    }
+    onClose()
+  }
 
   function handleAddUnit() {
     if (!addFloor) {
@@ -61,15 +73,15 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
 
   useEffect(() => {
     function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') requestClose()
     }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
+  }, [editingUnit, unitsChanged])
 
   return (
     <>
-      <div className={`units-overlay${stackedOnInfoPanel ? ' units-overlay--stacked' : ''}`} onClick={onClose} />
+      <div className={`units-overlay${stackedOnInfoPanel ? ' units-overlay--stacked' : ''}`} onClick={requestClose} />
 
       <aside className={`units-panel${stackedOnInfoPanel ? ' units-panel--stacked' : ''}`} role="dialog" aria-modal="true">
         {/* Header */}
@@ -78,7 +90,7 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
             <h2 className="units-panel-title">Units — {mall.name}</h2>
             <p className="units-panel-subtitle">{mall.city}</p>
           </div>
-          <button className="units-panel-close" onClick={onClose} aria-label="Close">
+          <button className="units-panel-close" onClick={requestClose} aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -172,7 +184,7 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
           {addError && <p className="mall-field-error">{addError}</p>}
 
           <div className="units-footer-btns">
-            <button className="units-footer-btn units-footer-btn--cancel" onClick={onClose}>
+            <button className="units-footer-btn units-footer-btn--cancel" onClick={requestClose}>
               Cancel
             </button>
             <BusyButton className="units-footer-btn units-footer-btn--save" onClick={handleSave}>
@@ -181,6 +193,26 @@ export default function UnitsPanel({ mall, onClose, onSave, stackedOnInfoPanel =
           </div>
         </div>
       </aside>
+
+      {showExitWarning && (
+        <div className="confirm-modal-overlay" role="presentation">
+          <div className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="units-exit-warning-title">
+            <div className="confirm-modal-icon">
+              <AlertTriangle size={66} color="#D51D1D" strokeWidth={1.8} />
+            </div>
+            <h3 id="units-exit-warning-title" className="confirm-modal-title">Exit without saving?</h3>
+            <p className="confirm-modal-text">Your unit changes have not been saved. Are you sure you want to exit?</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setShowExitWarning(false)}>
+                Stay
+              </button>
+              <button type="button" className="confirm-modal-confirm confirm-modal-confirm--deactivate" onClick={onClose}>
+                Exit without saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

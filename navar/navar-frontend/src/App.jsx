@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Bell, X } from 'lucide-react'
 import Sidebar from './components/layout/SideBar'
 import TopBar from './components/layout/TopBar'
 import LoginPage from './pages/LoginPage'
@@ -18,13 +19,15 @@ import EmailLogs from './pages/EmailLogs'
 import AuditLogs from './pages/AuditLogs'
 import SystemSettings from './pages/SystemSettings'
 import SubscriptionManagement from './pages/SubscriptionManagement'
-import NotificationsPanel, { INITIAL_NOTIFICATIONS } from './components/panels/NotificationsPanel'
+import ApplicationManagementTesting from './pages/ApplicationManagementTesting'
+import NotificationsPanel from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import { NAV_ITEMS, getActiveNavItem } from './config/navigation'
 import { apiRequest } from './config/api'
 import { supabase } from './config/supabase'
 import './App.css'
 import './styles/panels.css'
+import { playNotificationSound, unlockNotificationSound } from './utils/notificationSound'
 
 const TIER_MAP = {
   'SM Seaside City Cebu': 'Premium',
@@ -76,6 +79,7 @@ function PlaceholderPage({ title }) {
 
 export default function App() {
   const location = useLocation()
+  const navigate = useNavigate()
   const isAuthRoute = location.pathname.startsWith('/auth/')
   const [authLoading, setAuthLoading] = useState(true)
   const [session, setSession] = useState(null)
@@ -84,8 +88,20 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [activePanel, setActivePanel]   = useState(null)
   const [showLogout, setShowLogout]     = useState(false)
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
+  const [notifications, setNotifications] = useState([])
+  const [archivedNotifications, setArchivedNotifications] = useState([])
+  const [incomingToast, setIncomingToast] = useState(null)
   const [arIncomingProjects, setArIncomingProjects] = useState([])
+
+  useEffect(() => {
+    const unlock = () => unlockNotificationSound()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -121,6 +137,115 @@ export default function App() {
   }, [authLoading, session, isAuthRoute])
 
   useEffect(() => {
+    if (!admin) {
+      setNotifications([])
+      setArchivedNotifications([])
+      return undefined
+    }
+    let mounted = true
+    const loadNotifications = async () => {
+      try {
+        const [result, archivedResult] = await Promise.all([
+          apiRequest('/api/admin-notifications'),
+          apiRequest('/api/admin-notifications?includeArchived=true'),
+        ])
+        const normalize = notification => ({
+          ...notification,
+          mallName: notification.sourceLabel || 'NavAR',
+          text: notification.message,
+          time: new Date(notification.createdAt).toLocaleString(),
+        })
+        if (mounted) {
+          setNotifications(result.map(normalize))
+          setArchivedNotifications(archivedResult.map(normalize))
+        }
+      } catch (error) {
+        if (mounted) console.error('Admin notifications request failed:', error)
+      }
+    }
+    loadNotifications()
+    const interval = window.setInterval(loadNotifications, 30000)
+    return () => {
+      mounted = false
+      window.clearInterval(interval)
+    }
+  }, [admin])
+
+  useEffect(() => {
+    if (!admin) return undefined
+    const channel = supabase
+      .channel(`admin-notifications-${admin.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'admin_notification',
+        filter: `admin_id=eq.${admin.id}`,
+      }, payload => {
+        const row = payload.new
+        if (!row || String(row.admin_id) !== String(admin.id)) return
+        const notification = {
+          id: row.admin_notif_id,
+          type: row.admin_notif_type,
+          title: row.admin_notif_title,
+          message: row.admin_notif_message,
+          actionUrl: row.admin_notif_action_url,
+          actionLabel: row.admin_notif_action_label,
+          sourceType: row.admin_notif_source_type,
+          sourceId: row.admin_notif_source_id,
+          sourceLabel: row.admin_notif_source_label,
+          mallId: row.mall_id,
+          read: row.admin_notif_is_read,
+          createdAt: row.admin_notif_created_at,
+          mallName: row.admin_notif_source_label || 'NavAR',
+          text: row.admin_notif_message,
+          time: new Date(row.admin_notif_created_at).toLocaleString(),
+        }
+        if (payload.eventType === 'INSERT') {
+          setNotifications(prev => prev.some(item => item.id === notification.id) ? prev : [notification, ...prev])
+          playNotificationSound('notification')
+          setIncomingToast(notification)
+        } else if (payload.eventType === 'UPDATE') {
+          if (row.admin_notif_is_archived) {
+            setNotifications(prev => prev.filter(item => item.id !== notification.id))
+            setArchivedNotifications(prev => prev.some(item => item.id === notification.id) ? prev : [notification, ...prev])
+          } else {
+            setNotifications(prev => prev.map(item => item.id === notification.id ? notification : item))
+            setArchivedNotifications(prev => prev.filter(item => item.id !== notification.id))
+          }
+        }
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [admin])
+
+  useEffect(() => {
+    if (!incomingToast) return undefined
+    const timeout = window.setTimeout(() => setIncomingToast(null), 6000)
+    return () => window.clearTimeout(timeout)
+  }, [incomingToast])
+
+  useEffect(() => {
+    if (!admin) return undefined
+    const channel = supabase
+      .channel(`thread-messages-${admin.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'thread_message',
+      }, payload => {
+        const senderId = payload.new?.message_sender
+        if (senderId != null && String(senderId) === String(admin.id)) return
+        playNotificationSound('thread')
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [admin])
+
+  useEffect(() => {
     setSidebarOpen(false)
     setActivePanel(null)
   }, [location.pathname])
@@ -133,6 +258,10 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )
+  }
+
+  if (location.pathname === '/application-management-testing') {
+    return <ApplicationManagementTesting />
   }
 
   if (authLoading || (session && !admin && !accessDenied)) {
@@ -191,8 +320,45 @@ export default function App() {
     ))
   }
 
-  function handleMarkAllRead() {
+  async function handleMarkRead(id) {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    try {
+      await apiRequest(`/api/admin-notifications/${id}/read`, { method: 'PATCH' })
+    } catch (error) {
+      console.error('Admin notification read request failed:', error)
+    }
+  }
+
+  async function handleMarkAllRead() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    try {
+      await apiRequest('/api/admin-notifications/read-all', { method: 'PATCH' })
+    } catch (error) {
+      console.error('Admin notifications read-all request failed:', error)
+    }
+  }
+
+  async function handleArchive(id) {
+    const archived = notifications.find(n => n.id === id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    if (archived) setArchivedNotifications(prev => [archived, ...prev])
+    try {
+      await apiRequest(`/api/admin-notifications/${id}/archive`, { method: 'PATCH' })
+    } catch (error) {
+      console.error('Admin notification archive request failed:', error)
+    }
+  }
+
+  function handleOpenNotification(notification) {
+    handleMarkRead(notification.id)
+    const actionUrl = notification.actionUrl || ''
+    const targetUrl = notification.sourceType === 'beacon_ticket' &&
+      notification.sourceId &&
+      actionUrl === '/mall-management/beacon-tickets'
+      ? `${actionUrl}?ticketId=${notification.sourceId}`
+      : actionUrl
+    if (targetUrl) navigate(targetUrl)
+    setActivePanel(null)
   }
 
   function closeSidebar() {
@@ -213,9 +379,11 @@ export default function App() {
           activePage={activePage}
           onMenuClick={() => setSidebarOpen(prev => !prev)}
           onOpenNotifications={() => setActivePanel('notifications')}
+          onOpenNotification={handleOpenNotification}
           onOpenProfile={() => setActivePanel('profile')}
           onLogoutClick={() => setShowLogout(true)}
           notifications={notifications}
+          archivedNotifications={archivedNotifications}
           onMarkAllRead={handleMarkAllRead}
           user={admin}
         />
@@ -224,7 +392,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/mall-management" element={<MallManagement />} />
             <Route path="/mall-management/:tab" element={<MallManagement />} />
-            <Route path="/mall-management/units/:mallId" element={<UnitsPage />} />
+            <Route path="/mall-management/units/:mallId" element={<><MallManagement /><UnitsPage /></>} />
             <Route path="/mall-management/stores/:mallId" element={<StoresPage />} />
             <Route path="/mall-management/beacons/:mallId" element={<BeaconsPage />} />
             <Route path="/application-management" element={<ApplicationManagement onAppApproved={handleAppApproved} arProjects={arIncomingProjects} onStallAppApproved={handleStallAppApproved} />} />
@@ -250,11 +418,52 @@ export default function App() {
       </div>
 
       {/* Notifications full panel */}
+      {incomingToast && (
+        <div
+          className="notification-toast"
+          role="status"
+          tabIndex={0}
+          onKeyDown={event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            const notification = incomingToast
+            setIncomingToast(null)
+            handleOpenNotification(notification)
+          }}
+          onClick={() => {
+            const notification = incomingToast
+            setIncomingToast(null)
+            handleOpenNotification(notification)
+          }}
+        >
+          <span className="notification-toast-icon"><Bell size={17} /></span>
+          <span className="notification-toast-content">
+            <strong>{incomingToast.title}</strong>
+            <span>{incomingToast.message}</span>
+          </span>
+          <button
+            type="button"
+            className="notification-toast-close"
+            aria-label="Dismiss notification"
+            onClick={event => {
+              event.stopPropagation()
+              setIncomingToast(null)
+            }}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {activePanel === 'notifications' && (
         <NotificationsPanel
           notifications={notifications}
+          archivedNotifications={archivedNotifications}
           onClose={() => setActivePanel(null)}
-          onUpdate={setNotifications}
+          onMarkRead={handleMarkRead}
+          onMarkAllRead={handleMarkAllRead}
+          onArchive={handleArchive}
+          onOpenNotification={handleOpenNotification}
         />
       )}
 

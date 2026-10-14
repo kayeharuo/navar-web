@@ -1,5 +1,7 @@
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const defaultMallCoverageArea = 'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm'
+const displayStatus = value => String(value || '-').replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+const { uploadImage, downloadImage, contentTypeFromBuffer } = require('../storage/imageStorage')
 
 const dbColumn = value => value.toLowerCase()
 const lowerKeys = object => Object.fromEntries(Object.entries(object).map(([key, value]) => [key.toLowerCase(), value]))
@@ -81,7 +83,7 @@ function toBrand(row) {
 		name: brand.BRAND_NAME,
 		category: brand.BRAND_CATEGORY || '',
 		description: brand.BRAND_DESCRIPTION || '',
-		logo: brand.BRAND_LOGO ? `/api/brands/${brand.BRAND_ID}/logo` : null,
+		logo: brand.BRAND_LOGO_PATH || brand.BRAND_LOGO ? `/api/brands/${brand.BRAND_ID}/logo` : null,
 		dateAdded: formatDate(brand.BRAND_CREATED_AT),
 		lastUpdated: formatDate(brand.BRAND_UPDATED_AT),
 	}
@@ -98,7 +100,7 @@ function toStore(row, brand, units) {
 		floorLabel: assignedUnits[0]?.FLOOR_LABEL ?? assignedUnits[0]?.floorLabel ?? '',
 		brandId: store.BRAND_ID,
 		brand: brand?.BRAND_NAME || '',
-		brandLogo: brand?.BRAND_LOGO ? `/api/brands/${brand.BRAND_ID}/logo` : null,
+		brandLogo: brand?.BRAND_LOGO_PATH || brand?.BRAND_LOGO ? `/api/brands/${brand.BRAND_ID}/logo` : null,
 		category: brand?.BRAND_CATEGORY || '',
 		contactPerson: store.STORE_CONTACT_PERSON || '',
 		contactNo: store.STORE_CONTACT_NUM || '',
@@ -120,15 +122,17 @@ function createMallService(supabase) {
 		const [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult] = await Promise.all([
 			supabase.from('mall').select('*').eq(dbColumn('MALL_ID'), mallId).single(),
 			supabase.from('floor').select('*').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('FLOOR_NUM')),
-			supabase.from('operating_hours').select('*').eq(dbColumn('MALL_ID'), mallId).eq(dbColumn('OPTHRS_IS_MALL'), true).eq(dbColumn('OPTHRS_IS_INQUIRY'), false).order(dbColumn('OPTHRS_ID')),
+			supabase.from('operating_hours').select('*').eq(dbColumn('MALL_ID'), mallId).or('opthrs_is_store.eq.false,opthrs_is_store.is.null').eq(dbColumn('OPTHRS_IS_INQUIRY'), false).order(dbColumn('OPTHRS_ID')),
 			supabase.from('contract').select('*, subscription_tier(s_tier_label, s_tier_key)').eq(dbColumn('MALL_ID'), mallId).eq(dbColumn('CONTRACT_IS_CURRENT'), true).maybeSingle(),
 			supabase.from('beacon').select('*').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('BEACON_ID')),
 			supabase.from('store').select('*').eq(dbColumn('MALL_ID'), mallId),
 		])
 
+		const initialFailure = [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult].find(result => result.error)
+		if (initialFailure) throw initialFailure.error
 		const mall = upperKeys(mallResult.data)
-		const floors = upperKeys(floorsResult.data)
-		const hours = upperKeys(hoursResult.data)
+		const floors = upperKeys(floorsResult.data || [])
+		const hours = upperKeys(hoursResult.data || [])
 		const contract = upperKeys(contractResult.data)
 		const status = mallAgreementStatus(contract?.CONTRACT_STATUS)
 		const hasSubscription = Boolean(contract) && status !== 'Pending'
@@ -141,16 +145,16 @@ function createMallService(supabase) {
 			: { data: null, error: null }
 		const arDevelopment = upperKeys(arDevelopmentResult.data)
 		const floorIds = floors.map(floor => floor.FLOOR_ID)
-		const beaconRows = upperKeys(beaconResult.data)
+		const beaconRows = upperKeys(beaconResult.data || [])
 		const batteryResult = beaconRows.length
 			? await supabase.from('battery').select('*').in('beacon_id', beaconRows.map(beacon => beacon.BEACON_ID)).order('battery_id')
 			: { data: [], error: null }
-		const batteries = upperKeys(batteryResult.data)
+		const batteries = upperKeys(batteryResult.data || [])
 		const unitsResult = floorIds.length
 			? await supabase.from('unit').select('*').in('floor_id', floorIds).order('unit_label')
 			: { data: [], error: null }
-		const units = upperKeys(unitsResult.data)
-		const failed = [mallResult, floorsResult, hoursResult, contractResult, applicationResult, arDevelopmentResult, beaconResult, batteryResult, unitsResult, storesResult].find(result => result.error)
+		const units = upperKeys(unitsResult.data || [])
+		const failed = [applicationResult, arDevelopmentResult, batteryResult, unitsResult].find(result => result.error)
 		if (failed) throw failed.error
 		const ticketRowsResult = beaconRows.length
 			? await supabase.from('beacon_ticket').select('*').in('beacon_id', beaconRows.map(beacon => beacon.BEACON_ID)).order('ticket_reported_at', { ascending: true })
@@ -160,7 +164,17 @@ function createMallService(supabase) {
 			? await supabase.from('beacon_ticket_log').select('*').in('ticket_id', ticketRows.map(ticket => ticket.TICKET_ID)).order('ticket_log_changed_at', { ascending: true })
 			: { data: [], error: null }
 		const ticketLogs = upperKeys(ticketLogsResult.data || [])
-		if (ticketRowsResult.error || ticketLogsResult.error) throw ticketRowsResult.error || ticketLogsResult.error
+		const ticketAdminIds = [...new Set([
+			...ticketRows.map(ticket => ticket.TICKET_REPORTED_BY),
+			...ticketRows.map(ticket => ticket.TICKET_ASSIGNED_TO),
+			...ticketLogs.map(log => log.TICKET_LOG_CHANGED_BY),
+		].filter(Boolean))]
+		const ticketAdminsResult = ticketAdminIds.length
+			? await supabase.from('admin').select('admin_id, admin_full_name').in('admin_id', ticketAdminIds)
+			: { data: [], error: null }
+		const ticketAdmins = upperKeys(ticketAdminsResult.data || [])
+		const adminName = id => ticketAdmins.find(admin => String(admin.ADMIN_ID) === String(id))?.ADMIN_FULL_NAME || `Admin #${id}`
+		if (ticketRowsResult.error || ticketLogsResult.error || ticketAdminsResult.error) throw ticketRowsResult.error || ticketLogsResult.error || ticketAdminsResult.error
 		const tier = contract?.SUBSCRIPTION_TIER?.S_TIER_LABEL || 'Pending'
 		const overdueDays = contract?.CONTRACT_END && new Date(contract.CONTRACT_END) < new Date()
 			? Math.ceil((Date.now() - new Date(contract.CONTRACT_END).getTime()) / 86400000)
@@ -173,6 +187,8 @@ function createMallService(supabase) {
 			province: mall.MALL_STATE,
 			zipCode: mall.MALL_ZIPCODE,
 			address: mall.MALL_ADDRESS,
+			latitude: mall.MALL_LATITUDE,
+			longitude: mall.MALL_LONGITUDE,
 			description: mall.MALL_DESCRIPTION,
 			mallCoverageArea: mall.MALL_COVERAGE_AREA || defaultMallCoverageArea,
 			majorBeacons: mall.MALL_BEACON_MAJOR,
@@ -186,14 +202,14 @@ function createMallService(supabase) {
 			}, []),
 			agreementStatus: status,
 			tier,
-			application: hasSubscription ? application?.APPLICATION_STATUS || '-' : '-',
-			arDevelopment: hasSubscription ? arDevelopment?.AR_DEVELOPMENT_STATUS || '-' : '-',
+			application: hasSubscription ? displayStatus(application?.APPLICATION_STATUS) : '-',
+			arDevelopment: hasSubscription ? displayStatus(arDevelopment?.AR_DEVELOPMENT_STATUS) : '-',
 			dateAdded: formatDate(mall.MALL_CREATED_AT),
 			lastUpdated: formatDate(mall.MALL_UPDATED_AT),
 			note: ['Grace Period', 'Suspended'].includes(status) && overdueDays > 0 ? `${overdueDays} days overdue` : null,
 			units: units.map(unit => {
 				const floor = floors.find(item => item.FLOOR_ID === unit.FLOOR_ID)
-				return { id: unit.UNIT_ID, floorId: unit.FLOOR_ID, floorNo: String(floor?.FLOOR_NUM ?? ''), unitNo: unit.UNIT_LABEL, status: unit.STORE_ID == null ? 'vacant' : unit.UNIT_STATUS?.toLowerCase() || 'occupied', isActive: true, storeId: unit.STORE_ID }
+				return { id: unit.UNIT_ID, floorId: unit.FLOOR_ID, floorNo: String(floor?.FLOOR_NUM ?? ''), floorLabel: floor?.FLOOR_LABEL || '', unitNo: unit.UNIT_LABEL, status: unit.STORE_ID == null ? 'vacant' : unit.UNIT_STATUS?.toLowerCase() || 'occupied', isActive: true, storeId: unit.STORE_ID }
 			}),
 			storesCount: upperKeys(storesResult.data || []).filter(store => store.STORE_STATUS !== 'inactive').length,
 			unitsCount: units.length,
@@ -201,6 +217,7 @@ function createMallService(supabase) {
 			beacons: beaconRows.map(beacon => {
 				const floor = floors.find(item => item.FLOOR_ID === beacon.FLOOR_ID)
 				const beaconTickets = ticketRows.filter(ticket => ticket.BEACON_ID === beacon.BEACON_ID)
+				const hasOnlyResolvedTickets = beaconTickets.length > 0 && beaconTickets.every(ticket => ticket.TICKET_CURRENT_STATUS === 'resolved')
 				const history = batteries.filter(battery => battery.BEACON_ID === beacon.BEACON_ID).map(battery => ({
 					id: battery.BATTERY_ID,
 					batteryId: battery.BATTERY_CODE,
@@ -221,7 +238,11 @@ function createMallService(supabase) {
 					minor: beacon.BEACON_MINOR,
 					txPower: beacon.BEACON_TX_POWER,
 					numNodes: beacon.BEACON_NODE_COUNT,
-					status: beacon.BEACON_STATUS?.toLowerCase() || 'placed',
+					status: beacon.BEACON_STATUS?.toLowerCase() === 'deactivated'
+						? 'deactivated'
+						: hasOnlyResolvedTickets
+							? 'placed'
+							: beacon.BEACON_STATUS?.toLowerCase() || 'placed',
 					dateInstalled: beacon.BEACON_INSTALLED_AT?.slice(0, 10),
 					lastMaintenanceDate: beacon.BEACON_MAINTAINED_AT?.slice(0, 10),
 					batteryHistory: history,
@@ -231,12 +252,15 @@ function createMallService(supabase) {
 						status: ticket.TICKET_CURRENT_STATUS?.toLowerCase() || 'faulty',
 						reason: ticket.TICKET_ISSUE || '',
 						note: ticketLogs.find(log => log.TICKET_ID === ticket.TICKET_ID)?.TICKET_LOG_NOTES || '',
+						assignedTo: ticket.TICKET_ASSIGNED_TO ? adminName(ticket.TICKET_ASSIGNED_TO) : null,
+						dateFiled: ticket.TICKET_REPORTED_AT,
+						dateResolved: ticketLogs.filter(log => log.TICKET_ID === ticket.TICKET_ID && log.TICKET_LOG_STATUS.toLowerCase().includes('resolved')).at(-1)?.TICKET_LOG_CHANGED_AT || null,
 						timeline: ticketLogs.filter(log => log.TICKET_ID === ticket.TICKET_ID).map(log => ({
 							id: log.TICKET_LOG_ID,
 							date: new Date(log.TICKET_LOG_CHANGED_AT).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
 							action: log.TICKET_LOG_STATUS,
 							source: 'admin',
-							by: `Admin #${log.TICKET_LOG_CHANGED_BY}`,
+							by: adminName(log.TICKET_LOG_CHANGED_BY),
 							note: log.TICKET_LOG_NOTES || null,
 						})),
 					})),
@@ -245,7 +269,7 @@ function createMallService(supabase) {
 				}
 			}),
 			arMaxVersion: Number(arDevelopment?.AR_DEVELOPMENT_VERSION || 1),
-			logoUrl: mall.MALL_LOGO ? `/api/malls/${mall.MALL_ID}/logo` : null,
+			logoUrl: mall.MALL_LOGO_PATH || mall.MALL_LOGO ? `/api/malls/${mall.MALL_ID}/logo` : null,
 		}
 	}
 
@@ -258,13 +282,17 @@ function createMallService(supabase) {
 			MALL_CITY: payload.city,
 			MALL_ZIPCODE: payload.zipCode || null,
 			MALL_ADDRESS: payload.address,
+			MALL_LATITUDE: payload.latitude == null ? null : Number(payload.latitude),
+			MALL_LONGITUDE: payload.longitude == null ? null : Number(payload.longitude),
 			MALL_FLOOR_COUNT: Number(payload.floors),
 			MALL_DESCRIPTION: payload.description || null,
 			MALL_COVERAGE_AREA: payload.mallCoverageArea || null,
 			MALL_BEACON_MAJOR: Number(payload.majorBeacons),
 			MALL_UPDATED_AT: timestamp,
 		}
-		if (payload.logoDataUrl) mallData.MALL_LOGO = toByteaHex(payload.logoDataUrl)
+		if (payload.logoDataUrl) {
+			mallData.MALL_LOGO = toByteaHex(payload.logoDataUrl)
+		}
 		if (!mallId) {
 			mallData.MALL_CREATED_AT = timestamp
 			if (!mallData.MALL_LOGO) return reply.code(400).send({ message: 'A mall logo is required.' })
@@ -275,6 +303,16 @@ function createMallService(supabase) {
 			: await supabase.from('mall').insert(lowerKeys(mallData)).select(dbColumn('MALL_ID')).single()
 		if (mallResult.error) { request.log.error({ code: mallResult.error.code }, 'Mall save failed'); return reply.code(400).send({ message: 'Unable to save mall.' }) }
 		const id = mallId || upperKeys(mallResult.data).MALL_ID
+		if (payload.logoDataUrl) {
+			const logoPath = `malls/${id}/logo`
+			try {
+				await uploadImage(supabase, logoPath, payload.logoDataUrl)
+				const pathResult = await supabase.from('mall').update({ mall_logo_path: logoPath }).eq('mall_id', id)
+				if (pathResult.error) throw pathResult.error
+			} catch (storageError) {
+				request.log.error({ message: storageError.message }, 'Mall logo storage upload failed; keeping database image')
+			}
+		}
 
 		const floorRows = (payload.floorDetails || []).map((floor, index) => ({
 			FLOOR_NUM: Number(floor.floorNo) || index + 1,
@@ -283,14 +321,30 @@ function createMallService(supabase) {
 			FLOOR_UPDATED_AT: timestamp,
 			MALL_ID: id,
 		}))
+		let existingFloors = []
 		if (mallId) {
-			const floorDelete = await supabase.from('floor').delete().eq(dbColumn('MALL_ID'), id)
-			const hoursDelete = await supabase.from('operating_hours').delete().eq(dbColumn('MALL_ID'), id).eq(dbColumn('OPTHRS_IS_MALL'), true)
-			if (floorDelete.error || hoursDelete.error) { request.log.error({ code: (floorDelete.error || hoursDelete.error).code }, 'Mall cleanup failed'); return reply.code(500).send({ message: 'Unable to save mall.' }) }
+			const existingFloorResult = await supabase.from('floor').select('floor_id').eq(dbColumn('MALL_ID'), id).order(dbColumn('FLOOR_NUM'))
+			const hoursDelete = await supabase.from('operating_hours').delete().eq(dbColumn('MALL_ID'), id).or('opthrs_is_store.eq.false,opthrs_is_store.is.null').eq(dbColumn('OPTHRS_IS_INQUIRY'), false)
+			if (existingFloorResult.error || hoursDelete.error) {
+				const failure = existingFloorResult.error || hoursDelete.error
+				request.log.error({ code: failure.code, message: failure.message, details: failure.details }, 'Mall cleanup failed')
+				return reply.code(500).send({ message: 'Unable to save mall.' })
+			}
+			existingFloors = existingFloorResult.data || []
 		}
-		if (floorRows.length) {
-			const floors = await supabase.from('floor').insert(floorRows.map(lowerKeys))
-			if (floors.error) { request.log.error({ code: floors.error.code }, 'Floor save failed'); return reply.code(400).send({ message: 'Unable to save mall.' }) }
+		for (let index = 0; index < floorRows.length; index += 1) {
+			const floor = floorRows[index]
+			const result = existingFloors[index]
+				? await supabase.from('floor').update({
+					floor_num: floor.FLOOR_NUM,
+					floor_label: floor.FLOOR_LABEL,
+					floor_updated_at: floor.FLOOR_UPDATED_AT,
+				}).eq('floor_id', existingFloors[index].floor_id)
+				: await supabase.from('floor').insert(lowerKeys(floor))
+			if (result.error) {
+				request.log.error({ code: result.error.code, message: result.error.message, details: result.error.details }, 'Floor save failed')
+				return reply.code(400).send({ message: 'Unable to save mall.' })
+			}
 		}
 		const hourRows = (payload.operatingHours || []).flatMap(schedule => schedule.days.map(day => ({
 			OPTHRS_DAY_OF_WEEK: day,
@@ -425,17 +479,28 @@ async function registerMallManagementRoutes(app) {
 		try {
 			return await service.getMall(request.params.id)
 		} catch (error) {
-			request.log.error({ code: error.code }, 'Could not load mall')
+			request.log.error({ code: error.code, message: error.message, details: error.details, hint: error.hint }, 'Could not load mall')
 			return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: 'Unable to load mall.' })
 		}
 	})
 
 	app.get('/api/malls/:id/logo', async (request, reply) => {
-		const { data, error } = await app.supabase.from('mall').select('mall_logo').eq('mall_id', request.params.id).single()
+		let { data, error } = await app.supabase.from('mall').select('mall_logo, mall_logo_path').eq('mall_id', request.params.id).single()
+		if (error?.code === '42703') {
+			const fallback = await app.supabase.from('mall').select('mall_logo').eq('mall_id', request.params.id).single()
+			data = fallback.data
+			error = fallback.error
+		}
 		if (error) { request.log.error({ code: error.code }, 'Could not load mall logo'); return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: 'Unable to load logo.' }) }
+		if (data.mall_logo_path) {
+			try {
+				const image = await downloadImage(app.supabase, data.mall_logo_path)
+				return reply.header('Cross-Origin-Resource-Policy', 'cross-origin').header('Content-Type', contentTypeFromBuffer(image)).header('Cache-Control', 'private, max-age=300').send(image)
+			} catch (storageError) { request.log.error({ message: storageError.message }, 'Could not load mall logo from storage') }
+		}
 		const image = logoBuffer(data.mall_logo)
 		if (!image) return reply.code(404).send({ message: 'Mall logo not found.' })
-		return reply.header('Content-Type', imageContentType(image)).header('Cache-Control', 'private, max-age=300').send(image)
+		return reply.header('Cross-Origin-Resource-Policy', 'cross-origin').header('Content-Type', imageContentType(image)).header('Cache-Control', 'private, max-age=300').send(image)
 	})
 
 	app.post('/api/malls', (request, reply) => service.saveMall(request, reply))
@@ -505,9 +570,153 @@ async function registerMallManagementRoutes(app) {
 		if (result.error) throw result.error
 	}
 
+	async function notifyMallAdminsOfTicket({ mallId, ticketId, beaconCode, status, assignedTo, actorId, actorRole }) {
+		return notifyMallAdmins({
+			mallId,
+			sourceType: 'beacon_ticket',
+			sourceId: Number(ticketId),
+			sourceLabel: `Beacon ${beaconCode || `#${ticketId}`} ticket`,
+			title: 'Beacon ticket status changed',
+			message: `Beacon ${beaconCode || `#${ticketId}`} ticket was marked as ${status === 'maintenance' ? 'under maintenance' : status}.${assignedTo ? ` Assigned to ${assignedTo}.` : ''}`,
+			actionUrl: `/mall-management/beacon-tickets?ticketId=${ticketId}`,
+			actorId,
+			actorRole,
+		})
+	}
+
+	async function notifyMallAdmins({ mallId, sourceType, sourceId, sourceLabel, title, message, actionUrl, actionLabel = 'View details', actorId, actorRole }) {
+		const recipients = await app.supabase
+			.from('admin')
+			.select('admin_id, admin_role, mall_id')
+			.eq('admin_is_deactivated', false)
+		if (recipients.error) throw recipients.error
+		const recipientAdmins = (recipients.data || []).filter(admin =>
+			admin.admin_role === 'mall_admin' && String(admin.mall_id) === String(mallId)
+		)
+		if (!recipientAdmins.length) return
+
+		const notifications = recipientAdmins.map(recipient => ({
+			admin_notif_type: sourceType === 'beacon_ticket' ? 'ticket_status_changed' : 'beacon_status_changed',
+			admin_notif_title: title,
+			admin_notif_message: message,
+			admin_notif_action_url: actionUrl,
+			admin_notif_action_label: actionLabel,
+			admin_notif_source_type: sourceType,
+			admin_notif_source_id: sourceId,
+			admin_notif_source_label: sourceLabel,
+			admin_notif_actor_id: actorId,
+			admin_notif_actor_role: actorRole || 'admin',
+			admin_notif_is_read: false,
+			admin_notif_is_archived: false,
+			admin_notif_created_at: now(),
+			admin_id: recipient.admin_id,
+			mall_id: mallId,
+		}))
+		const result = await app.supabase.from('admin_notification').insert(notifications)
+		if (result.error) {
+			app.log.error({
+				code: result.error.code,
+				message: result.error.message,
+				details: result.error.details,
+				hint: result.error.hint,
+				mallId,
+				sourceType,
+				sourceId,
+			}, 'Admin notification delivery failed')
+		}
+	}
+
+	app.get('/api/admin-notifications', async (request, reply) => {
+		try {
+			const includeArchived = request.query?.includeArchived === 'true'
+			const result = await app.supabase
+				.from('admin_notification')
+				.select('*')
+				.eq('admin_id', request.admin.id)
+				.eq('admin_notif_is_archived', includeArchived ? true : false)
+				.order('admin_notif_created_at', { ascending: false })
+			if (result.error) throw result.error
+			const mallOnlyTypes = new Set([
+				'application_approved',
+				'application_revision_requested',
+				'ar_development_status_changed',
+				'beacon_ticket',
+				'ticket_status_changed',
+				'beacon_status_changed',
+			])
+			const visibleNotifications = request.admin.role === 'super_admin'
+				? (result.data || []).filter(notification => !mallOnlyTypes.has(notification.admin_notif_type) && !mallOnlyTypes.has(notification.admin_notif_source_type))
+				: result.data || []
+			return visibleNotifications.map(notification => ({
+				id: notification.admin_notif_id,
+				type: notification.admin_notif_type,
+				title: notification.admin_notif_title,
+				message: notification.admin_notif_message,
+				actionUrl: notification.admin_notif_action_url,
+				actionLabel: notification.admin_notif_action_label,
+				sourceType: notification.admin_notif_source_type,
+				sourceId: notification.admin_notif_source_id,
+				sourceLabel: notification.admin_notif_source_label,
+				mallId: notification.mall_id,
+				read: notification.admin_notif_is_read,
+				createdAt: notification.admin_notif_created_at,
+			}))
+		} catch (error) {
+			request.log.error({ code: error.code, message: error.message }, 'Admin notifications load failed')
+			return reply.code(500).send({ message: 'Unable to load notifications.' })
+		}
+	})
+
+	app.patch('/api/admin-notifications/:id/read', async (request, reply) => {
+		try {
+			const result = await app.supabase
+				.from('admin_notification')
+				.update({ admin_notif_is_read: true, admin_notif_read_at: now() })
+				.eq('admin_notif_id', request.params.id)
+				.eq('admin_id', request.admin.id)
+			if (result.error) throw result.error
+			return reply.send({ message: 'Notification marked as read.' })
+		} catch (error) {
+			request.log.error({ code: error.code, message: error.message }, 'Admin notification read update failed')
+			return reply.code(500).send({ message: 'Unable to update notification.' })
+		}
+	})
+
+	app.patch('/api/admin-notifications/read-all', async (request, reply) => {
+		try {
+			const result = await app.supabase
+				.from('admin_notification')
+				.update({ admin_notif_is_read: true, admin_notif_read_at: now() })
+				.eq('admin_id', request.admin.id)
+				.eq('admin_notif_is_archived', false)
+				.eq('admin_notif_is_read', false)
+			if (result.error) throw result.error
+			return reply.send({ message: 'Notifications marked as read.' })
+		} catch (error) {
+			request.log.error({ code: error.code, message: error.message }, 'All admin notifications read update failed')
+			return reply.code(500).send({ message: 'Unable to update notifications.' })
+		}
+	})
+
+	app.patch('/api/admin-notifications/:id/archive', async (request, reply) => {
+		try {
+			const result = await app.supabase
+				.from('admin_notification')
+				.update({ admin_notif_is_archived: true })
+				.eq('admin_notif_id', request.params.id)
+				.eq('admin_id', request.admin.id)
+			if (result.error) throw result.error
+			return reply.send({ message: 'Notification archived.' })
+		} catch (error) {
+			request.log.error({ code: error.code, message: error.message }, 'Admin notification archive failed')
+			return reply.code(500).send({ message: 'Unable to archive notification.' })
+		}
+	})
+
 	app.post('/api/malls/:id/beacons/:beaconId/fault-ticket', async (request, reply) => {
 		try {
-			await getBeaconForMall(request.params.id, request.params.beaconId)
+			const beacon = await app.supabase.from('beacon').select('beacon_id, beacon_code, mall_id').eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id).single()
+			if (beacon.error) throw beacon.error
 			const { issue, description, status = 'faulty' } = request.body || {}
 			if (!issue?.trim() || !description?.trim()) return reply.code(400).send({ message: 'Issue and description are required.' })
 			const ticketStatus = status === 'pending' ? 'pending' : 'faulty'
@@ -521,6 +730,14 @@ async function registerMallManagementRoutes(app) {
 			}).select('ticket_id').single()
 			if (created.error) throw created.error
 			await addTicketLog(created.data.ticket_id, ticketStatus === 'pending' ? 'Marked as pending' : 'Marked as faulty', description.trim(), request.admin.id)
+			await notifyMallAdminsOfTicket({
+				mallId: beacon.data.mall_id,
+				ticketId: created.data.ticket_id,
+				beaconCode: beacon.data.beacon_code,
+				status: ticketStatus,
+				actorId: request.admin.id,
+				actorRole: request.admin.role,
+			})
 			if (ticketStatus === 'faulty') {
 				const updated = await app.supabase.from('beacon').update({ beacon_status: 'faulty' }).eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id)
 				if (updated.error) throw updated.error
@@ -534,9 +751,10 @@ async function registerMallManagementRoutes(app) {
 
 	app.post('/api/malls/:id/beacons/:beaconId/reactivate', async (request, reply) => {
 		try {
-			await getBeaconForMall(request.params.id, request.params.beaconId)
+			const current = await app.supabase.from('beacon').select('beacon_id, beacon_code, mall_id, beacon_status').eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id).single()
+			if (current.error) throw current.error
 			const remarks = request.body?.remarks?.trim()
-			if (!remarks) return reply.code(400).send({ message: 'Reactivation remarks are required.' })
+			if (current.data.beacon_status !== 'deactivated' && !remarks) return reply.code(400).send({ message: 'Reactivation remarks are required.' })
 			const active = await app.supabase.from('beacon_ticket').select('ticket_id, ticket_issue').eq('beacon_id', request.params.beaconId).neq('ticket_current_status', 'resolved').order('ticket_reported_at', { ascending: false }).limit(1).maybeSingle()
 			if (active.error) throw active.error
 			const updatedBeacon = await app.supabase.from('beacon').update({ beacon_status: 'placed' }).eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id)
@@ -545,11 +763,79 @@ async function registerMallManagementRoutes(app) {
 				const updatedTicket = await app.supabase.from('beacon_ticket').update({ ticket_current_status: 'resolved', ticket_assigned_to: request.admin.id }).eq('ticket_id', active.data.ticket_id)
 				if (updatedTicket.error) throw updatedTicket.error
 				await addTicketLog(active.data.ticket_id, 'Marked as resolved', `Beacon reactivated in Beacon Management. ${remarks}`, request.admin.id)
+				const beacon = await app.supabase.from('beacon').select('beacon_code, mall_id').eq('beacon_id', request.params.beaconId).single()
+				if (beacon.error) throw beacon.error
+				await notifyMallAdminsOfTicket({
+					mallId: beacon.data.mall_id,
+					ticketId: active.data.ticket_id,
+					beaconCode: beacon.data.beacon_code,
+					status: 'resolved',
+					actorId: request.admin.id,
+					actorRole: request.admin.role,
+				})
+			} else {
+				await notifyMallAdmins({
+					mallId: current.data.mall_id,
+					sourceType: 'beacon',
+					sourceId: Number(current.data.beacon_id),
+					sourceLabel: `Beacon ${current.data.beacon_code || `#${current.data.beacon_id}`}`,
+					title: 'Beacon reactivated',
+					message: `Beacon ${current.data.beacon_code || `#${current.data.beacon_id}`} was reactivated.${remarks ? ` ${remarks}` : ''}`,
+					actionUrl: `/mall-management/beacons/${current.data.mall_id}`,
+					actionLabel: 'View beacon',
+					actorId: request.admin.id,
+					actorRole: request.admin.role,
+				})
 			}
 			return reply.send((await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(request.params.beaconId)))
 		} catch (error) {
 			request.log.error({ code: error.code }, 'Beacon reactivation failed')
 			return reply.code(400).send({ message: 'Unable to reactivate beacon.' })
+		}
+	})
+
+	app.post('/api/malls/:id/beacons/:beaconId/deactivate', async (request, reply) => {
+		try {
+			const beacon = await app.supabase
+				.from('beacon')
+				.select('beacon_id, beacon_code, mall_id')
+				.eq('beacon_id', request.params.beaconId)
+				.eq('mall_id', request.params.id)
+				.single()
+			if (beacon.error) throw beacon.error
+			const updated = await app.supabase
+				.from('beacon')
+				.update({ beacon_status: 'deactivated' })
+				.eq('beacon_id', request.params.beaconId)
+				.eq('mall_id', request.params.id)
+				.select('*')
+				.single()
+			if (updated.error) throw updated.error
+			await notifyMallAdmins({
+				mallId: beacon.data.mall_id,
+				sourceType: 'beacon',
+				sourceId: Number(beacon.data.beacon_id),
+				sourceLabel: `Beacon ${beacon.data.beacon_code || `#${beacon.data.beacon_id}`}`,
+				title: 'Beacon deactivated',
+				message: `Beacon ${beacon.data.beacon_code || `#${beacon.data.beacon_id}`} was deactivated.`,
+				actionUrl: `/mall-management/beacons/${beacon.data.mall_id}`,
+				actionLabel: 'View beacon',
+				actorId: request.admin.id,
+				actorRole: request.admin.role,
+			})
+			const updatedBeacon = (await service.getMall(request.params.id)).beacons.find(beacon => String(beacon.id) === String(request.params.beaconId))
+			if (!updatedBeacon) return reply.code(404).send({ message: 'Beacon was updated but could not be loaded.' })
+			return reply.send(updatedBeacon)
+		} catch (error) {
+			request.log.error({
+				code: error.code,
+				message: error.message,
+				details: error.details,
+				hint: error.hint,
+				mallId: request.params.id,
+				beaconId: request.params.beaconId,
+			}, 'Beacon deactivation failed')
+			return reply.code(400).send({ message: 'Unable to deactivate beacon.' })
 		}
 	})
 
@@ -617,6 +903,8 @@ async function registerMallManagementRoutes(app) {
 			if (!allowed.includes(status)) return reply.code(400).send({ message: 'Invalid ticket status.' })
 			const ticket = await app.supabase.from('beacon_ticket').select('ticket_id, beacon_id, ticket_current_status, ticket_issue').eq('ticket_id', request.params.ticketId).single()
 			if (ticket.error) throw ticket.error
+			const beacon = await app.supabase.from('beacon').select('beacon_id, beacon_code, mall_id').eq('beacon_id', ticket.data.beacon_id).single()
+			if (beacon.error) throw beacon.error
 			if (status === 'investigating' && !assignedTo) return reply.code(400).send({ message: 'Please select who to assign.' })
 			let assignedAdminId = null
 			if (status === 'investigating') {
@@ -630,9 +918,18 @@ async function registerMallManagementRoutes(app) {
 			if (updated.error) throw updated.error
 			const labels = { faulty: 'Marked as faulty', investigating: 'Marked as investigating', maintenance: 'Marked as under maintenance', resolved: 'Marked as resolved' }
 			await addTicketLog(request.params.ticketId, labels[status], note, request.admin.id)
-			if (status === 'faulty') {
-				const beacon = await app.supabase.from('beacon').update({ beacon_status: 'faulty' }).eq('beacon_id', ticket.data.beacon_id)
-				if (beacon.error) throw beacon.error
+			await notifyMallAdminsOfTicket({
+				mallId: beacon.data.mall_id,
+				ticketId: Number(request.params.ticketId),
+				beaconCode: beacon.data.beacon_code,
+				status,
+				assignedTo: status === 'investigating' ? assignedTo : null,
+				actorId: request.admin.id,
+				actorRole: request.admin.role,
+			})
+			if (status === 'faulty' || status === 'resolved') {
+				const updatedBeacon = await app.supabase.from('beacon').update({ beacon_status: status === 'resolved' ? 'placed' : 'faulty' }).eq('beacon_id', ticket.data.beacon_id)
+				if (updatedBeacon.error) throw updatedBeacon.error
 			}
 			return reply.send({ message: 'Ticket updated.' })
 		} catch (error) {
@@ -727,8 +1024,14 @@ async function registerMallManagementRoutes(app) {
 	})
 
 	app.get('/api/brands/:id/logo', async (request, reply) => {
-		const { data, error } = await app.supabase.from('brand').select('brand_logo').eq('brand_id', request.params.id).single()
+		const { data, error } = await app.supabase.from('brand').select('brand_logo, brand_logo_path').eq('brand_id', request.params.id).single()
 		if (error) { request.log.error({ code: error.code }, 'Could not load brand logo'); return reply.code(error.code === 'PGRST116' ? 404 : 500).send({ message: 'Unable to load logo.' }) }
+		if (data.brand_logo_path) {
+			try {
+				const image = await downloadImage(app.supabase, data.brand_logo_path)
+				return reply.header('Content-Type', contentTypeFromBuffer(image)).header('Cache-Control', 'private, max-age=300').send(image)
+			} catch (storageError) { request.log.error({ message: storageError.message }, 'Could not load brand logo from storage') }
+		}
 		if (typeof data.brand_logo === 'string' && data.brand_logo.startsWith('data:')) return reply.redirect(data.brand_logo)
 		const image = logoBuffer(data.brand_logo)
 		if (!image) return reply.code(404).send({ message: 'Brand logo not found.' })
@@ -745,6 +1048,17 @@ async function registerMallManagementRoutes(app) {
 			? await app.supabase.from('brand').update(row).eq('brand_id', brandId).select('*').single()
 			: await app.supabase.from('brand').insert(row).select('*').single()
 		if (result.error) { request.log.error({ code: result.error.code }, 'Brand save failed'); return reply.code(400).send({ message: 'Unable to save brand.' }) }
+		if (payload.logo?.startsWith('data:')) {
+			const logoPath = `brands/${brandId || result.data.brand_id}/logo`
+			try {
+				await uploadImage(app.supabase, logoPath, payload.logo)
+				const pathResult = await app.supabase.from('brand').update({ brand_logo_path: logoPath }).eq('brand_id', brandId || result.data.brand_id)
+				if (pathResult.error) throw pathResult.error
+			} catch (storageError) {
+				request.log.error({ message: storageError.message }, 'Brand logo storage upload failed')
+				return reply.code(400).send({ message: 'Unable to save brand logo.' })
+			}
+		}
 		return reply.code(brandId ? 200 : 201).send(toBrand(result.data))
 	}
 	app.post('/api/brands', (request, reply) => saveBrand(request, reply))

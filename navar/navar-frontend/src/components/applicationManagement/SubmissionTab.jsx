@@ -1,3 +1,7 @@
+import { useState } from 'react'
+import AuthImage from '../ui/AuthImage'
+import { apiRequest } from '../../config/api'
+
 function FileIcon() {
   return (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -7,7 +11,87 @@ function FileIcon() {
   )
 }
 
+function formatTime(time) {
+  if (!time) return ''
+  const [hours, minutes] = String(time).split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return String(time)
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+function formatOperatingHours(hours) {
+  if (!Array.isArray(hours) || hours.length === 0) return '—'
+  return hours
+    .filter(hour => hour.opthrs_is_mall)
+    .map(hour => `${String(hour.opthrs_day_of_week || '').slice(0, 3)}: ${
+      hour.opthrs_is_closed
+        ? 'Closed'
+        : `${formatTime(hour.opthrs_open_time)} – ${formatTime(hour.opthrs_close_time)}`
+    }`)
+    .join('\n')
+}
+
+function FloorPlanCard({ floorPlan }) {
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function openFloorPlan() {
+    setLoading(true)
+    try {
+      const result = await apiRequest(`/api/application-floor-plans/${floorPlan.app_floor_plan_id}/url`)
+      setPreviewUrl(result.url)
+    } catch (error) {
+      console.error('Floor-plan preview failed:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function downloadFloorPlan() {
+    try {
+      const result = await apiRequest(`/api/application-floor-plans/${floorPlan.app_floor_plan_id}/url`)
+      const link = document.createElement('a')
+      link.href = result.url
+      link.download = result.fileName || floorPlan.filename || 'floor-plan'
+      link.target = '_blank'
+      link.rel = 'noopener'
+      link.click()
+    } catch (error) {
+      console.error('Floor-plan download failed:', error)
+    }
+  }
+
+  return (
+    <>
+      <div className="review-floor-card">
+        <button className="review-floor-card-preview" onClick={openFloorPlan} disabled={loading}>
+          <div className="review-floor-card-icon"><FileIcon /></div>
+          <div className="review-floor-card-info">
+            <div className="review-floor-card-name">{floorPlan.floor}</div>
+            <div className="review-floor-card-file">{floorPlan.filename} · {floorPlan.size}</div>
+          </div>
+        </button>
+        <button className="review-download-btn" onClick={downloadFloorPlan}>Download</button>
+      </div>
+      {previewUrl && (
+        <div className="review-floor-preview-overlay" onClick={() => setPreviewUrl('')}>
+          <img src={previewUrl} alt={`${floorPlan.floor} floor plan`} />
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function SubmissionTab({ app, isStallApplication = false }) {
+  const floorPlans = app.floorPlans || []
+  const scaleReference = app.scaleReference || { referenceLine: '', lengthInMeters: '', floor: '' }
+  const accessibilityRoutes = app.accessibilityRoutes || []
+  const emergencyExits = app.emergencyExits || []
+  const entryPoints = app.entryPoints || []
+  const operatingHours = typeof app.operatingHours === 'string'
+    ? app.operatingHours
+    : formatOperatingHours(app.operatingHours)
+  const logoUrl = app.logoUrl
   const SUBSCRIPTION_TIERS = {
     'Basic': { maxTenants: 50 },
     'Standard': { maxTenants: 100 },
@@ -80,20 +164,11 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
           <div className="review-section-accent accent--grey" />
           <span className="review-section-title">Floor Plans</span>
         </div>
-        {app.floorPlans.length === 0 ? (
+        {floorPlans.length === 0 ? (
           <p style={{ color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>No floor plans uploaded yet.</p>
         ) : (
           <div className="review-floor-plans">
-            {app.floorPlans.map((fp, i) => (
-              <div key={i} className="review-floor-card">
-                <div className="review-floor-card-icon"><FileIcon /></div>
-                <div className="review-floor-card-info">
-                  <div className="review-floor-card-name">{fp.floor}</div>
-                  <div className="review-floor-card-file">{fp.filename} · {fp.size}</div>
-                </div>
-                <button className="review-download-btn">Download</button>
-              </div>
-            ))}
+            {floorPlans.map(fp => <FloorPlanCard key={fp.app_floor_plan_id || fp.floor} floorPlan={fp} />)}
           </div>
         )}
 
@@ -159,11 +234,15 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
         </div>
         <div className="review-info-row">
           <span className="review-info-label">Operating Hours</span>
-          <span className="review-info-value">{app.operatingHours}</span>
+          <span className="review-info-value review-info-value--multiline">{operatingHours || 'Not provided'}</span>
         </div>
         <div className="review-info-row">
           <span className="review-info-label">Logo</span>
-          <span className="review-info-value">{app.logo}</span>
+          <span className="review-info-value">
+            {logoUrl
+              ? <AuthImage className="review-mall-logo" src={logoUrl} alt={`${app.mallName} logo`} />
+              : 'No logo'}
+          </span>
         </div>
       </div>
 
@@ -172,20 +251,11 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
         <div className="review-section-accent accent--grey" />
         <span className="review-section-title">Floor Plans</span>
       </div>
-      {app.floorPlans.length === 0 ? (
+      {floorPlans.length === 0 ? (
         <p style={{ color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>No floor plans uploaded yet.</p>
       ) : (
         <div className="review-floor-plans">
-          {app.floorPlans.map((fp, i) => (
-            <div key={i} className="review-floor-card">
-              <div className="review-floor-card-icon"><FileIcon /></div>
-              <div className="review-floor-card-info">
-                <div className="review-floor-card-name">{fp.floor}</div>
-                <div className="review-floor-card-file">{fp.filename} · {fp.size}</div>
-              </div>
-              <button className="review-download-btn">Download</button>
-            </div>
-          ))}
+          {floorPlans.map(fp => <FloorPlanCard key={fp.app_floor_plan_id || fp.floor} floorPlan={fp} />)}
         </div>
       )}
 
@@ -197,19 +267,19 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
       <div className="review-callout review-callout--blue">
         Used to calibrate pixel-to-meter distances in the node editor. Without this, navigation timing will be inaccurate.
       </div>
-      {app.scaleReference.referenceLine ? (
+      {scaleReference.referenceLine ? (
         <div className="review-info-table" style={{ marginBottom: 4 }}>
           <div className="review-info-row">
             <span className="review-info-label">Reference Line</span>
-            <span className="review-info-value" style={{ maxWidth: 260 }}>{app.scaleReference.referenceLine}</span>
+            <span className="review-info-value" style={{ maxWidth: 260 }}>{scaleReference.referenceLine}</span>
           </div>
           <div className="review-info-row">
             <span className="review-info-label">Length in meters</span>
-            <span className="review-info-value">{app.scaleReference.lengthInMeters}</span>
+            <span className="review-info-value">{scaleReference.lengthInMeters}</span>
           </div>
           <div className="review-info-row">
             <span className="review-info-label">Floor</span>
-            <span className="review-info-value">{app.scaleReference.floor}</span>
+            <span className="review-info-value">{scaleReference.floor}</span>
           </div>
         </div>
       ) : (
@@ -227,9 +297,9 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
 
       <div className="review-sub-section-title sub-title--yellow">Accessible Routes</div>
       <div className="review-access-cards">
-        {app.accessibilityRoutes.length === 0
+        {accessibilityRoutes.length === 0
           ? <p style={{ color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>No accessible routes provided.</p>
-          : app.accessibilityRoutes.map((r, i) => (
+          : accessibilityRoutes.map((r, i) => (
             <div key={i} className="review-access-card review-access-card--yellow">
               <span className="review-access-floor-badge floor-badge--yellow">{r.floor}</span>
               <span className="review-access-text">{r.description}</span>
@@ -240,9 +310,9 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
 
       <div className="review-sub-section-title sub-title--red">Emergency Exits & Fire Exits</div>
       <div className="review-access-cards">
-        {app.emergencyExits.length === 0
+        {emergencyExits.length === 0
           ? <p style={{ color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>No emergency exits provided.</p>
-          : app.emergencyExits.map((e, i) => (
+          : emergencyExits.map((e, i) => (
             <div key={i} className="review-access-card review-access-card--grey">
               <div style={{ flex: 1 }}>
                 <div className="review-access-text" style={{ fontWeight: 500, fontSize: 13, color: '#000' }}>{e.description}</div>
@@ -260,9 +330,9 @@ export default function SubmissionTab({ app, isStallApplication = false }) {
         <span className="review-section-title">Entry Points</span>
       </div>
       <div className="review-access-cards">
-        {app.entryPoints.length === 0
+        {entryPoints.length === 0
           ? <p style={{ color: '#9B9C9C', fontFamily: 'Poppins', fontSize: 13 }}>No entry points provided.</p>
-          : app.entryPoints.map((ep, i) => (
+          : entryPoints.map((ep, i) => (
             <div key={i} className="review-entry-card">
               <div className="review-entry-info">
                 <div className="review-entry-name">{ep.name}</div>

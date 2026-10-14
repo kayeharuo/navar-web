@@ -396,26 +396,35 @@ const initialBrands = [
 ]
 void initialBrands
 
+let mallListCache = []
+
 export default function MallsTable() {
   const navigate = useNavigate()
   const location = useLocation()
   const activeTab = PATH_TABS[location.pathname.split('/').filter(Boolean)[1]] || 'Malls'
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [malls, setMalls] = useState(initialMalls)
+  const [malls, setMalls] = useState(() => mallListCache.length ? mallListCache : initialMalls)
   const [loading, setLoading] = useState(true)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingMall, setEditingMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
-
   const loadMalls = useCallback(() => {
     setLoading(true)
-    apiRequest('/api/malls').then(setMalls).catch(showRequestError).finally(() => setLoading(false))
+    apiRequest('/api/malls').then(nextMalls => {
+      mallListCache = nextMalls
+      setMalls(nextMalls)
+    }).catch(showRequestError).finally(() => setLoading(false))
   }, [])
 
   function showRequestError(error) {
-    console.error('Mall Management request failed:', error.details || error)
+    console.error('Mall Management request failed:', {
+      message: error.message,
+      status: error.status,
+      details: error.details,
+      cause: error.cause,
+    })
     window.alert(error.message)
   }
 
@@ -478,7 +487,11 @@ export default function MallsTable() {
         application: '-',
         arDevelopment: '-',
       }
-      setMalls(prev => [...prev, mall])
+      setMalls(prev => {
+        const nextMalls = [...prev, mall]
+        mallListCache = nextMalls
+        return nextMalls
+      })
       setShowAddModal(false)
     } catch (error) {
       showRequestError(error)
@@ -488,7 +501,11 @@ export default function MallsTable() {
   async function handleEditSave(data) {
     try {
       const mall = await apiRequest(`/api/malls/${editingMall.id}`, { method: 'PUT', body: JSON.stringify(data) })
-      setMalls(prev => prev.map(item => item.id === mall.id ? mall : item))
+      setMalls(prev => {
+        const nextMalls = prev.map(item => item.id === mall.id ? mall : item)
+        mallListCache = nextMalls
+        return nextMalls
+      })
       setViewMall(current => current?.id === mall.id ? mall : current)
       setEditingMall(null)
     } catch (error) {
@@ -716,7 +733,7 @@ export default function MallsTable() {
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
+                    {loading && malls.length === 0 ? (
                       <tr><td colSpan={9} className="mall-table-empty mall-table-loading"><span className="table-loading"><span className="table-loading-spinner" />Loading malls...</span></td></tr>
                     ) : filteredMalls.length === 0 ? (
                       <tr><td colSpan={9} className="mall-table-empty">No malls found.</td></tr>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import UnitsPanel from '../components/mallManagement/UnitsPanel'
-import MallManagement from './MallManagement'
 import { apiRequest } from '../config/api'
+import '../styles/mallManagement/mallManagementLayout.css'
+import '../styles/mallManagement/mallModal.css'
 
 export default function UnitsPage() {
   const { mallId } = useParams()
@@ -19,20 +20,9 @@ export default function UnitsPage() {
   }
 
   if (!mall) {
-    return (
-      <>
-        <MallManagement />
-        <div className="stores-page-loading" role="status" aria-live="polite">
-          <span className="stores-page-spinner" aria-hidden="true" />
-          <span>Loading units...</span>
-        </div>
-      </>
-    )
+    return <div className="stores-page-loading" role="status" aria-live="polite"><span className="stores-page-spinner" aria-hidden="true" /><span>Loading units...</span></div>
   }
   return (
-    <>
-      <MallManagement />
-      <UnitsPanel mall={mall} onClose={() => navigate('/mall-management')} onSave={saveUnits} />
-    </>
+    <UnitsPanel mall={mall} onClose={() => navigate('/mall-management')} onSave={saveUnits} />
   )
 }

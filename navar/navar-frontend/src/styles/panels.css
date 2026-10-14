@@ -213,6 +213,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 10px;
+  text-align: left;
 }
 
 .notif-mini-title {
@@ -267,6 +268,12 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 14px;
+  width: 100%;
+  text-align: left;
+  background: #FFF;
+  border-top: none;
+  border-left: none;
+  border-right: none;
   border-bottom: 0.5px solid #F3F4F6;
   cursor: pointer;
   transition: background-color 0.12s;
@@ -295,6 +302,7 @@
 .notif-mini-body {
   flex: 1;
   min-width: 0;
+  text-align: left;
 }
 
 .notif-mini-text {
@@ -453,6 +461,7 @@
 .notif-card-content {
   flex: 1;
   min-width: 0;
+  text-align: left;
 }
 
 .notif-card-text {
@@ -461,6 +470,7 @@
   color: #374151;
   line-height: 1.5;
   margin: 0 0 4px;
+  text-align: left;
 }
 
 .notif-card-text strong {
@@ -478,7 +488,104 @@
 .notif-card-right {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding-top: 4px;
+}
+
+.notif-card-right button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #6B7280;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.notif-card-right button:hover {
+  background: #EEF2FF;
+  color: #2563EB;
+}
+
+.notification-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 500;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid #BFDBFE;
+  border-radius: 12px;
+  background: #FFF;
+  box-shadow: 0 10px 28px rgba(31, 56, 76, 0.18);
+  color: #1F384C;
+  cursor: pointer;
+  text-align: left;
+  animation: notification-toast-in 0.2s ease-out;
+}
+
+.notification-toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #DBEAFE;
+  color: #2563EB;
+}
+
+.notification-toast-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.notification-toast-content strong {
+  color: #1F384C;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notification-toast-content span {
+  color: #4B5563;
+}
+
+.notification-toast-close {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: #9B9C9C;
+  cursor: pointer;
+}
+
+.notification-toast-close:hover {
+  color: #1F384C;
+}
+
+@keyframes notification-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .notif-card-dot {

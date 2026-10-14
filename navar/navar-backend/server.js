@@ -8,8 +8,10 @@ const { createClient } = require('@supabase/supabase-js')
 const registerMallManagementRoutes = require('./modules/mallManagement/routes')
 const createAuthGuards = require('./modules/auth/authGuard')
 const registerAccountManagementRoutes = require('./modules/accountManagement/routes')
+const registerApplicationTestingRoutes = require('./modules/applicationTesting/routes')
+const registerApplicationManagementRoutes = require('./modules/applicationManagement/routes')
 
-const app = Fastify({ logger: true, bodyLimit: 1024 * 1024 })
+const app = Fastify({ logger: true, bodyLimit: 25 * 1024 * 1024 })
 
 const port = Number(process.env.PORT || 3000)
 const host = process.env.HOST || '127.0.0.1'
@@ -34,7 +36,9 @@ app.register(cors, {
 	credentials: true,
 	methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 })
-app.register(helmet)
+app.register(helmet, {
+	crossOriginResourcePolicy: { policy: 'cross-origin' },
+})
 app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
 
 app.setErrorHandler((error, request, reply) => {
@@ -54,9 +58,15 @@ app.register(async protectedApp => {
 	protectedApp.addHook('preHandler', requireAuth())
 	protectedApp.addHook('preHandler', requireSuperAdmin)
 	registerMallManagementRoutes(protectedApp)
+	registerApplicationManagementRoutes(protectedApp)
 })
 
 registerAccountManagementRoutes(app, { supabase, requireAuth, requireSuperAdmin, requirePrimarySuperAdmin })
+app.register(async testingApp => {
+	testingApp.addHook('preHandler', requireAuth())
+	testingApp.addHook('preHandler', requireSuperAdmin)
+	registerApplicationTestingRoutes(testingApp)
+})
 
 const start = async () => {
 	try {

@@ -425,3 +425,359 @@ When a stall application is approved:
 - Advanced search filters (date range, agreement type, etc.)
 - Analytics dashboard for conversion rates
 - Payment receipt details and wallet transaction history links for paid additional-stall charges
+
+---
+
+## Confirmed Implementation Decisions
+
+These decisions apply to the database-backed development-application workflow.
+
+### Internal notification table
+
+Use the existing `public.admin_notification` table for both super-admin and
+mall-admin notifications. Do not create a second mall-admin notification
+table.
+
+- Create one notification row per recipient admin.
+- Notify every active `mall_admin` associated with the affected mall.
+- Notify active `super_admin` users for system-wide application events.
+- Do not notify `store_admin` users for this development workflow.
+- Keep mobile `APP_USER` notifications separate from internal admin
+  notifications.
+
+### Timestamp migration
+
+Migration `18_migrate_timestamps_to_philippines.sql` has already been run by
+the project owner. Its required assumption is that legacy
+`timestamp without time zone` values represented UTC wall-clock values before
+conversion.
+
+To verify the migration in Supabase SQL Editor, run:
+
+```sql
+SELECT
+    COUNT(*) FILTER (WHERE data_type = 'timestamp without time zone') AS
+        remaining_without_timezone,
+    COUNT(*) FILTER (WHERE data_type = 'timestamp with time zone') AS
+        timezone_aware_columns
+FROM information_schema.columns
+WHERE table_schema = 'public';
+```
+
+The first value should be `0` for the columns covered by the migration. To
+inspect the remaining column types and the configured session timezone, run:
+
+```sql
+SELECT
+    table_name,
+    column_name,
+    data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND data_type IN ('timestamp without time zone', 'timestamp with time zone')
+ORDER BY table_name, column_name;
+
+SHOW TIMEZONE;
+SELECT NOW() AS database_now,
+       NOW() AT TIME ZONE 'Asia/Manila' AS manila_wall_clock;
+```
+
+`SHOW TIMEZONE` should report `Asia/Manila` for a connection configured to
+display Philippine time. If it reports `UTC`, the stored instants can still be
+correct; only the display/session timezone remains to be configured. The
+application should format timestamps explicitly as `Asia/Manila` where
+consistent user-facing display is required.
+
+After verification, compare several known records from before and after the
+migration, including a mall, ticket, notification, and application record.
+The same instant should be displayed eight hours ahead of its UTC display.
+
+### Application and AR-development statuses
+
+Application statuses are:
+
+```text
+draft
+submitted
+for_revision
+approved
+```
+
+For the current implementation, AR development supports only:
+
+```text
+pending
+node_mapping
+suspended
+```
+
+The later statuses shown in the AR-development flow are reserved for future
+work:
+
+```text
+testing
+ready
+live
+unpublished
+published
+```
+
+Approving an application creates an AR-development record in `pending`.
+Selecting **Edit Map** opens a confirmation modal. Only after confirmation
+does a pending record transition to `node_mapping`; there is no separate
+Start Mapping action. Requesting revision on an approved application changes
+its application status to `for_revision` and suspends its AR-development
+record. Edit Map is disabled while suspended. Testing, ready, live,
+unpublished, and published actions are intentionally not implemented yet.
+
+### Draft behavior during development
+
+Subscription checks and mall-login detection are deferred. Until those
+requirements are finalized, every mall present in the `MALL` table without an
+application is represented in the application-management UI as a temporary
+`draft`.
+
+This is a testing rule. It must not be treated as proof that a mall has logged
+in or subscribed. The real eligibility condition can replace it later without
+changing the application workflow.
+
+### Floor-plan image storage
+
+Floor-plan images must be private. They will use the same Supabase Storage
+mechanism as mall and brand logos, but with application-specific paths in the
+existing private `navar-images` bucket.
+
+Recommended path format:
+
+```text
+applications/{application_id}/versions/{version}/floors/{floor_id}/{file_name}
+```
+
+The database should store the storage path, not a public URL and not a
+base64 image. The backend will create short-lived signed URLs for authorized
+viewing and downloading.
+
+The implementation will add explicit metadata columns rather than relying
+only on the existing image text field:
+
+- storage path
+- original file name
+- MIME type
+- file size
+
+This is preferable to treating `APPLICATION_FLOOR_PLAN_IMAGE` as an
+unstructured URL because it preserves file identity, allows reliable
+validation, supports downloads, and avoids exposing private storage. The
+existing logo storage behavior remains unchanged.
+
+Only the NavAR branding images remain intentionally public. Mall logos, brand
+logos, and application floor plans remain private and are served through
+authorized backend routes or signed URLs.
+
+### Queue behavior
+
+Subscription-aware prioritization is deferred. Until subscription rules are
+confirmed, pending AR-development records use first-come-first-served order.
+
+### Notification scope
+
+Application and AR-development notifications are stored in the database for
+now. The separate mall repository will later read the recipient's
+`admin_notification` rows and provide its own notification UI. No additional
+notification table is required for that repository.
+
+## Database Migration 19: Application Workflow Support
+
+Migration `19_application_workflow.sql` is the schema change for the
+database-backed application workflow. It is idempotent and can be run once in
+the Supabase SQL Editor.
+
+### Tables changed
+
+#### `public.thread_message_attachment`
+
+This generic table belongs to thread messages, regardless of thread source:
+development application, stall application, or AR development. Each row is
+one image, so one message can have multiple images.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `thread_message_attachment_id` | `SERIAL` | Primary key |
+| `thread_message_id` | `INTEGER NOT NULL` | Parent thread message |
+| `thread_message_attachment_type` | `VARCHAR(30)` | Currently `image` |
+| `thread_message_attachment_storage_path` | `TEXT NOT NULL` | Private Storage path |
+| `thread_message_attachment_file_name` | `VARCHAR(255) NOT NULL` | Original filename |
+| `thread_message_attachment_mime_type` | `VARCHAR(100) NOT NULL` | PNG, JPEG, or WebP |
+| `thread_message_attachment_file_size` | `BIGINT NOT NULL` | Size in bytes |
+| `thread_message_attachment_created_at` | `TIMESTAMPTZ NOT NULL` | Upload timestamp |
+| `thread_message_attachment_uploaded_by` | `INTEGER` nullable | Admin uploader |
+
+The table does not contain `application_id`, `stall_application_id`, or
+`ar_development_id`; the parent thread already identifies the source through
+`THREAD`.
+
+### Attachment limits
+
+Thread images are limited to PNG, JPEG, and WebP. The backend and database
+enforce:
+
+- Maximum 5 MB per image
+- Maximum 5 images per message
+- Maximum 20 MB total images per message
+
+Thread messages support selecting images in the application review UI. Stored
+attachments are returned with each message as short-lived authenticated signed
+URLs.
+
+Application floor plans are separate from thread attachments and are limited
+to PNG/JPEG files with a maximum of 10 MB per floor plan. PDF and DOCX
+attachments are not supported in this phase.
+
+#### `public.application_floor_plan`
+
+Four nullable columns are added:
+
+| Column | Type | Purpose |
+|---|---|---|
+| `app_floor_plan_storage_path` | `TEXT` | Private Supabase Storage object path |
+| `app_floor_plan_file_name` | `VARCHAR(255)` | Original uploaded filename |
+| `app_floor_plan_mime_type` | `VARCHAR(100)` | Uploaded MIME type, such as `image/png` |
+| `app_floor_plan_file_size` | `BIGINT` | Uploaded file size in bytes |
+
+The existing floor-plan columns are not removed or renamed. The existing
+`app_floor_plan_image` column remains for compatibility while the new storage
+path becomes the preferred source for new uploads.
+
+### Indexes added
+
+The migration adds indexes for:
+
+- Applications by mall
+- Applications by status and update time
+- Application floor plans by application and floor
+- Floor-plan storage paths
+- Entry points by application and floor
+- AR-development records by application and status
+- Threads by application, AR development, and stall application
+- Threads by creation time
+- Thread messages by thread and sent time
+
+### Constraint added
+
+A unique index ensures that an application version is unique within a mall:
+
+```text
+application (mall_id, application_version)
+```
+
+This permits version `1` for multiple malls while preventing duplicate
+versions for the same mall.
+
+### Testing intake page
+
+An isolated super-admin testing page is available at:
+
+```text
+/application-management-testing
+```
+
+It is intentionally not linked from the sidebar, topbar, or normal
+application-management page. It creates a real `submitted` application for an
+existing mall, uploads private floor plans, records floor metadata, and adds
+entry points while mall accounts are unavailable.
+
+### Production API implementation
+
+The normal super-admin application table is now database-backed through the
+protected `/api/applications` route. It returns the latest application version
+for each mall and adds a display-only `Draft` row for malls without an
+application until mall-side submission is available.
+
+The protected backend also provides:
+
+- `GET /api/applications/:id` for the complete review payload
+- `PATCH /api/applications/:id/revision` to set `for_revision`, suspend related
+  AR development, and add a thread note
+- `POST /api/applications/:id/approve` to set `approved` and create `pending` AR development
+- `POST /api/ar-developments/:id/start-mapping` is called by the confirmed
+  Edit Map action for the `pending` to `node_mapping` transition
+- `GET` and `POST /api/applications/:id/thread` for application messages
+- `GET /api/conversations` for the super-admin conversation inbox across
+  development applications, stall applications, and AR-development threads
+- `GET /api/application-floor-plans/:id/url` for short-lived signed URLs
+
+Floor plans remain private in Storage. Only authenticated super admins can
+access these routes, and no public Storage URL is returned.
+
+### Version cleanup rule
+
+Migration `20_cleanup_application_versions.sql` removes older application
+versions for malls that do not yet have a `live` or `published` AR
+development. It also removes the dependent floor plans, entry points, threads,
+messages, attachments, and non-live AR-development records belonging to those
+older versions. Once a mall has a live or published AR development, historical
+application versions are retained. The migration uses one PostgreSQL `DO`
+block so it does not depend on temporary-table session behavior.
+
+### No tables removed
+
+This migration does not remove or rename any table or column. It does not
+create another notification table, admin table, mobile-user table, or thread
+table. It creates one generic thread-message attachment table for images.
+
+### Verification query
+
+Before applying the migration, optionally check for duplicate application
+versions. The migration performs this check itself and stops with an explicit
+error instead of silently deleting or changing data:
+
+```sql
+SELECT
+    mall_id,
+    application_version,
+    COUNT(*) AS duplicate_count
+FROM public.application
+GROUP BY mall_id, application_version
+HAVING COUNT(*) > 1
+ORDER BY mall_id, application_version;
+```
+
+The query should return no rows.
+
+After applying the migration, run:
+
+```sql
+SELECT
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'application_floor_plan'
+  AND column_name IN (
+      'app_floor_plan_storage_path',
+      'app_floor_plan_file_name',
+      'app_floor_plan_mime_type',
+      'app_floor_plan_file_size'
+  )
+ORDER BY ordinal_position;
+
+SELECT indexname
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND indexname IN (
+      'uq_application_mall_version',
+      'idx_application_mall',
+      'idx_application_status_updated',
+      'idx_application_floor_plan_application_floor',
+      'idx_application_floor_plan_storage_path',
+      'idx_application_entry_point_application_floor',
+      'idx_ar_development_application_status',
+      'idx_thread_application',
+      'idx_thread_ar_development',
+      'idx_thread_stall_application',
+      'idx_thread_created',
+      'idx_thread_message_thread_sent'
+  )
+ORDER BY indexname;
+```

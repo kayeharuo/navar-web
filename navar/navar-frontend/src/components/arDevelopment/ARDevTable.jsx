@@ -6,139 +6,11 @@ import PublishModal from './PublishModal'
 import ARDevDetail from './ARDevDetail'
 import ToBeAddedStallsModal from './ToBeAddedStallsModal'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { apiRequest } from '../../config/api'
 
 const TIER_ORDER = { Premium: 0, Standard: 1, Basic: 2 }
 
-const STATUS_FILTERS = ['All', 'Pending', 'Node Mapping', 'Navigation Testing', 'Ready for activation', 'Live']
-
-const INITIAL_PROJECTS = [
-  {
-    id: 1,
-    mallName: 'SM Seaside City Cebu',
-    tier: 'Premium',
-    city: 'Cebu City',
-    adminName: 'Jose Dela Cruz',
-    adminEmail: 'jdelacruz@smseaside.ph',
-    version: 1,
-    floors: 3,
-    nodes: 78,
-    edges: 103,
-    agreement: 'Setup',
-    applicationStatus: 'Approved',
-    arStatus: 'Ready for activation',
-    dateAdded: 'September 1, 2025',
-    lastUpdated: 'September 20, 2025',
-    thread: [
-      {
-        id: 1,
-        sender: 'system',
-        name: 'NavAR System',
-        date: 'September 20, 2025',
-        message: 'Confirmation request sent to Jose Dela Cruz. Email sent to jdelacruz@smseaside.ph with map summary (78 nodes, 103 edges, 3 floors).',
-      },
-    ],
-    testErrors: [],
-    stallAdditions: [
-      { id: 1, stallNumber: 'G-101A', floor: 'Ground', description: 'New stall near main entrance', status: 'pending' },
-      { id: 2, stallNumber: 'G-101B', floor: 'Ground', description: 'Stall in food court area', status: 'pending' },
-      { id: 3, stallNumber: '2-205', floor: '2nd Floor', description: 'Kiosk by escalator', status: 'pending' },
-    ],
-  },
-  {
-    id: 2,
-    mallName: 'Ayala Center Cebu',
-    tier: 'Premium',
-    city: 'Cebu City',
-    adminName: 'Maria Santos',
-    adminEmail: 'msantos@ayalacebu.ph',
-    version: 1,
-    floors: 3,
-    nodes: 95,
-    edges: 142,
-    agreement: 'Active',
-    applicationStatus: 'Approved',
-    arStatus: 'Live',
-    dateAdded: 'March 1, 2025',
-    lastUpdated: 'March 13, 2025',
-    thread: [],
-    testErrors: [],
-  },
-  {
-    id: 3,
-    mallName: 'Pacific Mall Cebu',
-    tier: 'Standard',
-    city: 'Mandaue City',
-    adminName: 'Lea Tan',
-    adminEmail: 'ltan@pacificmall.ph',
-    version: 1,
-    floors: 2,
-    nodes: 62,
-    edges: 89,
-    agreement: 'Setup',
-    applicationStatus: 'Approved',
-    arStatus: 'Node Mapping',
-    dateAdded: 'March 3, 2025',
-    lastUpdated: 'March 20, 2025',
-    thread: [],
-    testErrors: [
-      'Floor 2 has unmapped dead-end corridors near the East Wing.',
-      'Scale reference calibration is off by more than 15% on Floor 1.',
-    ],
-  },
-  {
-    id: 4,
-    mallName: 'Gaisano Grand Liloan',
-    tier: 'Standard',
-    city: 'Liloan, Cebu',
-    adminName: 'Anna Cruz',
-    adminEmail: 'acruz@gaisanogm.ph',
-    version: 1,
-    floors: 2,
-    nodes: 41,
-    edges: 58,
-    agreement: 'Setup',
-    applicationStatus: 'Approved',
-    arStatus: 'Navigation Testing',
-    dateAdded: 'November 23, 2025',
-    lastUpdated: 'December 10, 2025',
-    thread: [],
-    testErrors: [],
-  },
-  {
-    id: 5,
-    mallName: 'Gaisano Grand Minglanilla',
-    tier: 'Basic',
-    city: 'Minglanilla, Cebu',
-    adminName: 'Lily Cruz',
-    adminEmail: 'lcruz@gaisanogm.ph',
-    version: 1,
-    floors: 3,
-    nodes: 44,
-    edges: 61,
-    agreement: 'Setup',
-    applicationStatus: 'Approved',
-    arStatus: 'Ready for activation',
-    dateAdded: 'August 23, 2025',
-    lastUpdated: 'December 10, 2025',
-    thread: [
-      {
-        id: 1,
-        sender: 'system',
-        name: 'NavAR System',
-        date: 'December 8, 2025',
-        message: 'Confirmation request sent to Lily Cruz. Email sent to lcruz@gaisanogm.ph with map summary (44 nodes, 61 edges, 3 floors).',
-      },
-      {
-        id: 2,
-        sender: 'mall',
-        name: 'Lily C.',
-        date: 'December 10, 2025',
-        message: "I've reviewed the map preview. All store entrances look correct and the PWD routes are properly marked. You may proceed with activation.",
-      },
-    ],
-    testErrors: [],
-  },
-]
+const STATUS_FILTERS = ['All', 'Pending', 'Node Mapping', 'Suspended', 'Navigation Testing', 'Ready for activation', 'Live']
 
 function SearchIcon() {
   return (
@@ -153,6 +25,7 @@ function getArStatusVariant(status) {
   const map = {
     'Pending': 'pending',
     'Node Mapping': 'node-mapping',
+    'Suspended': 'suspended',
     'Navigation Testing': 'nav-testing',
     'Ready for activation': 'ready',
     'Live': 'live',
@@ -175,7 +48,9 @@ function sortProjects(projects) {
 }
 
 export default function ARDevTable({ incomingProjects, stallApplications = [] }) {
-  const [items, setItems] = useState(INITIAL_PROJECTS)
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [testingProject, setTestingProject] = useState(null)
@@ -187,10 +62,32 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   const navigate = useNavigate()
 
   useEffect(() => {
+    let mounted = true
+    apiRequest('/api/ar-developments')
+      .then(projects => {
+        if (!mounted) return
+        setItems(sortProjects(projects))
+        setLoadError('')
+      })
+      .catch(error => {
+        if (mounted) setLoadError(error.message)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
     const projectId = Number(searchParams.get('projectId'))
     if (!projectId) return
     const project = items.find(item => item.id === projectId)
-    if (project) setThreadProject(project)
+    if (project) {
+      setThreadProject(project)
+      apiRequest(`/api/ar-developments/${project.id}/thread`)
+        .then(result => setThreadProject(current => current?.id === project.id ? { ...current, thread: result.messages || [] } : current))
+        .catch(error => console.error('AR development thread load failed:', error))
+    }
   }, [items, searchParams])
 
   useEffect(() => {
@@ -234,8 +131,24 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     setItems(prev => prev.map(p => p.id === id ? { ...p, ...changes, lastUpdated: now } : p))
   }
 
-  function handleStartMapping(id) {
-    updateItem(id, { arStatus: 'Node Mapping' })
+  async function handleEditMap(project) {
+    if (project.arStatus === 'Suspended') return
+    if (project.arStatus === 'Pending') {
+      const confirmed = window.confirm(`Edit the map for ${project.mallName}? This will move the AR development to Node Mapping.`)
+      if (!confirmed) return
+      try {
+        const updated = await apiRequest(`/api/ar-developments/${project.id}/start-mapping`, { method: 'POST' })
+        setItems(prev => sortProjects(prev.map(item => item.id === project.id
+          ? { ...item, arStatus: 'Node Mapping', lastUpdated: updated.ar_development_updated_at || item.lastUpdated }
+          : item
+        )))
+      } catch (error) {
+        console.error('Node mapping request failed:', error)
+        window.alert(error.message)
+        return
+      }
+    }
+    navigate(`/ar-development/editor/${project.id}`, { state: { mallName: project.mallName } })
   }
 
   function handleSubmitForTesting(project) {
@@ -265,34 +178,38 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     ))
   }
 
-  function handleViewThread(project) {
+  async function handleViewThread(project) {
     const latest = items.find(p => p.id === project.id) || project
     setThreadProject(latest)
+    try {
+      const result = await apiRequest(`/api/ar-developments/${project.id}/thread`)
+      setThreadProject(current => current?.id === project.id ? { ...current, thread: result.messages || [] } : current)
+    } catch (error) {
+      console.error('AR development thread load failed:', error)
+    }
   }
 
-  function handleSendNote(id, note) {
-    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    setItems(prev => prev.map(p => {
-      if (p.id !== id) return p
-      return {
-        ...p,
-        thread: [
-          ...p.thread,
-          { id: Date.now(), sender: 'admin', name: 'Delicious B.', isAdmin: true, date: now, message: note },
-        ],
-        lastUpdated: now,
-      }
-    }))
-    setThreadProject(prev => {
-      if (!prev || prev.id !== id) return prev
-      return {
-        ...prev,
-        thread: [
-          ...prev.thread,
-          { id: Date.now(), sender: 'admin', name: 'Delicious B.', isAdmin: true, date: now, message: note },
-        ],
-      }
-    })
+  async function handleSendNote(id, note) {
+    try {
+      const sentMessage = await apiRequest(`/api/ar-developments/${id}/thread`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: note }),
+      })
+      const message = { ...sentMessage, sender: sentMessage.isAdmin ? 'admin' : 'mall' }
+      const updatedAt = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      setItems(prev => prev.map(project => project.id === id
+        ? { ...project, thread: [...(project.thread || []), message], lastUpdated: updatedAt }
+        : project
+      ))
+      setThreadProject(prev => prev?.id === id
+        ? { ...prev, thread: [...(prev.thread || []), message] }
+        : prev
+      )
+    } catch (error) {
+      console.error('AR development thread request failed:', error)
+      window.alert(error.message)
+    }
   }
 
   function handlePublishConfirm() {
@@ -349,6 +266,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
 
   return (
     <>
+      {loadError && <div className="app-mgmt-callout app-mgmt-callout--error" role="alert">{loadError}</div>}
       {/* Header */}
       <div className="ar-dev-header">
         <h1 className="ar-dev-title">AR Development</h1>
@@ -412,7 +330,13 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
               </tr>
             </thead>
             <tbody>
-              {filtered.map(project => (
+              {loading ? (
+                <tr>
+                  <td colSpan={11} className="ar-dev-table-empty ar-dev-table-loading">
+                    <span className="table-loading"><span className="table-loading-spinner" />Loading AR development projects...</span>
+                  </td>
+                </tr>
+              ) : filtered.map(project => (
                 <tr
                   key={project.id}
                   className={project.arStatus === 'Live' || project.arStatus === 'Unpublished' ? 'row--live' : ''}
@@ -445,8 +369,9 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
                     <div className="ar-dev-action-cell">
                       <button
                         className="ar-dev-action-btn ar-dev-action-btn--edit-map"
-                        onClick={() => navigate(`/ar-development/editor/${project.id}`, { state: { mallName: project.mallName } })}
-                        title="Open the node editor"
+                        onClick={() => handleEditMap(project)}
+                        disabled={project.arStatus === 'Suspended'}
+                        title={project.arStatus === 'Suspended' ? 'Map editing is suspended while this application is under revision' : 'Open the node editor'}
                       >
                         Edit Map
                       </button>
@@ -458,15 +383,6 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
                           title="To Be Added Stalls"
                         >
                           To Be Added Stalls ({project.stallAdditions.filter(s => s.status === 'pending').length})
-                        </button>
-                      )}
-
-                      {project.arStatus === 'Pending' && (
-                        <button
-                          className="ar-dev-action-btn ar-dev-action-btn--start"
-                          onClick={() => handleStartMapping(project.id)}
-                        >
-                          Start Mapping
                         </button>
                       )}
 
@@ -532,7 +448,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={11} style={{ textAlign: 'center', color: '#9B9C9C', padding: '32px', fontFamily: 'Poppins' }}>
                     No projects found.

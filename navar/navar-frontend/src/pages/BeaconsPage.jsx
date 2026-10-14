@@ -88,6 +88,7 @@ export default function BeaconsPage() {
   const { mallId } = useParams()
   const navigate = useNavigate()
   const [mall, setMall] = useState(null)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     apiRequest(`/api/malls/${mallId}`)
@@ -101,7 +102,7 @@ export default function BeaconsPage() {
           ticketHistory: beacon.ticketHistory || [],
         })),
       }))
-      .catch(() => navigate('/mall-management', { replace: true }))
+      .catch(error => setLoadError(error.message || 'Unable to load beacons.'))
   }, [mallId, navigate])
 
   useEffect(() => {
@@ -128,6 +129,14 @@ export default function BeaconsPage() {
   }
 
   if (!mall) {
+    if (loadError) {
+      return (
+        <div className="stores-page-loading" role="alert">
+          <span>{loadError}</span>
+          <button className="stores-action-btn bcn-btn--reactivate" onClick={() => navigate('/mall-management')}>Back to Mall Management</button>
+        </div>
+      )
+    }
     return (
       <div className="stores-page-loading" role="status" aria-live="polite">
         <span className="stores-page-spinner" aria-hidden="true" />
