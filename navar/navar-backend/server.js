@@ -10,6 +10,7 @@ const createAuthGuards = require('./modules/auth/authGuard')
 const registerAccountManagementRoutes = require('./modules/accountManagement/routes')
 const registerApplicationTestingRoutes = require('./modules/applicationTesting/routes')
 const registerApplicationManagementRoutes = require('./modules/applicationManagement/routes')
+const registerNodeMapRoutes = require('./modules/nodeMap/routes')
 
 const app = Fastify({ logger: true, bodyLimit: 25 * 1024 * 1024 })
 
@@ -47,9 +48,12 @@ app.setErrorHandler((error, request, reply) => {
 	return reply.code(statusCode).send({ message: 'Something went wrong.' })
 })
 
+const startedAt = new Date().toISOString()
 app.get('/health', async () => ({
 	status: 'ok',
-	service: 'navar-backend'
+	service: 'navar-backend',
+	pid: process.pid,
+	startedAt
 }))
 
 const { requireAuth, requireSuperAdmin, requirePrimarySuperAdmin } = createAuthGuards(supabase)
@@ -59,6 +63,7 @@ app.register(async protectedApp => {
 	protectedApp.addHook('preHandler', requireSuperAdmin)
 	registerMallManagementRoutes(protectedApp)
 	registerApplicationManagementRoutes(protectedApp)
+	registerNodeMapRoutes(protectedApp)
 })
 
 registerAccountManagementRoutes(app, { supabase, requireAuth, requireSuperAdmin, requirePrimarySuperAdmin })

@@ -45,7 +45,12 @@ async function serializeMessages(supabase, messages, includeAttachments = true) 
 	if (attachments.error) throw attachments.error
 	const attachmentsByMessage = new Map()
 	for (const attachment of attachments.data || []) {
-		const url = await signedImageUrl(supabase, attachment.thread_message_attachment_storage_path, 300)
+		let url = null
+		try {
+			url = await signedImageUrl(supabase, attachment.thread_message_attachment_storage_path, 300)
+		} catch (error) {
+			console.error('Attachment signed URL failed:', attachment.thread_message_attachment_storage_path, error.message)
+		}
 		const item = {
 			id: attachment.thread_message_attachment_id,
 			fileName: attachment.thread_message_attachment_file_name,
@@ -226,35 +231,38 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			])
 			if (malls.error || applications.error || developments.error) throw malls.error || applications.error || developments.error
 			const mallById = new Map((malls.data || []).map(mall => [String(mall.mall_id), mall]))
-			const latestByMall = new Map()
 			const developmentByApplication = new Map()
-			for (const item of applications.data || []) {
-				const current = latestByMall.get(String(item.mall_id))
-				if (!current || new Date(item.application_updated_at) > new Date(current.application_updated_at)) {
-					latestByMall.set(String(item.mall_id), item)
-				}
-				for (const development of developments.data || []) {
-					if (!developmentByApplication.has(String(development.application_id))) {
-						developmentByApplication.set(String(development.application_id), development)
-					}
+			for (const development of developments.data || []) {
+				// developments are newest-first, so the first one seen per application is the latest
+				if (!developmentByApplication.has(String(development.application_id))) {
+					developmentByApplication.set(String(development.application_id), development)
 				}
 			}
+			const latestVersionByMall = new Map()
+			const mallsWithApplications = new Set()
+			for (const item of applications.data || []) {
+				const key = String(item.mall_id)
+				mallsWithApplications.add(key)
+				latestVersionByMall.set(key, Math.max(latestVersionByMall.get(key) || 0, item.application_version))
+			}
 			const rows = []
+			// Malls without any application show one temporary draft row.
 			for (const mall of malls.data || []) {
-				const application = latestByMall.get(String(mall.mall_id))
-				if (!application) {
-					rows.push({
-						id: `draft-${mall.mall_id}`, draft: true, mallId: mall.mall_id,
-						mallName: mall.mall_name, city: mall.mall_city || '',
-						adminName: 'No mall account', adminEmail: '',
-						version: 1, floors: mall.mall_floor_count || 0,
-						address: mall.mall_address || '', cityProvince: [mall.mall_city, mall.mall_state].filter(Boolean).join(', '),
-						agreement: 'Setup', applicationStatus: 'Draft', arDevelopment: '-',
-						submittedDate: '-', lastUpdated: '-', floorPlans: [], thread: [],
-					})
-					continue
-				}
-				const relatedMall = mallById.get(String(application.mall_id)) || mall
+				if (mallsWithApplications.has(String(mall.mall_id))) continue
+				rows.push({
+					id: `draft-${mall.mall_id}`, draft: true, mallId: mall.mall_id,
+					mallName: mall.mall_name, city: mall.mall_city || '',
+					adminName: 'No mall account', adminEmail: '',
+					version: 1, floors: mall.mall_floor_count || 0,
+					address: mall.mall_address || '', cityProvince: [mall.mall_city, mall.mall_state].filter(Boolean).join(', '),
+					agreement: 'Setup', applicationStatus: 'Draft', arDevelopment: '-',
+					submittedDate: '-', lastUpdated: '-', floorPlans: [], thread: [],
+				})
+			}
+			// Every application version is its own row.
+			for (const application of applications.data || []) {
+				const relatedMall = mallById.get(String(application.mall_id))
+				if (!relatedMall) continue
 				rows.push({
 					id: application.application_id,
 					mallId: application.mall_id,
@@ -263,6 +271,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					adminName: 'View details',
 					adminEmail: '',
 					version: application.application_version,
+					isLatestVersion: application.application_version === latestVersionByMall.get(String(application.mall_id)),
 					floors: relatedMall.mall_floor_count || 0,
 					agreement: 'Setup',
 					applicationStatus: titleCase(application.application_status),
@@ -273,6 +282,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					thread: [],
 				})
 			}
+			rows.sort((a, b) => String(a.mallName).localeCompare(String(b.mallName)) || b.version - a.version)
 			return rows
 		} catch (error) {
 			request.log.error({ code: error.code, message: error.message }, 'Application list failed')
@@ -406,7 +416,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 	})
 
 	app.get('/api/ar-developments/:id/thread', async (request, reply) => {
-		const result = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', Number(request.params.id)).maybeSingle()
+		const result = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
 		if (result.error) throw result.error
 		if (!result.data) return { threadId: null, messages: [] }
 		const messages = await app.supabase.from('thread_message').select('*').eq('thread_id', result.data.thread_id).order('message_sent_at')
@@ -418,7 +428,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 		const id = Number(request.params.id)
 		const content = String(request.body?.content || '').trim()
 		if (!content) return reply.code(400).send({ message: 'Message content is required.' })
-		let thread = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', id).maybeSingle()
+		let thread = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', id).order('thread_id').limit(1).maybeSingle()
 		if (thread.error) throw thread.error
 		if (!thread.data) {
 			thread = await app.supabase.from('thread').insert({
@@ -436,11 +446,11 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			message_sender: request.admin.id,
 		}).select('*').single()
 		if (message.error) throw message.error
-		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
+		return (await serializeMessages(app.supabase, [message.data], false))[0]
 	})
 
 	app.get('/api/applications/:id/thread', async (request, reply) => {
-		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).maybeSingle()
+		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
 		if (result.error) throw result.error
 		if (!result.data) return { threadId: null, messages: [] }
 		const messages = await app.supabase.from('thread_message').select('*').eq('thread_id', result.data.thread_id).order('message_sent_at')
@@ -464,8 +474,12 @@ module.exports = function registerApplicationManagementRoutes(app) {
 		if (parsedAttachments.reduce((total, attachment) => total + attachment.parsed.size, 0) > MAX_THREAD_TOTAL_BYTES) {
 			return reply.code(400).send({ message: 'The total image size per message cannot exceed 20 MB.' })
 		}
-		let thread = await app.supabase.from('thread').select('thread_id').eq('application_id', id).maybeSingle()
-		if (!thread.data) thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: id }).select('thread_id').single()
+		let thread = await app.supabase.from('thread').select('thread_id').eq('application_id', id).order('thread_id').limit(1).maybeSingle()
+		if (thread.error) throw thread.error
+		if (!thread.data) {
+			thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: id }).select('thread_id').single()
+			if (thread.error) throw thread.error
+		}
 		const message = await app.supabase.from('thread_message').insert({ message_sender_type: 'admin', message_sent_at: now(), message_content: content || '', thread_id: thread.data.thread_id, message_sender: request.admin.id }).select('*').single()
 		if (message.error) throw message.error
 		for (const attachment of parsedAttachments) {
@@ -484,7 +498,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			})
 			if (inserted.error) throw inserted.error
 		}
-		return (await serializeMessages(app.supabase, [message.data]))[0]
+		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
 	})
 
 	app.get('/api/application-floor-plans/:id/url', async (request, reply) => {

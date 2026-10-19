@@ -5,48 +5,30 @@ import { PlaceModal } from "./components/PlaceModal";
 import { CalibrationModal } from "./components/CalibrationModal";
 import { DataTable } from "./components/DataTable";
 import { useHistory } from "./hooks/useHistory";
-import { C, F, M, NODE_TYPES, NODE_GROUPS, PATH_TYPE, FLOORS, STORE_UNITS, STALL_STORES, formatStore, uid, pxDist, } from "./editorConstants";
-import { makeNodes, makeEdges, makeCalibration } from "./editorData";
+import { C, F, M, NODE_TYPES, NODE_GROUPS, PATH_TYPE, FLOORS, STORE_UNITS, STALL_STORES, formatStore, uid, } from "./editorConstants";
+import { loadNodeMap, buildSaveBody, saveNodeMap, edgeMeters, withFreshDistances } from "./mapApi";
+import { useFloorImage } from "./hooks/useFloorImage";
+// The map is editable only while the AR development is in Node Mapping. The status
+// comes from the server; the editor never changes it.
 const STATUS_CONFIG = {
-    draft: { label: "Pending", short: "Pending", color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1", icon: "✏️", editable: true },
-    node_mapping: { label: "Node Mapping", short: "Node Mapping", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", icon: "🗺️", editable: false },
+    node_mapping: { label: "Node Mapping", short: "Node Mapping", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", icon: "🗺️", editable: true },
     navigation_testing: { label: "Navigation Testing", short: "Nav Testing", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", icon: "🧭", editable: false },
     ready_for_activation: { label: "Ready for Activation", short: "Ready", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", icon: "✅", editable: false },
     live: { label: "Live", short: "Live", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", icon: "🟢", editable: false },
 };
-const STATUS_ORDER = ["draft", "node_mapping", "navigation_testing", "ready_for_activation", "live"];
-// ── Persistence keys ──────────────────────────────────────────────────────────
-const NODE_DRAFT_KEY = "navarEditorDraft_v3";
-const STATUS_KEY = "navarEditorStatus_v1";
-const SAVED_TS_KEY = "navarEditorSavedTs_v1";
-function loadNodeDraft() {
-    try {
-        const r = localStorage.getItem(NODE_DRAFT_KEY);
-        return r ? JSON.parse(r) : null;
+const STATUS_ORDER = ["node_mapping", "navigation_testing", "ready_for_activation", "live"];
+const LOCKED_STATUS = { label: "Locked", short: "Locked", color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1", icon: "🔒", editable: false };
+const statusConfigFor = (status) => STATUS_CONFIG[status] || { ...LOCKED_STATUS, label: String(status || "locked").replace(/_/g, " "), short: String(status || "locked").replace(/_/g, " ") };
+// Deleting a node also removes its edges and any cross-floor link that pointed at it.
+function removeNodeFromSnapshot(snap, floor, id) {
+    const nodes = {};
+    for (const f of Object.keys(snap.nodes)) {
+        nodes[f] = snap.nodes[f]
+            .filter(n => !(f === floor && n.id === id))
+            .map(n => (n.cross_floor_link === id ? { ...n, cross_floor_link: null } : n));
     }
-    catch {
-        return null;
-    }
+    return { nodes, edges: { ...snap.edges, [floor]: (snap.edges[floor] || []).filter(e => e.from !== id && e.to !== id) }, calibration: snap.calibration };
 }
-function loadStatus() {
-    try {
-        return localStorage.getItem(STATUS_KEY) || "draft";
-    }
-    catch {
-        return "draft";
-    }
-}
-function loadSavedTs() {
-    try {
-        const r = localStorage.getItem(SAVED_TS_KEY);
-        return r ? new Date(r) : null;
-    }
-    catch {
-        return null;
-    }
-}
-const INITIAL_SNAPSHOT = { nodes: makeNodes(), edges: makeEdges(), calibration: makeCalibration() };
-const getStartSnapshot = () => loadNodeDraft() ?? INITIAL_SNAPSHOT;
 function validateTransitions(nodes) {
     const issues = [];
     const allNodes = Object.values(nodes).flat();
@@ -188,19 +170,40 @@ const EdgePanel = ({ edge, nodes, onChangeType, onDelete, locked }) => {
         </div>)}
     </>);
 };
+// Shows why a save was refused (red) or what to double-check on a map that was saved (amber).
+const SaveProblemsModal = ({ problems, onClose }) => {
+    const tone = problems.tone === "warn" ? { c: "#B45309", bg: "#FFFBEB", border: "#FDE68A", icon: "⚠️" } : { c: C.red, bg: "#FEF2F2", border: "#FECACA", icon: "⛔" };
+    return (<div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 8100 }}>
+    <div style={{ background: "#fff", borderRadius: 14, padding: "24px 26px 20px", width: 560, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.28)", fontFamily: F }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: tone.c, marginBottom: 12 }}>{tone.icon} {problems.title}</div>
+      <div style={{ background: tone.bg, border: `1px solid ${tone.border}`, borderRadius: 9, padding: "10px 14px", maxHeight: 260, overflowY: "auto", marginBottom: 16 }}>
+        {problems.items.map((t, i) => (<div key={i} style={{ fontSize: 12, color: "#0F172A", padding: "5px 0", borderBottom: i < problems.items.length - 1 ? `1px solid ${tone.border}` : "none", lineHeight: 1.5 }}>{t}</div>))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, background: tone.c, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: F }}>OK</button>
+      </div>
+    </div>
+  </div>);
+};
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }) {
-    const { snapshot, push, undo, redo, canUndo, canRedo } = useHistory(getStartSnapshot());
-    // Project status
-    const [projectStatus, setProjectStatus] = useState(loadStatus);
-    const [savedAt, setSavedAt] = useState(loadSavedTs);
+function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
+    const { snapshot, push, undo, redo, canUndo, canRedo } = useHistory(initial.snapshot);
+    const { floorMeta } = initial;
+    // The status and revision come from the server. The revision is how the backend
+    // detects that someone else saved the map first.
+    const projectStatus = initial.meta.status;
+    const revision = useRef(initial.meta.revision);
+    const dbIds = useRef(new Map());
+    const [savedAt, setSavedAt] = useState(null);
     const [unsaved, setUnsaved] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null);
     const [transitionIssues, setTransitionIssues] = useState(null);
-    const statusCfg = STATUS_CONFIG[projectStatus];
+    const [saveProblems, setSaveProblems] = useState(null);
+    const statusCfg = statusConfigFor(projectStatus);
     const isLocked = !statusCfg.editable;
     // ── View state ──
-    const [floor, setFloor] = useState("Ground Floor");
+    const [floor, setFloor] = useState(FLOORS[0]);
     const [edMode, setEdMode] = useState("select");
     const [calibPts, setCalibPts] = useState([]);
     const [calibModal, setCalibModal] = useState(false);
@@ -237,8 +240,23 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
         setToast({ msg, color });
         setTimeout(() => setToast(null), 2800);
     };
-    useEffect(() => { localStorage.setItem(STATUS_KEY, projectStatus); }, [projectStatus]);
-    useEffect(() => { setUnsaved(true); }, [snapshot]);
+    const firstSnapshot = useRef(true);
+    useEffect(() => {
+        if (firstSnapshot.current) {
+            firstSnapshot.current = false;
+            return;
+        }
+        setUnsaved(true);
+    }, [snapshot]);
+    // Warn before leaving with changes that were never saved.
+    useEffect(() => {
+        if (!unsaved)
+            return;
+        const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
+        window.addEventListener("beforeunload", warn);
+        return () => window.removeEventListener("beforeunload", warn);
+    }, [unsaved]);
+    const floorImage = useFloorImage(floorMeta[floor]?.imageUrl);
     useEffect(() => { setDragNodes(null); }, [snapshot]);
     // Sync nodeEdits when selection changes
     useEffect(() => {
@@ -253,48 +271,49 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
         setLabelError(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId]);
-    // ── Node persistence ──
-    const persistNodeData = (statusOverride) => {
-        const toSave = { nodes: liveNodes, edges, calibration };
-        localStorage.setItem(NODE_DRAFT_KEY, JSON.stringify(toSave));
-        const now = new Date();
-        localStorage.setItem(SAVED_TS_KEY, now.toISOString());
-        if (statusOverride)
-            localStorage.setItem(STATUS_KEY, statusOverride);
-        setSavedAt(now);
-        setUnsaved(false);
-        return now;
-    };
-    const handleSaveDraft = useCallback(() => {
-        if (isLocked)
-            return;
-        const now = persistNodeData();
-        showToast(`Draft saved — ${now.toLocaleTimeString()}`, C.green);
+    // ── Persistence: everything goes through the backend, which re-validates and re-computes ──
+    const persist = useCallback(async (finalize) => {
+        if (isLocked || saving)
+            return false;
+        setSaving(true);
+        try {
+            const body = buildSaveBody({ nodes: liveNodes, edges, calibration }, floorMeta, { baseRevision: revision.current, finalize, dbIds: dbIds.current });
+            const result = await saveNodeMap(projectId, body);
+            revision.current = result.revision;
+            for (const [clientId, id] of Object.entries(result.nodeIds || {}))
+                dbIds.current.set(clientId, id);
+            const now = new Date();
+            setSavedAt(now);
+            setUnsaved(false);
+            setSaveProblems(result.warnings?.length ? { title: "Saved, with warnings", items: result.warnings.map(w => w.message), tone: "warn" } : null);
+            showToast(finalize ? "Map saved and validated." : `Draft saved — ${now.toLocaleTimeString()}`, C.green);
+            return true;
+        }
+        catch (error) {
+            const items = error.details?.errors?.length ? error.details.errors : [error.message];
+            if (error.status === 409)
+                setSaveProblems({ title: "Cannot save — the map changed elsewhere", items: [error.message, "Copy anything you need, then reload the editor."], tone: "error" });
+            else
+                setSaveProblems({ title: "Not saved", items, tone: "error" });
+            return false;
+        }
+        finally {
+            setSaving(false);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLocked, liveNodes, edges, calibration]);
-    const handleSave = () => {
-        const issues = validateTransitions(nodes);
+    }, [isLocked, saving, liveNodes, edges, calibration, floorMeta, projectId]);
+    const handleSaveDraft = useCallback(() => { persist(false); }, [persist]);
+    // "Save & Validate": stricter than a draft save (every stairs / escalator / elevator /
+    // ramp must be linked). It does NOT change the AR development status; moving to
+    // Navigation Testing is done from the AR Development page.
+    const handleSave = async () => {
+        setConfirmAction(null);
+        const issues = validateTransitions(liveNodes);
         if (issues.length > 0) {
-            setConfirmAction(null);
             setTransitionIssues(issues);
             return;
         }
-        persistNodeData("node_mapping");
-        setProjectStatus("node_mapping");
-        setConfirmAction(null);
-        showToast("Saved & sent to AR development. Editing locked.", C.blue);
-    };
-    const handleSubmitForTesting = () => {
-        persistNodeData("navigation_testing");
-        setProjectStatus("navigation_testing");
-        setConfirmAction(null);
-        showToast("Submitted for navigation testing.", "#D97706");
-    };
-    const handleRevertToDraft = () => {
-        setProjectStatus("draft");
-        localStorage.setItem(STATUS_KEY, "draft");
-        setConfirmAction(null);
-        showToast("Reverted to Draft — editing unlocked.", C.violet);
+        await persist(true);
     };
     // ── Push helpers ──
     const pushNodes = (n) => push({ nodes: n, edges, calibration });
@@ -343,7 +362,7 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
             if (!inInput && (e.key === "Delete" || e.key === "Backspace") && !isLocked) {
                 if (selectedId) {
                     e.preventDefault();
-                    push({ nodes: { ...nodes, [floor]: nodes[floor].filter(n => n.id !== selectedId) }, edges: { ...edges, [floor]: edges[floor].filter(e2 => e2.from !== selectedId && e2.to !== selectedId) }, calibration });
+                    push(removeNodeFromSnapshot({ nodes, edges, calibration }, floor, selectedId));
                     setSelId(null);
                     showToast("Node deleted.", C.red);
                 }
@@ -413,9 +432,7 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
                     autoPt = "accessible";
                 if (NODE_TYPES[fromNode?.type || ""]?.isEmergencyType || NODE_TYPES[node.type]?.isEmergencyType)
                     autoPt = "restricted";
-                let dist = null;
-                if (floorCalib && fromNode)
-                    dist = parseFloat((pxDist(fromNode, node) / floorCalib.pxPerMeter).toFixed(1));
+                const dist = fromNode ? edgeMeters(fromNode, node, floorCalib?.pxPerMeter) : null;
                 const newEdge = { id: uid("e"), from: connectFrom, to: node.id, floor, path_type: autoPt, distance_value: dist };
                 pushEdges({ ...edges, [floor]: [...(edges[floor] || []), newEdge] });
                 showToast(`Edge added${dist != null ? ` — ${dist}m` : ""}${autoPt !== "normal" ? ` (${autoPt})` : ""}.`);
@@ -444,12 +461,29 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
         if (!dragInProgress.current)
             return;
         dragInProgress.current = false;
-        const updated = dragNodes ?? nodes;
-        push({ nodes: { ...updated, [floor]: (updated[floor] || []).map(n => n.id === id ? { ...n, x, y } : n) }, edges, calibration });
+        moveNode(id, x, y);
         setDragNodes(null);
     };
+    // Moves one node and refreshes the length of every edge that touches it, so the
+    // distance shown always matches where the nodes really are.
+    const moveNode = (id, x, y) => {
+        const moved = (nodes[floor] || []).map(n => n.id === id ? { ...n, x, y } : n);
+        push({
+            nodes: { ...nodes, [floor]: moved },
+            edges: { ...edges, [floor]: withFreshDistances(edges[floor] || [], moved, floorCalib?.pxPerMeter, id) },
+            calibration,
+        });
+    };
+    const handleNodeNudge = (id, x, y) => {
+        if (isLocked)
+            return;
+        moveNode(id, x, y);
+    };
     const handleCalibConfirm = (data) => {
-        pushAll(nodes, edges, { ...calibration, [floor]: data });
+        // Keep the two clicked points: they are what makes the scale reproducible and auditable.
+        const next = { ...data, refStart: calibPts[0], refEnd: calibPts[1] };
+        // A new scale changes the real length of every edge on this floor.
+        pushAll(nodes, { ...edges, [floor]: withFreshDistances(edges[floor] || [], nodes[floor] || [], next.pxPerMeter) }, { ...calibration, [floor]: next });
         setCalibPts([]);
         setCalibModal(false);
         setEdMode("select");
@@ -479,7 +513,8 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
             showToast("Label is required for all nodes.", C.red);
             return;
         }
-        pushNodes({ ...nodes, [floor]: nodes[floor].map(n => n.id === selectedId ? nodeEdits : n) });
+        // Property edits never carry coordinates: keep the node where it currently is.
+        pushNodes({ ...nodes, [floor]: nodes[floor].map(n => n.id === selectedId ? { ...nodeEdits, x: n.x, y: n.y } : n) });
         setNodeEditsDirty(false);
         setLabelError(false);
         showToast("Node properties saved.", C.green);
@@ -487,7 +522,7 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
     const deleteNode = () => {
         if (!selectedId || isLocked)
             return;
-        push({ nodes: { ...nodes, [floor]: nodes[floor].filter(n => n.id !== selectedId) }, edges: { ...edges, [floor]: edges[floor].filter(e => e.from !== selectedId && e.to !== selectedId) }, calibration });
+        push(removeNodeFromSnapshot({ nodes, edges, calibration }, floor, selectedId));
         setSelId(null);
         showToast("Node deleted.", C.red);
     };
@@ -553,7 +588,7 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
         {/* Status stepper */}
         <div style={{ display: "flex", alignItems: "center", gap: 0, marginLeft: 6, background: "#F8FAFC", border: `1px solid ${C.border}`, borderRadius: 8, padding: "3px 8px" }}>
           {STATUS_ORDER.map((s, i) => {
-            const cfg = STATUS_CONFIG[s];
+            const cfg = statusConfigFor(s);
             const isCurrent = s === projectStatus;
             const isPast = STATUS_ORDER.indexOf(projectStatus) > i;
             return (<div key={s} style={{ display: "flex", alignItems: "center" }}>
@@ -578,21 +613,13 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
           {!isLocked && (<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
               <button onClick={handleSaveDraft} title="Save Draft (Ctrl+S)" style={{ display: "flex", alignItems: "center", gap: 5, background: unsaved ? "#F0FDF4" : "#F8FAFC", color: unsaved ? "#166534" : "#94A3B8", border: `1px solid ${unsaved ? "#BBF7D0" : C.border}`, borderRadius: 7, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F, transition: "all 0.2s" }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Save Draft
+                {saving ? "Saving…" : "Save Draft"}
               </button>
               {savedAt && <span style={{ fontSize: 9, color: "#94A3B8", fontFamily: M }}>{savedAt.toLocaleTimeString()}</span>}
             </div>)}
           {!isLocked && (<button onClick={() => setConfirmAction("save")} style={{ display: "flex", alignItems: "center", gap: 5, background: C.blue, color: "#fff", border: `1px solid ${C.blue}`, borderRadius: 7, padding: "5px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Save
-            </button>)}
-          {projectStatus === "node_mapping" && (<button onClick={() => setConfirmAction("submit")} style={{ display: "flex", alignItems: "center", gap: 5, background: "#D97706", color: "#fff", border: "1px solid #D97706", borderRadius: 7, padding: "5px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Submit for Testing
-            </button>)}
-          {isLocked && (<button onClick={() => setConfirmAction("revert")} style={{ display: "flex", alignItems: "center", gap: 5, background: "#FEF9C3", color: "#92400E", border: "1px solid #FDE68A", borderRadius: 7, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13C5.5 6.5 12 4 17.5 7.5S22 18 16 20"/></svg>
-              Revert to Draft
+              Save &amp; Validate
             </button>)}
           <div style={{ width: 1, height: 22, background: C.border }}/>
           <button onClick={() => setShowData(true)} style={{ background: C.white, color: "#334155", border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: F, display: "flex", alignItems: "center", gap: 5 }}>
@@ -608,13 +635,13 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
           <div style={{ flex: 1 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: statusCfg.color, fontFamily: F }}>{statusCfg.label} — Editing Locked.{" "}</span>
             <span style={{ fontSize: 11, color: statusCfg.color, fontFamily: F, opacity: 0.8 }}>
-              {projectStatus === "node_mapping" && "AR development team is working on this map."}
               {projectStatus === "navigation_testing" && "Map is under navigation testing."}
               {projectStatus === "ready_for_activation" && "Map is ready for activation."}
               {projectStatus === "live" && "This map is live and active."}
+              {!STATUS_CONFIG[projectStatus] && "The map can only be edited while the AR development is in Node Mapping."}
             </span>
           </div>
-          <span style={{ fontSize: 10, color: statusCfg.color, fontFamily: M, opacity: 0.65, whiteSpace: "nowrap" }}>Use "Revert to Draft" to unlock</span>
+          <span style={{ fontSize: 10, color: statusCfg.color, fontFamily: M, opacity: 0.65, whiteSpace: "nowrap" }}>Read-only</span>
         </div>)}
 
       {/* ── BODY ── */}
@@ -702,8 +729,8 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
           </div>
 
           {/* Canvas */}
-          <div style={{ flex: 1, overflow: "auto", padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "flex-start" }}>
-            <NodeCanvas nodes={canvasFloorNodes} edges={floorEdges} mode={isLocked ? "select" : edMode} selectedId={selectedId} selectedEdgeId={selectedEdgeId} connectFrom={connectFrom} calibPts={calibPts} onCanvasClick={handleCanvasClick} onNodeClick={handleNodeClick} onNodeDrag={handleNodeDrag} onNodeDragEnd={handleNodeDragEnd} onEdgeClick={handleEdgeClick}/>
+          <div style={{ flex: 1, padding: 12, minHeight: 0 }}>
+            <NodeCanvas key={floor} nodes={canvasFloorNodes} edges={floorEdges} mode={isLocked && edMode !== "calibrate" ? "select" : edMode} editable={!isLocked} selectedId={selectedId} selectedEdgeId={selectedEdgeId} connectFrom={connectFrom} calibPts={calibPts} savedRef={floorCalib} image={floorImage.image} imageStatus={floorImage.status} pxPerMeter={floorCalib?.pxPerMeter} onCanvasClick={handleCanvasClick} onNodeClick={handleNodeClick} onNodeDrag={handleNodeDrag} onNodeDragEnd={handleNodeDragEnd} onNodeNudge={handleNodeNudge} onEdgeClick={handleEdgeClick}/>
           </div>
 
           {/* Status bar */}
@@ -910,7 +937,7 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
             <div style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#475569", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: M, marginBottom: 8 }}>Pipeline</div>
               {STATUS_ORDER.map((s, i) => {
-            const cfg = STATUS_CONFIG[s];
+            const cfg = statusConfigFor(s);
             const isCurrent = s === projectStatus;
             const isPast = STATUS_ORDER.indexOf(projectStatus) > i;
             return (<div key={s} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
@@ -930,17 +957,46 @@ export default function NodeEditor({ mallName = "SM Seaside City Cebu", onBack }
 
       {/* ── MODALS ── */}
       {placeModal && !isLocked && (<PlaceModal x={placeModal.x} y={placeModal.y} floor={floor} onConfirm={handlePlaceConfirm} onCancel={() => setPlaceModal(null)}/>)}
-      {calibModal && (<CalibrationModal floor={floor} calibPts={calibPts} onConfirm={handleCalibConfirm} onCancel={() => { setCalibModal(false); setCalibPts([]); }}/>)}
+      {calibModal && (<CalibrationModal floor={floor} calibPts={calibPts} initial={floorCalib} suggested={floorMeta[floor]?.submittedReference} onConfirm={handleCalibConfirm} onCancel={() => { setCalibModal(false); setCalibPts([]); }}/>)}
       {showData && (<DataTable nodes={nodes} edges={edges} calibration={calibration} onClose={() => setShowData(false)}/>)}
 
       {/* ── CONFIRM DIALOGS ── */}
-      {confirmAction === "save" && (<ConfirmModal title="Save Map" body="This will validate all floor transitions, then lock editing and send the map to the AR development team. Continue?" confirmLabel="Validate & Save" confirmColor={C.blue} onConfirm={handleSave} onCancel={() => setConfirmAction(null)}/>)}
-      {confirmAction === "submit" && (<ConfirmModal title="Submit for Testing" body="Submit this map for navigation testing? The map will enter the testing pipeline." confirmLabel="Submit" confirmColor="#D97706" onConfirm={handleSubmitForTesting} onCancel={() => setConfirmAction(null)}/>)}
-      {confirmAction === "revert" && (<ConfirmModal title="Revert to Draft" body="This will unlock editing and move the map back to Pending status." confirmLabel="Revert" confirmColor={C.violet} onConfirm={handleRevertToDraft} onCancel={() => setConfirmAction(null)}/>)}
+      {confirmAction === "save" && (<ConfirmModal title="Save & Validate" body="This checks that every stairs, escalator, elevator and ramp is linked to its counterpart on another floor, then saves the map. The map stays editable until it is submitted for navigation testing from the AR Development page." confirmLabel="Save & Validate" confirmColor={C.blue} onConfirm={handleSave} onCancel={() => setConfirmAction(null)}/>)}
+
+      {/* ── SAVE RESULT: errors from the backend, or warnings about a saved map ── */}
+      {saveProblems && (<SaveProblemsModal problems={saveProblems} onClose={() => setSaveProblems(null)}/>)}
 
       {/* ── TRANSITION VALIDATION WARNING ── */}
       {transitionIssues && transitionIssues.length > 0 && (<TransitionWarningModal issues={transitionIssues} onClose={() => setTransitionIssues(null)}/>)}
 
       {toast && <Toast msg={toast.msg} color={toast.color}/>}
     </div>);
+}
+
+// ── Entry point: load the map from the backend, then render the editor ─────────
+export default function NodeEditor({ projectId, mallName, onBack }) {
+    const [state, setState] = useState({ status: "loading", data: null, error: "" });
+    useEffect(() => {
+        let active = true;
+        setState({ status: "loading", data: null, error: "" });
+        loadNodeMap(projectId)
+            .then(data => { if (active) setState({ status: "ready", data, error: "" }); })
+            .catch(error => { if (active) setState({ status: "error", data: null, error: error.message || "Unable to load the map." }); });
+        return () => { active = false; };
+    }, [projectId]);
+    if (state.status !== "ready") {
+        return (<div style={{ fontFamily: F, height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: C.bg, color: C.txt }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: state.status === "error" ? C.red : "#475569" }}>{state.status === "error" ? state.error : "Loading map…"}</div>
+        {onBack && (<button onClick={onBack} style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: "#334155", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: F }}>← Back</button>)}
+      </div>);
+    }
+    if (state.data.floorMetaEmpty || Object.keys(state.data.floorMeta).length === 0) {
+        return (<div style={{ fontFamily: F, height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, background: C.bg, color: "#475569", textAlign: "center", padding: 24 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>No floor plans were submitted for this application.</div>
+        <div style={{ fontSize: 12 }}>The mall must upload at least one floor plan before the map can be edited.</div>
+        {onBack && (<button onClick={onBack} style={{ marginTop: 8, padding: "7px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: "#334155", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: F }}>← Back</button>)}
+      </div>);
+    }
+    // key forces a clean editor (fresh undo history, fresh revision) after a reload
+    return <NodeEditorWorkspace key={projectId} projectId={projectId} mallName={mallName || state.data.meta.mallName} onBack={onBack} initial={state.data}/>;
 }

@@ -2,6 +2,7 @@
 
 const { uploadImage } = require('../storage/imageStorage')
 const { MAX_FLOOR_PLAN_BYTES, parseImageDataUrl } = require('../storage/attachmentValidation')
+const { getVersionEligibility } = require('../applicationManagement/versionRules')
 
 function now() { return new Date().toISOString() }
 function safeFileName(name) { return String(name || 'floor-plan.png').replace(/[^a-zA-Z0-9._-]/g, '-') }
@@ -13,8 +14,17 @@ module.exports = function registerApplicationTestingRoutes(app) {
 			app.supabase.from('floor').select('floor_id, floor_num, floor_label, mall_id').order('floor_id'),
 		])
 		if (malls.error || floors.error) return reply.code(500).send({ message: 'Unable to load malls and floors.' })
+		const mallRows = await Promise.all((malls.data || []).map(async mall => {
+			const eligibility = await getVersionEligibility(app.supabase, mall.mall_id)
+			return {
+				...mall,
+				canSubmit: eligibility.allowed,
+				nextVersion: eligibility.nextVersion,
+				blockedReason: eligibility.reason,
+			}
+		}))
 		return {
-			malls: malls.data || [],
+			malls: mallRows,
 			floors: (floors.data || []).map(floor => ({
 				floor_id: floor.floor_id,
 				floor_num: floor.floor_num,
@@ -39,13 +49,15 @@ module.exports = function registerApplicationTestingRoutes(app) {
 		if (selectedFloors.some(floor => !String(floor.referenceLine || '').trim() || Number(floor.meterLength) <= 0)) {
 			return reply.code(400).send({ message: 'Each floor requires a scale reference and a positive meter length.' })
 		}
-		const existing = await app.supabase.from('application').select('application_version').eq('mall_id', mallId).order('application_version', { ascending: false }).limit(1)
-		if (existing.error) throw existing.error
-		const version = (existing.data?.[0]?.application_version || 0) + 1
+		const eligibility = await getVersionEligibility(app.supabase, mallId)
+		if (!eligibility.allowed) return reply.code(409).send({ message: eligibility.reason })
+		const version = eligibility.nextVersion
 		const application = await app.supabase.from('application').insert({
 			application_version: version, application_status: 'submitted',
 			application_created_at: now(), application_updated_at: now(), mall_id: mallId,
 		}).select('application_id, application_version, application_status').single()
+		// The database enforces the same rule with a trigger, so surface its message cleanly.
+		if (application.error?.code === 'P0001') return reply.code(409).send({ message: application.error.message })
 		if (application.error) throw application.error
 		try {
 			for (const floor of selectedFloors) {
