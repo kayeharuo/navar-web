@@ -869,6 +869,20 @@
   color: #6B7280;
 }
 
+.profile-picture-empty-preview {
+  width: min(260px, 70vw);
+  height: min(260px, 70vw);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFE6CC;
+  color: #1F384C;
+  font-family: 'Poppins', sans-serif;
+  font-size: 96px;
+  font-weight: 700;
+}
+
 /* ══════════════════════════════════════════════════════════ */
 /* ─── Logout modal ──────────────────────────────────────── */
 /* ══════════════════════════════════════════════════════════ */

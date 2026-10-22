@@ -8,6 +8,9 @@ const {
 	MAX_THREAD_IMAGE_BYTES,
 } = require('../storage/attachmentValidation')
 
+const arService = require('./arService')
+const { action } = arService
+
 const now = () => new Date().toISOString()
 const titleCase = value => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 const dateLabel = value => value
@@ -27,13 +30,13 @@ const timeLabel = value => {
 	return `${displayHours}:${String(minutes).padStart(2, '0')} ${suffix}`
 }
 const dayLabels = {
-	monday: 'Mon',
-	tuesday: 'Tue',
-	wednesday: 'Wed',
-	thursday: 'Thu',
-	friday: 'Fri',
-	saturday: 'Sat',
-	sunday: 'Sun',
+	mon: 'Monday', monday: 'Monday',
+	tue: 'Tuesday', tues: 'Tuesday', tuesday: 'Tuesday',
+	wed: 'Wednesday', wednesday: 'Wednesday',
+	thu: 'Thursday', thur: 'Thursday', thurs: 'Thursday', thursday: 'Thursday',
+	fri: 'Friday', friday: 'Friday',
+	sat: 'Saturday', saturday: 'Saturday',
+	sun: 'Sunday', sunday: 'Sunday',
 }
 const normalizeDay = value => dayLabels[String(value || '').toLowerCase()] || String(value || '')
 
@@ -72,37 +75,6 @@ async function serializeMessages(supabase, messages, includeAttachments = true) 
 	}))
 }
 
-async function mallRecipients(supabase, mallId) {
-	const result = await supabase.from('admin').select('admin_id, admin_role, mall_id').eq('admin_is_deactivated', false)
-	if (result.error) throw result.error
-	return (result.data || []).filter(admin =>
-		admin.admin_role === 'mall_admin' && String(admin.mall_id) === String(mallId)
-	)
-}
-
-async function notify(supabase, { mallId, sourceType, sourceId, title, message, actionUrl, actorId, actorRole }) {
-	const recipients = await mallRecipients(supabase, mallId)
-	if (!recipients.length) return
-	const result = await supabase.from('admin_notification').insert(recipients.map(recipient => ({
-		admin_notif_type: sourceType,
-		admin_notif_title: title,
-		admin_notif_message: message,
-		admin_notif_action_url: actionUrl,
-		admin_notif_action_label: 'View details',
-		admin_notif_source_type: sourceType,
-		admin_notif_source_id: sourceId,
-		admin_notif_source_label: `Application #${sourceId}`,
-		admin_notif_actor_id: actorId,
-		admin_notif_actor_role: actorRole || 'admin',
-		admin_notif_is_read: false,
-		admin_notif_is_archived: false,
-		admin_notif_created_at: now(),
-		admin_id: recipient.admin_id,
-		mall_id: mallId,
-	})))
-	if (result.error) throw result.error
-}
-
 async function applicationDetails(supabase, applicationId, request) {
 	const application = await supabase.from('application').select('*').eq('application_id', applicationId).single()
 	if (application.error) return null
@@ -111,10 +83,11 @@ async function applicationDetails(supabase, applicationId, request) {
 	const plans = await supabase.from('application_floor_plan').select('*').eq('application_id', applicationId).order('floor_id')
 	const entries = await supabase.from('application_entry_point').select('*').eq('application_id', applicationId).order('floor_id')
 	const developments = await supabase.from('ar_development').select('*').eq('application_id', applicationId).order('ar_development_id', { ascending: false }).limit(1)
-	const thread = await supabase.from('thread').select('*').eq('application_id', applicationId).maybeSingle()
+	const thread = await supabase.from('thread').select('thread_id').eq('application_id', applicationId)
 	let messages = []
-	if (thread.data) {
-		const messageResult = await supabase.from('thread_message').select('*').eq('thread_id', thread.data.thread_id).order('message_sent_at')
+	if (thread.error) throw thread.error
+	if (thread.data?.length) {
+		const messageResult = await supabase.from('thread_message').select('*').in('thread_id', thread.data.map(t => t.thread_id)).order('message_sent_at')
 		messages = messageResult.data || []
 	}
 	const admin = await supabase.from('admin').select('admin_full_name, admin_email').eq('mall_id', application.data.mall_id).eq('admin_role', 'mall_admin').eq('admin_is_deactivated', false).limit(1).maybeSingle()
@@ -134,8 +107,19 @@ async function applicationDetails(supabase, applicationId, request) {
 		}
 	})
 	const scalePlan = floorPlans.find(plan => plan.referenceLine)
+	const versions = await supabase.from('application').select('application_id,application_version,application_attempt,application_status').eq('mall_id', application.data.mall_id).order('application_version', { ascending: false }).order('application_attempt', { ascending: false })
+	if (versions.error) throw versions.error
+	const d = developments.data?.[0]
+	const readOnly = versions.data?.[0]?.application_id !== applicationId || ['live','unpublished'].includes(d?.ar_development_status)
 	return {
 		id: application.data.application_id,
+		versions: versions.data, readOnly, attempt: application.data.application_attempt,
+		reasonCategory: application.data.application_reason_category, reasonNotes: application.data.application_reason_notes,
+		disputeCount: application.data.application_dispute_count,
+		canRevise: !readOnly && !d?.ar_development_ready_at && (
+			application.data.application_status === 'submitted'
+			|| (application.data.application_status === 'approved' && d && ['pending','node_mapping','testing'].includes(d.ar_development_status))
+		),
 		mallId: application.data.mall_id,
 		mallName: mall.data?.mall_name || 'Unknown mall',
 		city: mall.data?.mall_city || '',
@@ -177,6 +161,12 @@ async function applicationDetails(supabase, applicationId, request) {
 }
 
 module.exports = function registerApplicationManagementRoutes(app) {
+ app.addHook('preValidation', async (request, reply) => {
+  if (request.params?.id !== undefined && (!Number.isSafeInteger(Number(request.params.id)) || Number(request.params.id) < 1)) return reply.code(400).send({ message: 'Invalid resource ID.' })
+  if (request.body?.attachments !== undefined && !Array.isArray(request.body.attachments)) return reply.code(400).send({ message: 'Attachments must be an array.' })
+  if (request.body?.content !== undefined && (typeof request.body.content !== 'string' || request.body.content.length > 10000)) return reply.code(400).send({ message: 'Messages must contain at most 10000 characters.' })
+ })
+
 	app.get('/api/ar-developments', async (request, reply) => {
 		try {
 			const developments = await app.supabase.from('ar_development').select('*').order('ar_development_created_at', { ascending: true })
@@ -191,6 +181,12 @@ module.exports = function registerApplicationManagementRoutes(app) {
 				? await app.supabase.from('mall').select('*').in('mall_id', mallIds)
 				: { data: [], error: null }
 			if (malls.error) throw malls.error
+			const allApps = await app.supabase.from('application').select('application_id,mall_id,application_version,application_attempt').in('mall_id', mallIds.length ? mallIds : [0])
+			const admins = await app.supabase.from('admin').select('mall_id,admin_full_name,admin_email').eq('admin_role', 'mall_admin').eq('admin_is_deactivated', false)
+			const threads = await app.supabase.from('thread').select('ar_development_id').not('ar_development_id', 'is', null)
+			const nodes = await app.supabase.from('node').select('ar_development_id')
+			const edges = await app.supabase.from('edge').select('ar_development_id')
+			for (const r of [allApps, admins, threads, nodes, edges]) if (r.error) throw r.error
 			const applicationById = new Map((applications.data || []).map(item => [item.application_id, item]))
 			const mallById = new Map((malls.data || []).map(item => [item.mall_id, item]))
 			return (developments.data || []).map(item => {
@@ -198,8 +194,15 @@ module.exports = function registerApplicationManagementRoutes(app) {
 				const mall = mallById.get(application?.mall_id)
 				return {
 					id: item.ar_development_id,
+					mallId: application?.mall_id,
+					readOnly: ['live','unpublished'].includes(item.ar_development_status) || (allApps.data || []).some(a => a.mall_id === application?.mall_id && (a.application_version > application.application_version || (a.application_version === application.application_version && a.application_attempt > application.application_attempt))),
+					hasThread: (threads.data || []).some(t => t.ar_development_id === item.ar_development_id),
+					readyAt: item.ar_development_ready_at, mallApprovedAt: item.ar_development_mall_approved_at, resumeStatus: item.ar_development_resume_status,
+					waitingDays: item.ar_development_status === 'ready' && item.ar_development_ready_at ? Math.max(0, Math.floor((Date.now() - new Date(item.ar_development_ready_at)) / 86400000)) : 0,
 					applicationId: item.application_id,
 					mallName: mall?.mall_name || 'Unknown mall',
+					adminName: admins.data.find(a => a.mall_id === application?.mall_id)?.admin_full_name || 'No mall admin',
+					adminEmail: admins.data.find(a => a.mall_id === application?.mall_id)?.admin_email || '',
 					city: mall?.mall_city || '',
 					version: application?.application_version || item.ar_development_version,
 					floors: mall?.mall_floor_count || 0,
@@ -209,8 +212,8 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					arStatus: titleCase(item.ar_development_status),
 					dateAdded: dateLabel(item.ar_development_created_at),
 					lastUpdated: dateLabel(item.ar_development_updated_at),
-					nodes: 0,
-					edges: 0,
+					nodes: (nodes.data || []).filter(n => n.ar_development_id === item.ar_development_id).length,
+					edges: (edges.data || []).filter(e => e.ar_development_id === item.ar_development_id).length,
 					thread: [],
 					testErrors: [],
 					stallAdditions: [],
@@ -271,7 +274,8 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					adminName: 'View details',
 					adminEmail: '',
 					version: application.application_version,
-					isLatestVersion: application.application_version === latestVersionByMall.get(String(application.mall_id)),
+					isLatestVersion: !(applications.data || []).some(a => a.mall_id === application.mall_id && (a.application_version > application.application_version || (a.application_version === application.application_version && a.application_attempt > application.application_attempt))),
+					attempt: application.application_attempt,
 					floors: relatedMall.mall_floor_count || 0,
 					agreement: 'Setup',
 					applicationStatus: titleCase(application.application_status),
@@ -303,7 +307,9 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			for (const message of messageRows.data || []) {
 				if (!messagesByThread.has(message.thread_id)) messagesByThread.set(message.thread_id, message)
 			}
-			const applicationIds = threadRows.filter(thread => thread.application_id).map(thread => thread.application_id)
+			const arApps = await app.supabase.from('ar_development').select('application_id').in('ar_development_id', threadRows.filter(t => t.ar_development_id).map(t => t.ar_development_id).concat([0]))
+			if (arApps.error) throw arApps.error
+			const applicationIds = [...new Set([...threadRows.filter(thread => thread.application_id).map(thread => thread.application_id), ...(arApps.data || []).map(d => d.application_id)])]
 			const stallApplicationIds = threadRows.filter(thread => thread.s_application_id).map(thread => thread.s_application_id)
 			const arDevelopmentIds = threadRows.filter(thread => thread.ar_development_id).map(thread => thread.ar_development_id)
 			const [applications, stallApplications, developments, malls] = await Promise.all([
@@ -353,67 +359,40 @@ module.exports = function registerApplicationManagementRoutes(app) {
 		return detail
 	})
 
-	app.patch('/api/applications/:id/revision', async (request, reply) => {
-		const id = Number(request.params.id)
-		const notes = String(request.body?.notes || '').trim()
-		if (!notes) return reply.code(400).send({ message: 'Revision notes are required.' })
-		const current = await app.supabase.from('application').select('mall_id').eq('application_id', id).single()
-		if (current.error) return reply.code(404).send({ message: 'Application not found.' })
-		const update = await app.supabase.from('application').update({ application_status: 'for_revision', application_updated_at: now() }).eq('application_id', id)
-		if (update.error) throw update.error
-		const suspended = await app.supabase.from('ar_development')
-			.update({ ar_development_status: 'suspended', ar_development_updated_at: now() })
-			.eq('application_id', id)
-			.select('*')
-		if (suspended.error) throw suspended.error
-		let thread = await app.supabase.from('thread').select('thread_id').eq('application_id', id).order('thread_id', { ascending: true }).limit(1).maybeSingle()
-		if (thread.error) throw thread.error
-		if (!thread.data) {
-			thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: id }).select('thread_id').single()
-			if (thread.error) throw thread.error
-		}
-		const message = await app.supabase.from('thread_message').insert({ message_sender_type: 'admin', message_sent_at: now(), message_content: notes, thread_id: thread.data.thread_id, message_sender: request.admin.id })
-		if (message.error) throw message.error
-		await notify(app.supabase, { mallId: current.data.mall_id, sourceType: 'application_revision_requested', sourceId: id, title: 'Application revision requested', message: notes, actionUrl: `/application-management?applicationId=${id}&view=thread`, actorId: request.admin.id, actorRole: request.admin.role })
-		return { message: 'Revision requested.', arDevelopment: suspended.data?.[0] || null }
-	})
 
-	app.post('/api/applications/:id/approve', async (request, reply) => {
-		const id = Number(request.params.id)
-		const current = await app.supabase.from('application').select('mall_id, application_version').eq('application_id', id).single()
-		if (current.error) return reply.code(404).send({ message: 'Application not found.' })
-		const update = await app.supabase.from('application').update({ application_status: 'approved', application_updated_at: now() }).eq('application_id', id)
-		if (update.error) throw update.error
-		let development = await app.supabase.from('ar_development').select('*').eq('application_id', id).order('ar_development_updated_at', { ascending: false }).limit(1).maybeSingle()
-		if (development.error) throw development.error
-		if (development.data) {
-			development = await app.supabase.from('ar_development').update({
-				ar_development_status: 'pending',
-				ar_development_version: current.data.application_version,
-				ar_development_updated_at: now(),
-			}).eq('ar_development_id', development.data.ar_development_id).select('*').single()
-		} else {
-			development = await app.supabase.from('ar_development').insert({
-				ar_development_status: 'pending', ar_development_version: current.data.application_version,
-				ar_development_created_at: now(), ar_development_updated_at: now(), application_id: id,
-			}).select('*').single()
-		}
-		if (development.error) throw development.error
-		await notify(app.supabase, { mallId: current.data.mall_id, sourceType: 'application_approved', sourceId: id, title: 'Application approved', message: 'Your application was approved and AR development is now pending in the queue.', actionUrl: `/application-management?applicationId=${id}`, actorId: request.admin.id, actorRole: request.admin.role })
-		return { message: 'Application approved.', arDevelopment: development.data }
-	})
-
-	app.post('/api/ar-developments/:id/start-mapping', async (request, reply) => {
-		const id = Number(request.params.id)
-		const development = await app.supabase.from('ar_development').select('application_id, ar_development_status').eq('ar_development_id', id).single()
-		if (development.error) return reply.code(404).send({ message: 'AR development not found.' })
-		if (development.data.ar_development_status !== 'pending') return reply.code(400).send({ message: 'Only pending AR development can start node mapping.' })
-		const updated = await app.supabase.from('ar_development').update({ ar_development_status: 'node_mapping', ar_development_updated_at: now() }).eq('ar_development_id', id).select('*').single()
-		if (updated.error) throw updated.error
-		const application = await app.supabase.from('application').select('mall_id').eq('application_id', development.data.application_id).single()
-		if (!application.error) await notify(app.supabase, { mallId: application.data.mall_id, sourceType: 'ar_development_status_changed', sourceId: id, title: 'AR development started', message: 'Node mapping has started for your mall.', actionUrl: `/ar-development?projectId=${id}`, actorId: request.admin.id, actorRole: request.admin.role })
-		return updated.data
-	})
+ const idSchema = { type: 'object', required: ['id'], properties: { id: { type: 'integer', minimum: 1 } } }
+ const actionBody = { type: 'object', additionalProperties: false, properties: { notes: { type: 'string', maxLength: 10000 }, target: { type: 'string', enum: ['node_mapping','testing','ready'] } } }
+ for (const name of ['accept','reject','approve','revision']) {
+  app.route({ method: name === 'revision' ? 'PATCH' : 'POST', url: `/api/applications/:id/${name}`, schema: { params: idSchema, ...(name === 'approve' ? {} : { body: actionBody }) }, handler: async (request, reply) => {
+   const notes = request.body?.notes?.trim() || ''
+   if (name === 'reject' && !notes) return reply.code(400).send({ message: 'A rejection explanation is required.' })
+   if (name === 'accept') {
+    const a = await app.supabase.from('application').select('mall_id').eq('application_id', request.params.id).single()
+    if (a.error) return reply.code(404).send({ message: 'Application not found.' })
+    const [floors, plans] = await Promise.all([
+     app.supabase.from('floor').select('floor_id').eq('mall_id', a.data.mall_id),
+     app.supabase.from('application_floor_plan').select('floor_id').eq('application_id', request.params.id),
+    ])
+    if (floors.error || plans.error) throw floors.error || plans.error
+    const actual = plans.data.map(p => String(p.floor_id))
+    if (actual.length !== floors.data.length || new Set(actual).size !== actual.length || floors.data.some(f => !actual.includes(String(f.floor_id)))) return reply.code(409).send({ message: 'A request needs exactly one plan for every existing floor.' })
+   }
+   return action(app.supabase, request.params.id, request.admin.id, name, notes)
+  } })
+ }
+ async function changeAR(request, reply, target) {
+  const d = await app.supabase.from('ar_development').select('application_id,ar_development_status').eq('ar_development_id', request.params.id).maybeSingle()
+  if (d.error) throw d.error
+  if (!d.data) return reply.code(404).send({ message: 'AR development not found.' })
+  if (request.routeOptions.url.endsWith('/change-status') && !({ testing: ['node_mapping'], ready: ['testing','node_mapping'] }[d.data.ar_development_status] || []).includes(target)) return reply.code(409).send({ message: 'Change Status only permits backward moves.' })
+  await action(app.supabase, d.data.application_id, request.admin.id, 'ar_status', '', target)
+  return { message: 'AR status updated.' }
+ }
+ app.post('/api/ar-developments/:id/start-mapping', { schema: { params: idSchema } }, (request, reply) => changeAR(request, reply, 'node_mapping'))
+ app.post('/api/ar-developments/:id/change-status', { schema: { params: idSchema, body: { ...actionBody, required: ['target'] } } }, (request, reply) => changeAR(request, reply, request.body.target))
+ app.post('/api/ar-developments/:id/submit-testing', { schema: { params: idSchema } }, (request, reply) => changeAR(request, reply, 'testing'))
+ app.post('/api/ar-developments/:id/mark-ready', { schema: { params: idSchema } }, (request, reply) => changeAR(request, reply, 'ready'))
+ app.post('/api/ar-developments/:id/publish', { schema: { params: idSchema } }, request => arService(app.supabase).tryPublish(request.params.id, request.admin.id))
 
 	app.get('/api/ar-developments/:id/thread', async (request, reply) => {
 		const result = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
@@ -424,42 +403,11 @@ module.exports = function registerApplicationManagementRoutes(app) {
 		return { threadId: result.data.thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
 	})
 
-	app.post('/api/ar-developments/:id/thread', async (request, reply) => {
+	app.post('/api/ar-developments/:id/thread', { bodyLimit: 30 * 1024 * 1024 }, async (request, reply) => {
 		const id = Number(request.params.id)
-		const content = String(request.body?.content || '').trim()
-		if (!content) return reply.code(400).send({ message: 'Message content is required.' })
-		let thread = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', id).order('thread_id').limit(1).maybeSingle()
-		if (thread.error) throw thread.error
-		if (!thread.data) {
-			thread = await app.supabase.from('thread').insert({
-				thread_source: 'ar_development',
-				thread_created_at: now(),
-				ar_development_id: id,
-			}).select('thread_id').single()
-			if (thread.error) throw thread.error
-		}
-		const message = await app.supabase.from('thread_message').insert({
-			message_sender_type: 'admin',
-			message_sent_at: now(),
-			message_content: content,
-			thread_id: thread.data.thread_id,
-			message_sender: request.admin.id,
-		}).select('*').single()
-		if (message.error) throw message.error
-		return (await serializeMessages(app.supabase, [message.data], false))[0]
-	})
-
-	app.get('/api/applications/:id/thread', async (request, reply) => {
-		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
-		if (result.error) throw result.error
-		if (!result.data) return { threadId: null, messages: [] }
-		const messages = await app.supabase.from('thread_message').select('*').eq('thread_id', result.data.thread_id).order('message_sent_at')
-		if (messages.error) throw messages.error
-		return { threadId: result.data.thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
-	})
-
-	app.post('/api/applications/:id/thread', async (request, reply) => {
-		const id = Number(request.params.id)
+		const dev = await app.supabase.from('ar_development').select('application_id').eq('ar_development_id', id).single()
+		if (dev.error) return reply.code(404).send({ message: 'AR development not found.' })
+		await assertThreadWritable(app.supabase, dev.data.application_id, id)
 		const content = String(request.body?.content || '').trim()
 		const attachments = Array.isArray(request.body?.attachments) ? request.body.attachments : []
 		if (!content && attachments.length === 0) return reply.code(400).send({ message: 'Message content or an image is required.' })
@@ -474,17 +422,64 @@ module.exports = function registerApplicationManagementRoutes(app) {
 		if (parsedAttachments.reduce((total, attachment) => total + attachment.parsed.size, 0) > MAX_THREAD_TOTAL_BYTES) {
 			return reply.code(400).send({ message: 'The total image size per message cannot exceed 20 MB.' })
 		}
-		let thread = await app.supabase.from('thread').select('thread_id').eq('application_id', id).order('thread_id').limit(1).maybeSingle()
+		let thread = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', id).order('thread_id').limit(1).maybeSingle()
 		if (thread.error) throw thread.error
-		if (!thread.data) {
-			thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: id }).select('thread_id').single()
-			if (thread.error) throw thread.error
-		}
+		if (!thread.data) return reply.code(409).send({ message: 'The AR thread is available after Ready.' })
 		const message = await app.supabase.from('thread_message').insert({ message_sender_type: 'admin', message_sent_at: now(), message_content: content || '', thread_id: thread.data.thread_id, message_sender: request.admin.id }).select('*').single()
 		if (message.error) throw message.error
 		for (const attachment of parsedAttachments) {
 			const fileName = String(attachment.fileName || `image-${Date.now()}`).replace(/[^a-zA-Z0-9._-]/g, '_')
-			const path = `threads/${thread.data.thread_id}/messages/${message.data.message_id}/${fileName}`
+			const path = `threads/${thread.data.thread_id}/messages/${message.data.message_id}/${require('crypto').randomUUID()}-${fileName}`
+			await uploadImage(app.supabase, path, attachment.dataUrl)
+			const inserted = await app.supabase.from('thread_message_attachment').insert({
+				thread_message_id: message.data.message_id,
+				thread_message_attachment_type: 'image',
+				thread_message_attachment_storage_path: path,
+				thread_message_attachment_file_name: fileName,
+				thread_message_attachment_mime_type: attachment.parsed.mimeType,
+				thread_message_attachment_file_size: attachment.parsed.size,
+				thread_message_attachment_created_at: now(),
+				thread_message_attachment_uploaded_by: request.admin.id,
+			})
+			if (inserted.error) throw inserted.error
+		}
+		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
+	})
+
+	app.get('/api/applications/:id/thread', async (request, reply) => {
+		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).order('thread_id')
+		if (result.error) throw result.error
+		if (!result.data?.length) return { threadId: null, messages: [] }
+		const messages = await app.supabase.from('thread_message').select('*').in('thread_id', result.data.map(t => t.thread_id)).order('message_sent_at')
+		if (messages.error) throw messages.error
+		return { threadId: result.data[0].thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
+	})
+
+	app.post('/api/applications/:id/thread', { bodyLimit: 30 * 1024 * 1024 }, async (request, reply) => {
+		const id = Number(request.params.id)
+		await assertThreadWritable(app.supabase, id)
+		const content = String(request.body?.content || '').trim()
+		const attachments = Array.isArray(request.body?.attachments) ? request.body.attachments : []
+		if (!content && attachments.length === 0) return reply.code(400).send({ message: 'Message content or an image is required.' })
+		if (attachments.length > MAX_THREAD_IMAGES_PER_MESSAGE) return reply.code(400).send({ message: `A message can contain at most ${MAX_THREAD_IMAGES_PER_MESSAGE} images.` })
+		const parsedAttachments = attachments.map(attachment => ({
+			...attachment,
+			parsed: parseImageDataUrl(attachment.dataUrl),
+		}))
+		if (parsedAttachments.some(attachment => !attachment.parsed || attachment.parsed.size > MAX_THREAD_IMAGE_BYTES)) {
+			return reply.code(400).send({ message: 'Thread images must be valid PNG, JPEG, or WebP files no larger than 5 MB.' })
+		}
+		if (parsedAttachments.reduce((total, attachment) => total + attachment.parsed.size, 0) > MAX_THREAD_TOTAL_BYTES) {
+			return reply.code(400).send({ message: 'The total image size per message cannot exceed 20 MB.' })
+		}
+		const ensured = await app.supabase.rpc('ensure_application_thread', { p_application: id })
+		if (ensured.error) throw ensured.error
+		const thread = { data: { thread_id: ensured.data } }
+		const message = await app.supabase.from('thread_message').insert({ message_sender_type: 'admin', message_sent_at: now(), message_content: content || '', thread_id: thread.data.thread_id, message_sender: request.admin.id }).select('*').single()
+		if (message.error) throw message.error
+		for (const attachment of parsedAttachments) {
+			const fileName = String(attachment.fileName || `image-${Date.now()}`).replace(/[^a-zA-Z0-9._-]/g, '_')
+			const path = `threads/${thread.data.thread_id}/messages/${message.data.message_id}/${require('crypto').randomUUID()}-${fileName}`
 			await uploadImage(app.supabase, path, attachment.dataUrl)
 			const inserted = await app.supabase.from('thread_message_attachment').insert({
 				thread_message_id: message.data.message_id,
@@ -508,4 +503,17 @@ module.exports = function registerApplicationManagementRoutes(app) {
 		const url = await signedImageUrl(app.supabase, storagePath, 300)
 		return { url, fileName: plan.data.app_floor_plan_file_name || 'floor-plan' }
 	})
+}
+async function assertThreadWritable(supabase, applicationId, arId) {
+ const a = await supabase.from('application').select('mall_id,application_status').eq('application_id', applicationId).single()
+ if (a.error) throw a.error
+ const latest = await supabase.from('application').select('application_id').eq('mall_id', a.data.mall_id).order('application_version', { ascending: false }).order('application_attempt', { ascending: false }).limit(1).single()
+ const d = await supabase.from('ar_development').select('ar_development_status').eq('application_id', applicationId)
+ if (latest.error || d.error) throw latest.error || d.error
+ if (latest.data.application_id !== applicationId || a.data.application_status === 'draft' || d.data.some(d => ['live','unpublished'].includes(d.ar_development_status))) { const e = new Error('This version is read-only.'); e.statusCode = 409; throw e }
+ if (arId) {
+  const t = await supabase.from('thread').select('thread_id').eq('ar_development_id', arId).maybeSingle()
+  if (t.error) throw t.error
+  if (!t.data) { const e = new Error('This version is not ready yet.'); e.statusCode = 409; throw e }
+ }
 }

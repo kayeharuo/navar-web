@@ -19,6 +19,8 @@ function validateFloor(floor) {
 }
 
 export default function ApplicationManagementTesting() {
+  const [reasonCategory, setReasonCategory] = useState('')
+  const [reasonNotes, setReasonNotes] = useState('')
   const [options, setOptions] = useState({ malls: [], floors: [] })
   const [mallId, setMallId] = useState('')
   const [floorData, setFloorData] = useState({})
@@ -101,10 +103,10 @@ export default function ApplicationManagementTesting() {
     setSaving(true)
     setMessage('')
     try {
-      const floors = mallFloors.map(item => ({ floorId: item.floor_id, ...(floorData[item.floor_id] || blankFloor()) }))
+      const floors = mallFloors.map(item => { const floor = floorData[item.floor_id] || blankFloor(); return { floorId: item.floor_id, ...floor, meterLength: Number(floor.meterLength) } })
       const result = await apiRequest('/api/testing/applications', {
         method: 'POST',
-        body: JSON.stringify({ mallId: Number(mallId), floors }),
+        body: JSON.stringify({ reasonCategory, reasonNotes, mallId: Number(mallId), floors }),
       })
       setMessage(`Created application #${result.application_id} (version ${result.application_version}) for ${result.mallName}.`)
       const refreshed = await apiRequest('/api/testing/applications/options')
@@ -134,7 +136,7 @@ export default function ApplicationManagementTesting() {
       </label>
 
       {mall && !blocked && (
-        <p className="application-testing-info">This will create version {mall.nextVersion} for {mall.mall_name}.</p>
+        <div><p className="application-testing-info">This will create version {mall.nextVersion} for {mall.mall_name}.</p>{mall.nextVersion > 1 && <><label>Reason category<input maxLength={100} value={reasonCategory} onChange={e => setReasonCategory(e.target.value)} /></label><label>Reason notes<textarea maxLength={5000} value={reasonNotes} onChange={e => setReasonNotes(e.target.value)} /></label></>}</div>
       )}
       {blocked && <p className="application-testing-blocked">{mall.blockedReason}</p>}
       {mall && !blocked && mallFloors.length === 0 && (

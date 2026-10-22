@@ -11,10 +11,10 @@ function SearchIcon() {
   )
 }
 
-const STATUS_FILTERS = ['All', 'Submitted', 'For Revision', 'Approved', 'Draft']
+const STATUS_FILTERS = ['All', 'Disputed', 'Submitted', 'For Revision', 'Approved', 'Rejected', 'Rejected Final', 'Draft']
 
-// eslint-disable-next-line no-unused-vars
 export default function ApplicationsTable({ applications, onApplicationsChange, onReviewApp }) {
+  const [cardIndex, setCardIndex] = useState(0)
   const [apps, setApps] = useState(applications || [])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState('All')
@@ -73,8 +73,6 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
     ...filtered.filter(a => a.applicationStatus === 'Approved'),
   ]
 
-  const pendingCount = apps.filter(a => a.applicationStatus === 'Submitted' || a.applicationStatus === 'For Revision').length
-
   return (
     <>
       {loadError && (
@@ -82,15 +80,6 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
           {loadError}
         </div>
       )}
-      {/* Pending count message */}
-      {pendingCount > 0 && (
-        <div style={{ marginBottom: '16px' }}>
-          <p className="app-mgmt-subtitle" style={{ margin: 0 }}>
-            <span className="app-mgmt-subtitle-alert">{pendingCount} submissions awaiting review.</span>
-          </p>
-        </div>
-      )}
-
       {/* Flow diagrams */}
       <FlowDiagrams />
 
@@ -161,7 +150,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
                     <div className="app-mgmt-admin-name">{app.adminName}</div>
                     <div className="app-mgmt-admin-email">{app.adminEmail}</div>
                   </td>
-                  <td>{app.version}</td>
+                  <td>{app.version}{app.attempt > 1 ? ` / attempt ${app.attempt}` : ''}</td>
                   <td>{app.floors}</td>
                   <td>{app.agreement}</td>
                   <td>
@@ -197,6 +186,13 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
             </tbody>
           </table>
         </div>
+      </div>
+      <div className="workflow-mobile-cards">
+        {loading ? <p>Loading applications...</p> : !sorted.length ? <p>No applications found.</p> : (() => {
+          const index = Math.min(cardIndex, sorted.length - 1)
+          const app = sorted[index]
+          return <><article><h3>{app.mallName}</h3><p>Version {app.version} / attempt {app.attempt || 1}</p><p>{app.applicationStatus} / AR: {app.arDevelopment}</p><p>{app.city} / {app.floors} floors</p><button className="app-mgmt-review-btn" disabled={app.draft} onClick={() => onReviewApp(app)}>{app.draft ? 'Not submitted' : 'Review'}</button></article><nav aria-label="Application cards"><button disabled={index === 0} onClick={() => setCardIndex(index - 1)}>Previous</button><span>{index + 1} / {sorted.length}</span><button disabled={index === sorted.length - 1} onClick={() => setCardIndex(index + 1)}>Next</button></nav></>
+        })()}
       </div>
       <p className="app-mgmt-hint">Click any row to view full details.</p>
     </>

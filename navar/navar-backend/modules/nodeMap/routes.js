@@ -59,7 +59,7 @@ module.exports = function registerNodeMapRoutes(app) {
 			const floorIds = context.floors.map(floor => floor.floor_id)
 
 			const [nodes, edges, calibrations, units, stalls] = await Promise.all([
-				floorIds.length ? app.supabase.from('node').select('*').in('floor_id', floorIds).order('node_id') : { data: [], error: null },
+				floorIds.length ? app.supabase.from('node').select('*').eq('ar_development_id', request.params.id).in('floor_id', floorIds).order('node_id') : { data: [], error: null },
 				app.supabase.from('edge').select('*').eq('ar_development_id', request.params.id).order('edge_id'),
 				app.supabase.from('floor_calibration').select('*').eq('ar_development_id', request.params.id),
 				floorIds.length ? app.supabase.from('unit').select('unit_id, unit_label, floor_id, store_id').in('floor_id', floorIds).not('store_id', 'is', null).order('unit_label') : { data: [], error: null },
@@ -161,7 +161,7 @@ module.exports = function registerNodeMapRoutes(app) {
 
 			const floorIds = context.floors.map(floor => floor.floor_id)
 			const [existing, units, stores] = await Promise.all([
-				floorIds.length ? app.supabase.from('node').select('node_id').in('floor_id', floorIds) : { data: [], error: null },
+				floorIds.length ? app.supabase.from('node').select('node_id').eq('ar_development_id', request.params.id).in('floor_id', floorIds) : { data: [], error: null },
 				floorIds.length ? app.supabase.from('unit').select('unit_id, unit_label, floor_id, store_id').in('floor_id', floorIds) : { data: [], error: null },
 				app.supabase.from('store').select('store_id, store_type').eq('mall_id', context.application.mall_id),
 			])
@@ -194,7 +194,7 @@ module.exports = function registerNodeMapRoutes(app) {
 				audit_log_details: `AR development ${context.development.ar_development_id}: ${built.payload.nodes.length} nodes, ${built.payload.edges.length} edges`,
 				audit_log_performed_at: new Date().toISOString(),
 				audit_log_performed_by: request.admin.id,
-				audit_log_mall_id: context.application.mall_id,
+				mall_id: context.application.mall_id,
 			})
 			if (audit.error) request.log.error({ code: audit.error.code }, 'Node map audit write failed')
 

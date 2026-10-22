@@ -17,7 +17,7 @@ const SAMPLE_MALLS = [
     dateAdded: 'August 15, 2024',
     lastUpdated: 'March 5, 2026',
     note: null,
-    operatingHours: [{ days: ['Mon','Tue','Wed','Thu','Fri'], open: '10:00', close: '21:00' }],
+    operatingHours: [{ days: ['Monday','Tuesday','Wednesday','Thursday','Friday'], open: '10:00', close: '21:00' }],
     floorDetails: [
       { floorNo: 'B1', label: 'Basement' },
       { floorNo: 'GF', label: 'Ground Floor' },
@@ -58,7 +58,7 @@ const SAMPLE_MALLS = [
     dateAdded: 'August 15, 2024',
     lastUpdated: 'March 5, 2026',
     note: '27 days overdue',
-    operatingHours: [{ days: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], open: '10:00', close: '21:00' }],
+    operatingHours: [{ days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'], open: '10:00', close: '21:00' }],
     floorDetails: [
       { floorNo: 'GF', label: 'Ground Floor' },
       { floorNo: '2F', label: '2nd Floor' },

@@ -147,7 +147,7 @@ export default function ThreadTab({ app, onSendNote }) {
         }
       </div>
 
-      <div className="review-note-area">
+      {!app.readOnly && <div className="review-note-area">
         {attachments.length > 0 && (
           <div className="thread-attachment-list">
             {attachments.map((attachment, index) => (
@@ -173,7 +173,7 @@ export default function ThreadTab({ app, onSendNote }) {
           </label>
           <button className="review-note-send-btn" onClick={handleSend}>Send Note</button>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

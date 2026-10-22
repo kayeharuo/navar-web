@@ -31,7 +31,7 @@ Algorithm choices and their justification (for panel defense):
 ### Beacon/Node Model
 - Beacons use iBeacon UUID/Major/Minor schema
 - A beacon holds a **nullable `node_id` FK with a unique constraint** (resolves beacon-node relationship without circular FKs)
-- **AR development versioning is tied to edges, not nodes**
+- **Nodes are versioned through `node.ar_development_id`, alongside edges, beacon assignments and floor calibration**
 - `FLOOR_CALIBRATION` is a separate version-specific table
 - Stall nodes use predefined slots with add-on fees for extras
 
@@ -49,6 +49,7 @@ Algorithm choices and their justification (for panel defense):
 - Plain CSS files (not Tailwind utility classes) due to Vite plugin compatibility issues
 - **Poppins** for UI text, **Fira Mono** for numeric values
 - Responsive design: fixed-column tables on desktop, card views with prev/next navigation on mobile, sidebar becomes a drawer on smaller screens
+- Action errors must appear in a modal matching existing dialogs, with proper padding and readable font sizes. Do not render error messages inline in the page. Use button loading indicators while approval and revision requests are pending.
 
 ### Database & Backend Services
 - **Supabase / PostgreSQL** — primary database, auth, and real-time features

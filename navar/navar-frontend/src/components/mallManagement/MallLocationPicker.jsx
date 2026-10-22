@@ -11,8 +11,8 @@ function locationFromPlace(place) {
     latitude: Number(place.lat),
     longitude: Number(place.lon),
     address: place.display_name || '',
-    city: details.city || details.town || details.municipality || details.village || details.state_district || '',
-    province: details.province || details.state || details.region || '',
+    city: details.city || details.town || details.municipality || details.city_district || details.village || details.county || '',
+    province: details.province || details.state || details.region || details.state_district || '',
     zipCode: details.postcode || '',
     label: place.display_name || 'Selected map location',
   }
@@ -32,13 +32,13 @@ function MapClick({ onPick }) {
 }
 
 async function searchPlaces(query) {
-  const response = await fetch(`${NOMINATIM_URL}/search?format=jsonv2&limit=5&countrycodes=ph&q=${encodeURIComponent(query)}`)
+  const response = await fetch(`${NOMINATIM_URL}/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=ph&q=${encodeURIComponent(query)}`)
   if (!response.ok) throw new Error('Location search failed.')
   return response.json()
 }
 
 async function reversePlace(latitude, longitude) {
-  const response = await fetch(`${NOMINATIM_URL}/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`)
+  const response = await fetch(`${NOMINATIM_URL}/reverse?format=jsonv2&addressdetails=1&zoom=18&lat=${latitude}&lon=${longitude}`)
   if (!response.ok) throw new Error('Address lookup failed.')
   return response.json()
 }

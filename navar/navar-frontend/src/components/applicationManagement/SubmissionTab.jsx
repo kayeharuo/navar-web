@@ -23,7 +23,7 @@ function formatOperatingHours(hours) {
   if (!Array.isArray(hours) || hours.length === 0) return '—'
   return hours
     .filter(hour => hour.opthrs_is_mall)
-    .map(hour => `${String(hour.opthrs_day_of_week || '').slice(0, 3)}: ${
+    .map(hour => `${String(hour.opthrs_day_of_week || '')}: ${
       hour.opthrs_is_closed
         ? 'Closed'
         : `${formatTime(hour.opthrs_open_time)} – ${formatTime(hour.opthrs_close_time)}`

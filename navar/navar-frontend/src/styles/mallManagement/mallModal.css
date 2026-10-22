@@ -615,6 +615,35 @@ select.mall-field-input {
   flex-wrap: wrap;
 }
 
+.op-hours-closed-toggle {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid #D1D5DB;
+  border-radius: 5px;
+  background: #fff;
+  color: #374151;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.op-hours-closed-toggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #2563EB;
+}
+
+.op-hours-time-input:disabled {
+  background: #F3F4F6;
+  color: #9CA3AF;
+  cursor: not-allowed;
+}
+
 .op-hours-time-group {
   display: flex;
   flex-direction: column;

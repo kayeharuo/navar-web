@@ -149,6 +149,9 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
       setApplications(next)
       const approved = next.find(app => app.id === id)
       if (onAppApproved && approved) onAppApproved(approved)
+      // Refresh the open review panel too, so the Approve button disappears
+      // and the status badge shows Approved immediately.
+      setReviewingApp(await apiRequest(`/api/applications/${id}`))
     }
   }
 
@@ -225,7 +228,14 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
 
       {currentReviewApp && activeTab === 'new' && (
         <ReviewPanel
+          key={currentReviewApp.id}
           app={currentReviewApp}
+          onVersionChange={id => loadApplication({ id })}
+          onDecision={async (id, name, notes) => {
+            await apiRequest(`/api/applications/${id}/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }) })
+            setApplications(await apiRequest('/api/applications'))
+            setReviewingApp(await apiRequest(`/api/applications/${id}`))
+          }}
           onClose={closeReview}
           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, false)}
           onApprove={(id) => handleApprove(id, false)}
@@ -233,6 +243,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
           initialTab={openThread ? 'thread' : 'submission'}
         />
       )}
+
 
       {currentReviewStallApp && activeTab === 'stall' && (
         <ReviewPanel

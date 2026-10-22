@@ -1,4 +1,4 @@
-export default function SuspendedModal({ project, onClose }) {
+export default function OnHoldModal({ project, onClose }) {
   return (
     <div className="ar-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="ar-modal-box">
@@ -12,7 +12,7 @@ export default function SuspendedModal({ project, onClose }) {
         </div>
 
         <h3 className="ar-modal-title" style={{ color: '#D51D1D' }}>
-          Map Editing Suspended — {project.mallName}
+          Map Editing On Hold — {project.mallName}
         </h3>
 
         <p className="ar-modal-subtitle">

@@ -5,10 +5,20 @@ import RequestRevisionModal from './RequestRevisionModal'
 import ApproveModal from './ApproveModal'
 import Stepper from './Stepper'
 
-export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove, onSendNote, isStallApplication = false, initialTab = 'submission' }) {
+export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove, onSendNote, isStallApplication = false, initialTab = 'submission', onVersionChange, onDecision }) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [showRevisionModal, setShowRevisionModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const [explanation, setExplanation] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function decide(name) {
+    setBusy(true); setActionError('')
+    try { await onDecision(app.id, name, explanation); setRejecting(false); setExplanation('') }
+    catch (error) { setActionError(error.message) }
+    finally { setBusy(false) }
+  }
 
   useEffect(() => {
     setActiveTab(initialTab)
@@ -28,11 +38,11 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
       setShowRevisionModal(false)
       setActiveTab('thread')
     } catch (error) {
-      console.error('Revision request failed:', error)
+      setActionError(error.message)
     }
   }
 
-  function handleApproveConfirm() {
+  async function handleApproveConfirm() {
     if (isStallApplication) {
       if (!app.floorPlans || app.floorPlans.length === 0) {
         alert('Please submit floor plans before approving this application.')
@@ -67,8 +77,12 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
       }
     }
 
-    setShowApproveModal(false)
-    onApprove(app.id)
+    try {
+      await onApprove(app.id)
+      setShowApproveModal(false)
+    } catch (error) {
+      setActionError(error.message)
+    }
   }
 
   const isApproved = app.applicationStatus === 'Approved'
@@ -84,7 +98,9 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
             <p className="review-panel-meta">{app.city} · {app.adminName} · {app.adminEmail}</p>
 
             <Stepper status={app.applicationStatus} />
-
+            {!isStallApplication && <div className="workflow-version-tabs">{(app.versions || []).map(v => <button key={v.application_id} aria-pressed={v.application_id === app.id} onClick={() => onVersionChange(v.application_id)}>Version {v.application_version} / attempt {v.application_attempt}</button>)}</div>}
+            {app.readOnly && <p className="workflow-info">Read-only version</p>}
+            {app.version > 1 && <div className="workflow-reason"><strong>{app.reasonCategory}</strong><p>{app.reasonNotes}</p><p>Disputes used: {app.disputeCount || 0} / 2</p></div>}
             <div className="review-badges-row">
               <div style={{ display: 'flex', gap: 6 }}>
                 <span className="review-badge-pill review-badge-pill--green">{app.agreement}</span>
@@ -124,16 +140,16 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
             }
           </div>
 
-          {!isStallApplication && (
+          {!isStallApplication && !app.readOnly && ['Pending','Disputed','Submitted','Approved','For Revision'].includes(app.applicationStatus) && (
             <div className="review-panel-footer">
-              <button className="review-footer-btn review-footer-btn--revision" onClick={() => setShowRevisionModal(true)}>
-                Request Revision
-              </button>
-              {!isApproved && (
-                <button className="review-footer-btn review-footer-btn--approve" onClick={() => setShowApproveModal(true)}>
-                  Approve Application
-                </button>
-              )}
+              {['Pending','Disputed'].includes(app.applicationStatus) ? <>
+                <button className="review-footer-btn review-footer-btn--approve" disabled={busy} onClick={() => decide('accept')}>Accept request</button>
+                <button className="review-footer-btn review-footer-btn--revision" disabled={busy} onClick={() => setRejecting(true)}>Reject request</button>
+                {rejecting && <div className="workflow-reject"><label>Rejection explanation<textarea maxLength={10000} value={explanation} onChange={e => setExplanation(e.target.value)} /></label><button disabled={busy || !explanation.trim()} onClick={() => decide('reject')}>Confirm rejection</button><button onClick={() => setRejecting(false)}>Cancel</button></div>}
+              </> : <>
+                {app.canRevise && <button className="review-footer-btn review-footer-btn--revision" onClick={() => setShowRevisionModal(true)}>Request Revision</button>}
+                {['Submitted','For Revision'].includes(app.applicationStatus) && <button className="review-footer-btn review-footer-btn--approve" onClick={() => setShowApproveModal(true)}>Approve Application</button>}
+              </>}
             </div>
           )}
 
@@ -166,6 +182,18 @@ export default function ReviewPanel({ app, onClose, onRequestRevision, onApprove
           onConfirm={handleApproveConfirm}
           isStallApplication={isStallApplication}
         />
+      )}
+
+      {actionError && (
+        <div className="app-modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="workflow-error-title">
+          <div className="app-modal-box app-modal-box--compact">
+            <h2 className="app-modal-title" id="workflow-error-title">Action could not be completed</h2>
+            <p className="app-modal-desc">{actionError}</p>
+            <div className="app-modal-actions">
+              <button className="app-modal-btn-approve" onClick={() => setActionError('')}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

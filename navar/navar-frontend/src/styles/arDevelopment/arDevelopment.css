@@ -270,7 +270,7 @@
 
 .ar-status-badge--pending         { color: #EA580C; }
 .ar-status-badge--node-mapping    { color: #2563EB; }
-.ar-status-badge--suspended       { color: #D51D1D; }
+.ar-status-badge--on-hold       { color: #D51D1D; }
 .ar-status-badge--nav-testing     { color: #9E5BF0; }
 .ar-status-badge--ready           { color: #D3A62B; }
 .ar-status-badge--live            { color: #16A34A; }
@@ -294,7 +294,7 @@
 
 .ar-dev-action-btn {
   display: inline-block;
-  padding: 3px 0;
+  padding: 6px 12px;
   text-align: center;
   border-radius: 3px;
   color: #fff;
@@ -305,6 +305,7 @@
   cursor: pointer;
   transition: opacity 0.15s;
   white-space: nowrap;
+  background: #2563EB;
 }
 
 .ar-dev-action-btn:hover { opacity: 0.85; }
@@ -312,7 +313,7 @@
 .ar-dev-action-btn--edit-map          { background: #2563EB; min-width: 72px; }
 .ar-dev-action-btn--stall-additions   { background: #9E5BF0; min-width: 140px; }
 .ar-dev-action-btn--start             { background: #0EC3C3; min-width: 96px; }
-.ar-dev-action-btn--test              { background: #FFC934; min-width: 118px; }
+.ar-dev-action-btn--test              { color: #1F384C; background: #FFC934; min-width: 118px; }
 .ar-dev-action-btn--mark-ready        { background: #9E5BF0; min-width: 100px; }
 .ar-dev-action-btn--view-thread       { background: #FF9233; min-width: 100px; }
 .ar-dev-action-btn--publish           { background: #16A34A; min-width: 70px; }
@@ -986,3 +987,18 @@
   font-weight: 500;
   color: #000;
 }
+
+.workflow-wait { display: block; font: 11px Poppins, sans-serif; color: #64748b; }
+
+.ar-status-select {
+  display: block;
+  width: 100%;
+  margin: 8px 0 24px;
+  padding: 10px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 5px;
+  background: #fff;
+  color: #1F384C;
+  font: inherit;
+}
+.ar-modal-box { max-height: 90vh; overflow-y: auto; }

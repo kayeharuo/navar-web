@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 function ApproveIcon() {
   return (
     <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
@@ -7,6 +9,14 @@ function ApproveIcon() {
 }
 
 export default function ApproveModal({ mallName, onCancel, onConfirm, isStallApplication = false }) {
+  const [submitting, setSubmitting] = useState(false)
+
+  async function confirm() {
+    setSubmitting(true)
+    try { await onConfirm() }
+    finally { setSubmitting(false) }
+  }
+
   return (
     <div className="app-modal-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
       <div className="app-modal-box">
@@ -15,13 +25,14 @@ export default function ApproveModal({ mallName, onCancel, onConfirm, isStallApp
         <p className="app-modal-desc">
           {isStallApplication
             ? 'This marks the stall addition as Approved. The current published AR will be unpublished to incorporate the new stalls. The mall admin will be notified.'
-            : 'This marks the application as Approved and sets AR development status to Pending, which means it enters the AR team\'s work queue. The mall admin will be notified.'
+            : 'This approves the application. New AR development enters the queue; AR work on hold resumes at its previous status. The mall admin will be notified.'
           }
         </p>
         <div className="app-modal-actions">
-          <button className="app-modal-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className="app-modal-btn-approve" onClick={onConfirm}>
-            {isStallApplication ? 'Approve Stall Addition' : 'Approve Application'}
+          <button className="app-modal-btn-cancel" disabled={submitting} onClick={onCancel}>Cancel</button>
+          <button className="app-modal-btn-approve" disabled={submitting} onClick={confirm}>
+            {submitting && <span className="app-btn-spinner" aria-hidden="true" />}
+            {submitting ? 'Approving...' : isStallApplication ? 'Approve Stall Addition' : 'Approve Application'}
           </button>
         </div>
       </div>

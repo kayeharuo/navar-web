@@ -88,7 +88,7 @@ export default function ProfilePanel({ onClose, onProfileUpdated }) {
         <div className="panel-divider" />
         <div className="profile-body">
           <div className="profile-user-card">
-            <button className="profile-user-avatar profile-picture-picker" type="button" title="View profile picture" onClick={() => profile.profilePicture && setShowPicture(true)}>
+            <button className="profile-user-avatar profile-picture-picker" type="button" title={profile.profilePicture ? 'View profile picture' : 'Add profile picture'} onClick={() => setShowPicture(true)}>
               {profile.profilePicture ? <img src={profile.profilePicture} alt="Profile" /> : <span>{profile.name?.charAt(0) || '?'}</span>}
               <span className="profile-picture-overlay"><Camera size={20} /><span>View</span></span>
             </button>
@@ -115,7 +115,9 @@ export default function ProfilePanel({ onClose, onProfileUpdated }) {
       {showPicture && (
         <div className="profile-picture-lightbox" onClick={event => event.target === event.currentTarget && setShowPicture(false)}>
           <div className="profile-picture-lightbox-content">
-            <img src={profile.profilePicture} alt="Profile" />
+            {profile.profilePicture
+              ? <img src={profile.profilePicture} alt="Profile" />
+              : <div className="profile-picture-empty-preview">{profile.name?.charAt(0) || '?'}</div>}
             <div className="profile-picture-lightbox-actions">
               <label className="profile-btn profile-btn--primary">Change picture<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={event => { setShowPicture(false); choosePicture(event) }} hidden /></label>
               <button className="profile-btn profile-btn--secondary" type="button" onClick={() => setShowPicture(false)}>Close</button>
