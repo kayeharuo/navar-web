@@ -134,3 +134,41 @@ test('account emails embed local branding, escape links, and close failed transp
   if(oldPass===undefined)delete process.env.SMTP_PASS;else process.env.SMTP_PASS=oldPass
  }
 })
+
+for (const primary of [false,true]) test(`mall admin creation and resend use the correct password page (primary=${primary})`,async()=>{
+ const mailer=require('nodemailer'),original=mailer.createTransport
+ const previous={SMTP_USER:process.env.SMTP_USER,SMTP_PASS:process.env.SMTP_PASS,MALL_ADMIN_ORIGIN:process.env.MALL_ADMIN_ORIGIN}
+ Object.assign(process.env,{SMTP_USER:'sender@example.test',SMTP_PASS:'test-only',MALL_ADMIN_ORIGIN:'http://localhost:5174'})
+ const calls=[]
+ let message,linkOptions
+ mailer.createTransport=()=>({sendMail:async mail=>{calls.push('send');message=mail;return {accepted:[mail.to]}},close(){}})
+ const db={
+  from(){return {select(){return {eq(){return {maybeSingle:async()=>({data:null})}}}}}},
+  rpc:async(name,args)=>{
+   calls.push(name)
+   if(name==='manage_super_admin_account') return {data:{admin_role:'mall_admin',admin_is_primary:primary,admin_auth_user_id:'mall-auth',admin_email:'mall@example.test'}}
+   assert.equal(name,'create_managed_admin','Mall setup must not use Super Admin password requests')
+   assert.equal(args.p_data.role,'mall_admin');assert.equal(args.p_data.mall_id,13);assert.equal(args.p_data.is_primary,primary)
+   return {data:{admin_id:50,admin_role:'mall_admin',mall_id:13,admin_full_name:args.p_data.name,admin_email:args.p_data.email,admin_account_status:'partial'}}
+  },
+  auth:{admin:{createUser:async()=>{calls.push('identity');return {data:{user:{id:'mall-auth'}}}},
+   generateLink:async args=>{calls.push('link');linkOptions=args;return {data:{user:{id:'mall-auth'},properties:{action_link:'https://auth.example.test/verify?token=test'}}}},
+   deleteUser:async()=>assert.fail('Saved mall account must be preserved')}}
+ }
+ const app=appWith(db)
+ try{
+  const response=await app.inject({method:'POST',url:'/api/admin-accounts',payload:{role:'mall_admin',email:'mall@example.test',name:'Mall Admin',contact_num:'09123456789',mall_id:13,is_primary:primary}})
+  assert.equal(response.statusCode,201)
+  assert.equal(response.json().role,'mall_admin');assert.equal(response.json().mallId,13)
+  assert.equal(response.json().status,'partial');assert.equal(response.json().warning,null)
+  assert.deepEqual(calls,['identity','create_managed_admin','link','send'])
+  assert.equal(linkOptions.options.redirectTo,'http://localhost:5174'+(primary?'/complete-setup':'/reset-password'))
+  assert.equal(message.to,'mall@example.test');assert.match(message.text,/auth.example.test/)
+  const resent=await app.inject({method:'POST',url:'/api/admin-accounts/50/resend-invite'})
+  assert.equal(resent.statusCode,200)
+  assert.equal(linkOptions.options.redirectTo,'http://localhost:5174'+(primary?'/complete-setup':'/reset-password'))
+ }finally{
+  await app.close();mailer.createTransport=original
+  for(const [key,value]of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value}
+ }
+})

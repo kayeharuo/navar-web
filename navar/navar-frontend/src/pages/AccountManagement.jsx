@@ -16,13 +16,7 @@ import '../styles/panels.css'
 import AccountDetailsPanel from '../components/panels/AccountDetailsPanel'
 
 /* ─── SVG Icons ─── */
-function IconLock() {
-  return (
-    <svg width="53" height="53" viewBox="0 0 53 53" fill="none">
-      <path d="M26.5 23.1875C25.1079 23.188 23.7625 23.6894 22.7096 24.6001C21.6568 25.5108 20.9668 26.7699 20.7658 28.1474C20.5648 29.5249 20.8663 30.9288 21.615 32.1023C22.3638 33.2759 23.5098 34.1408 24.8438 34.539V38.0938C24.8438 38.533 25.0182 38.9543 25.3289 39.2649C25.6395 39.5755 26.0607 39.75 26.5 39.75C26.9393 39.75 27.3605 39.5755 27.6711 39.2649C27.9818 38.9543 28.1562 38.533 28.1562 38.0938V34.539C29.4902 34.1408 30.6362 33.2759 31.385 32.1023C32.1337 30.9288 32.4352 29.5249 32.2342 28.1474C32.0332 26.7699 31.3432 25.5108 30.2904 24.6001C29.2375 23.6894 27.8921 23.188 26.5 23.1875ZM43.0625 16.5625H36.4375V11.5938C36.4375 8.95816 35.3905 6.43052 33.5269 4.56688C31.6632 2.70323 29.1356 1.65625 26.5 1.65625C23.8644 1.65625 21.3368 2.70323 19.4731 4.56688C17.6095 6.43052 16.5625 8.95816 16.5625 11.5938V16.5625H9.9375C9.05897 16.5625 8.21642 16.9115 7.59521 17.5327C6.97399 18.1539 6.625 18.9965 6.625 19.875V43.0625C6.625 43.941 6.97399 44.7836 7.59521 45.4048C8.21642 46.026 9.05897 46.375 9.9375 46.375H43.0625C43.941 46.375 44.7836 46.026 45.4048 45.4048C46.026 44.7836 46.375 43.941 46.375 43.0625V19.875C46.375 18.9965 46.026 18.1539 45.4048 17.5327C44.7836 16.9115 43.941 16.5625 43.0625 16.5625ZM19.875 11.5938C19.875 9.83669 20.573 8.1516 21.8154 6.90917C23.0578 5.66674 24.7429 4.96875 26.5 4.96875C28.2571 4.96875 29.9422 5.66674 31.1846 6.90917C32.427 8.1516 33.125 9.83669 33.125 11.5938V16.5625H19.875V11.5938ZM43.0625 43.0625H9.9375V19.875H43.0625V43.0625Z" fill="black"/>
-    </svg>
-  )
-}
+
 
 function IconKey() {
   return (
@@ -75,9 +69,6 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
     isPrimary: account.isPrimary ? 'yes' : 'no',
   } : emptyForm)
   const [errors, setErrors] = useState({})
-  const [submitNotice, setSubmitNotice] = useState('')
-  // Mall admin creation is shown but not wired up yet.
-  const mallAdminCreateUnavailable = !isEdit && roleTab === 'mall-admin'
 
   const activePrimaryForMall = useMemo(() => {
     if (!form.mall) return null
@@ -103,10 +94,6 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
   function handleSubmit() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    if (mallAdminCreateUnavailable) {
-      setSubmitNotice('Mall admin account creation is not available yet. Nothing was saved.')
-      return
-    }
     return onSave({
       role: roleTab,
       name: form.name.trim(),
@@ -185,7 +172,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
           </label>
         </div>
         {activePrimaryForMall && (
-          <p className="acct-primary-locked-note">⚠ {form.mall} already has an active primary admin ({activePrimaryForMall.name}). Only one primary admin is allowed per mall.</p>
+          <p className="acct-primary-locked-note">⚠ {activePrimaryForMall.mall} already has an active primary admin ({activePrimaryForMall.name}). Only one primary admin is allowed per mall.</p>
         )}
         {errors.isPrimary && <span className="acct-form-error">{errors.isPrimary}</span>}
       </div>
@@ -208,16 +195,12 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
         </div>
         {!isEdit && (
           <div className="acct-modal-role-tabs">
-            <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setErrors({}); setSubmitNotice('') }}>Super Admin</button>
-            <button className={`acct-modal-role-tab${roleTab === 'mall-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('mall-admin'); setErrors({}); setSubmitNotice('') }}>Mall Admin</button>
+            <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setErrors({}) }}>Super Admin</button>
+            <button className={`acct-modal-role-tab${roleTab === 'mall-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('mall-admin'); setErrors({}) }}>Mall Admin</button>
           </div>
         )}
         <div className="acct-modal-body">
-          {mallAdminCreateUnavailable && (
-            <p className="acct-primary-locked-note">Mall admin account creation is not available yet. You can fill in the form, but nothing will be saved.</p>
-          )}
           {(isEdit ? (account?.mall !== undefined ? 'mall-admin' : 'super-admin') : roleTab) === 'super-admin' ? superAdminFields : mallAdminFields}
-          {submitNotice && <span className="acct-form-error">{submitNotice}</span>}
         </div>
         <div className="acct-modal-footer">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
@@ -274,19 +257,17 @@ function AccountCreatedModal({ account, onClose }) {
 }
 
 /* ────────────────────────────────────────
-   MODAL: Reset Password (confirm)
+  MODAL: Email Sent
 ──────────────────────────────────────── */
 function ResetPasswordModal({ account, onClose, onConfirm }) {
-
   return (
     <div className="acct-modal-overlay">
       <div className="acct-confirm-modal">
-        <div className="acct-confirm-icon"><IconLock /></div>
+        <div className="acct-confirm-icon"><IconKey /></div>
         <div>
           <h3 className="acct-confirm-title">Reset Password</h3>
           <p className="acct-confirm-desc">Send {account.name} an email to set a new password. Their current password remains valid until they complete the reset.</p>
         </div>
-        <div className="acct-confirm-notice">{account.name} will set a new password from the secure email.</div>
         <div className="acct-confirm-actions">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
           <BusyButton className="acct-confirm-btn-proceed" onClick={onConfirm}>Send Reset Link</BusyButton>
@@ -296,9 +277,6 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
   )
 }
 
-/* ────────────────────────────────────────
-  MODAL: Email Sent
-──────────────────────────────────────── */
 function MagicLinkSentModal({ email, onClose }) {
 
   return (
@@ -519,12 +497,22 @@ export default function AccountManagement() {
     }
   }
 
+  function resetPasswordReason(account) {
+    if (!canManageAccounts || account.isPrimary) return 'Password resets are only available for non-primary accounts.'
+    if (String(account.id) === String(currentAdminId)) return 'Use Forgot Password to reset your own password.'
+    if (account.isDeactivated) return 'Reactivate this account before resetting its password.'
+    if (account.lifecycle !== 'official') return 'This account has not completed setup. Use Resend invite instead.'
+    return ''
+  }
+
   function handleResetPassword(account) {
+    if (actionInFlight.current || resetPasswordReason(account)) return
     setSelectedAccount(account)
     setModal('reset')
   }
 
   async function handleConfirmReset() {
+    if (!selectedAccount || resetPasswordReason(selectedAccount)) return
     try {
       await apiRequest(`/api/admin-accounts/${selectedAccount.id}/reset-password`, { method: 'POST' })
       setMagicLinkEmail(selectedAccount.email)
@@ -640,10 +628,9 @@ export default function AccountManagement() {
                     <td>
                     <div className="acct-actions">
                       <button disabled={actionBusy} className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
-                      {a.status === 'pending'
-                        ? canManageAccounts && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--resend" onClick={() => runAction(handleResendLink, a)}>Resend invite</button>
-                        : canManageAccounts && a.id !== currentAdminId && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
-                      <button disabled={actionBusy || !!deactivationReason(a)} title={deactivationReason(a) || 'Deactivate this account'} className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
+                      {canManageAccounts && !a.isPrimary && <button disabled={actionBusy || !!resetPasswordReason(a)} title={resetPasswordReason(a) || 'Send a password reset email'} className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset Password</button>}
+                      {canManageAccounts && <button disabled={actionBusy || !!deactivationReason(a)} title={deactivationReason(a) || 'Deactivate this account'} className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>}
+                      {a.status === 'pending' && canManageAccounts && String(a.id) !== String(currentAdminId) && <BusyButton disabled={actionBusy} className="acct-action-btn acct-action-btn--resend" onClick={() => runAction(handleResendLink, a)}>Resend invite</BusyButton>}
                     </div>
                     </td>
                   </tr>
@@ -679,10 +666,8 @@ export default function AccountManagement() {
                     <td>
                       <div className="acct-actions">
                         <button disabled={actionBusy} className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
-                        {a.status === 'pending'
-                          ? canManageAccounts && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--resend" onClick={() => runAction(handleResendLink, a)}>Resend invite</button>
-                          : canManageAccounts && a.id !== currentAdminId && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
-                        <button disabled={actionBusy || !!deactivationReason(a)} title={deactivationReason(a) || 'Deactivate this account'} className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
+                        {canManageAccounts && <button disabled={actionBusy || !!deactivationReason(a)} title={deactivationReason(a) || 'Deactivate this account'} className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>}
+                      {a.status === 'pending' && canManageAccounts && String(a.id) !== String(currentAdminId) && <BusyButton disabled={actionBusy} className="acct-action-btn acct-action-btn--resend" onClick={() => runAction(handleResendLink, a)}>Resend invite</BusyButton>}
                       </div>
                     </td>
                   </tr>

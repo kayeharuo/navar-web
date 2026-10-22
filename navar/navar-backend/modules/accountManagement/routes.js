@@ -199,7 +199,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 
 		const requestId = crypto.randomUUID()
 		// Create an identity without sending email; existing Auth identities are never adopted or deleted.
-        const redirectTo = mallAccount ? safeOrigin(process.env.MALL_ADMIN_ORIGIN, 'http://localhost:5174', process.env) + '/complete-setup' : passwordLinkRedirect('/auth/set-password', requestId)
+        const redirectTo = mallAccount ? safeOrigin(process.env.MALL_ADMIN_ORIGIN, 'http://localhost:5174', process.env) + (request.body.is_primary ? '/complete-setup' : '/reset-password') : passwordLinkRedirect('/auth/set-password', requestId)
         const invited = await supabase.auth.admin.createUser({ email, email_confirm: false })
 		if (invited.error || !invited.data?.user) {
 			request.log.error({
@@ -262,7 +262,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
                 const mall = row.admin_role === 'mall_admin'
                 const invite = action === 'resend-invite'
                 let redirectTo
-                if (mall) redirectTo = safeOrigin(process.env.MALL_ADMIN_ORIGIN, 'http://localhost:5174', process.env) + (invite ? '/complete-setup' : '/reset-password')
+                if (mall) redirectTo = safeOrigin(process.env.MALL_ADMIN_ORIGIN, 'http://localhost:5174', process.env) + (invite && row.admin_is_primary ? '/complete-setup' : '/reset-password')
                 else {
                     redirectTo = passwordLinkRedirect(invite ? '/auth/set-password' : '/auth/reset-password', requestId)
                     const recorded = await issuePasswordRequest(supabase, row.admin_auth_user_id, invite ? 'invite' : 'reset', requestId)
