@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ApplicationsTable from '../components/applicationManagement/ApplicationsTable'
 import StallApplicationsTable from '../components/applicationManagement/StallApplicationsTable'
@@ -12,6 +12,9 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
   const [reviewingApp, setReviewingApp] = useState(null)
   const [applications, setApplications] = useState(null) // Will be passed from ApplicationsTable
   const [stallApplications, setStallApplications] = useState(null) // Will be passed from StallApplicationsTable
+  const [openingApp, setOpeningApp] = useState(false)
+  const requestSeq = useRef(0)       // lets a close/new click cancel an in-flight detail request
+  const autoOpenedKey = useRef('')   // the URL query already handled, so it only auto-opens once
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -22,7 +25,11 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const applicationId = Number(params.get('applicationId'))
-    if (!applicationId) return
+    if (!applicationId) {
+      autoOpenedKey.current = ''
+      return
+    }
+    if (autoOpenedKey.current === location.search) return
 
     const isStallApplication = params.get('type') === 'stall'
     const source = isStallApplication
@@ -30,20 +37,51 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
       : applications?.find(app => app.id === applicationId)
 
     if (!source) return
+    autoOpenedKey.current = location.search
     setActiveTab(isStallApplication ? 'stall' : 'new')
     if (isStallApplication) setReviewingApp(source)
-    else if (reviewingApp?.id !== applicationId || reviewingApp.scaleReference === undefined) handleReviewApp(source)
-  }, [applications, location.search, reviewingApp, stallApplications])
+    else loadApplication(source)
+  }, [applications, location.search, stallApplications])
 
   const openThread = new URLSearchParams(location.search).get('view') === 'thread'
 
-  async function handleReviewApp(app) {
+  // The URL (?applicationId=...) is what auto-opens the panel, so it has to be
+  // cleared whenever the panel is closed or a different row is opened by hand.
+  function clearReviewParams() {
+    if (new URLSearchParams(location.search).has('applicationId')) {
+      navigate(location.pathname, { replace: true })
+    }
+  }
+
+  function closeReview() {
+    requestSeq.current += 1   // ignore any detail request that is still loading
+    setOpeningApp(false)
+    setReviewingApp(null)
+    clearReviewParams()
+  }
+
+  async function loadApplication(app) {
     if (app.draft) return
+    const seq = ++requestSeq.current
+    setOpeningApp(true)
     try {
-      setReviewingApp(await apiRequest(`/api/applications/${app.id}`))
+      const detail = await apiRequest(`/api/applications/${app.id}`)
+      if (seq === requestSeq.current) setReviewingApp(detail)
     } catch (error) {
       console.error('Application detail request failed:', error)
+    } finally {
+      if (seq === requestSeq.current) setOpeningApp(false)
     }
+  }
+
+  function handleReviewApp(app) {
+    clearReviewParams()
+    return loadApplication(app)
+  }
+
+  function handleReviewStallApp(app) {
+    clearReviewParams()
+    setReviewingApp(app)
   }
 
   const liveProjects = useMemo(() => {
@@ -121,10 +159,12 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: note, attachments }),
     })
-    setApplications(await apiRequest('/api/applications'))
     setReviewingApp(current => current?.id === id
       ? { ...current, thread: [...(current.thread || []), sentMessage] }
       : current)
+    // Refresh the table in the background; the thread must not wait for it.
+    apiRequest('/api/applications').then(setApplications).catch(() => {})
+    return sentMessage
   }
 
   const currentReviewApp = reviewingApp && applications ? reviewingApp : null
@@ -168,16 +208,25 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
           <StallApplicationsTable
             applications={stallApplications}
             onApplicationsChange={setStallApplications}
-            onReviewApp={setReviewingApp}
+            onReviewApp={handleReviewStallApp}
             liveProjects={liveProjects}
           />
         )}
       </div>
 
+      {openingApp && !currentReviewApp && (
+        <div className="review-overlay" onClick={closeReview}>
+          <div className="review-panel review-panel--loading" role="status" aria-live="polite" onClick={e => e.stopPropagation()}>
+            <span className="stores-page-spinner" aria-hidden="true" />
+            <span>Loading application...</span>
+          </div>
+        </div>
+      )}
+
       {currentReviewApp && activeTab === 'new' && (
         <ReviewPanel
           app={currentReviewApp}
-          onClose={() => setReviewingApp(null)}
+          onClose={closeReview}
           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, false)}
           onApprove={(id) => handleApprove(id, false)}
           onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, false)}
@@ -188,7 +237,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
       {currentReviewStallApp && activeTab === 'stall' && (
         <ReviewPanel
           app={currentReviewStallApp}
-          onClose={() => setReviewingApp(null)}
+          onClose={closeReview}
           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, true)}
           onApprove={(id) => handleApprove(id, true)}
           onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, true)}

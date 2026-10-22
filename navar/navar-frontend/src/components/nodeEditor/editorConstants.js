@@ -127,6 +127,22 @@ export const STALL_STORES = [
 ];
 /** @deprecated kept as alias; use STORE_UNITS */
 export const STORES = STORE_UNITS;
+/**
+ * Replaces the sample floors / units / stalls with the real ones for the mall being
+ * edited. The arrays are filled IN PLACE because several components import them by
+ * name. Call it once, before the editor renders (mapApi.loadNodeMap does this).
+ *   floors     : ["Ground Floor", ...]               (display labels, in order)
+ *   storeUnits : [{ unit, brand, name, floor, unitId }]
+ *   stallStores: ["Potato Corner", ...]
+ */
+export function setEditorCatalog({ floors, storeUnits, stallStores }) {
+    FLOORS.length = 0;
+    FLOORS.push(...floors);
+    STORE_UNITS.length = 0;
+    STORE_UNITS.push(...storeUnits);
+    STALL_STORES.length = 0;
+    STALL_STORES.push(...stallStores);
+}
 let _id = 200;
 export const uid = (p = "n") => `${p}${++_id}`;
 export const pxDist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);

@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export default function ThreadTab({ app, onSendNote }) {
   const [noteText, setNoteText] = useState('')
   const [attachments, setAttachments] = useState([])
   const [attachmentError, setAttachmentError] = useState('')
+  // Messages sent from this tab, shown immediately while the request is still running.
+  const [localMessages, setLocalMessages] = useState([])
+  const listRef = useRef(null)
 
   async function handleFiles(event) {
     const files = Array.from(event.target.files || [])
@@ -36,20 +39,72 @@ export default function ThreadTab({ app, onSendNote }) {
     }
   }
 
-  async function handleSend() {
-    if (!noteText.trim() && attachments.length === 0) return
-    await onSendNote(noteText.trim(), attachments)
+  async function deliver(tempId, text, files) {
+    try {
+      const sent = await onSendNote(text, files)
+      setLocalMessages(current => current.map(item => item.tempId === tempId
+        ? { ...item, realId: sent?.id ?? null, status: 'sent' }
+        : item))
+    } catch {
+      setLocalMessages(current => current.map(item => item.tempId === tempId ? { ...item, status: 'failed' } : item))
+    }
+  }
+
+  function handleSend() {
+    const text = noteText.trim()
+    const files = attachments
+    if (!text && files.length === 0) return
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    setLocalMessages(current => [...current, { tempId, realId: null, message: text, files, status: 'sending' }])
     setNoteText('')
     setAttachments([])
+    setAttachmentError('')
+    deliver(tempId, text, files)
   }
+
+  function handleRetry(tempId) {
+    const item = localMessages.find(entry => entry.tempId === tempId)
+    if (!item) return
+    setLocalMessages(current => current.map(entry => entry.tempId === tempId ? { ...entry, status: 'sending' } : entry))
+    deliver(tempId, item.message, item.files)
+  }
+
+  const serverMessages = app.thread || []
+  const serverIds = new Set(serverMessages.map(message => String(message.id)))
+  const localByRealId = new Map(localMessages.filter(item => item.realId != null).map(item => [String(item.realId), item]))
+  const items = [
+    ...serverMessages.map(message => ({
+      ...message,
+      key: String(message.id),
+      localStatus: localByRealId.get(String(message.id))?.status,
+    })),
+    ...localMessages
+      .filter(item => item.status !== 'sent' || !serverIds.has(String(item.realId)))
+      .map(item => ({
+        id: item.tempId,
+        key: String(item.realId ?? item.tempId),
+        tempId: item.tempId,
+        name: 'Super Admin',
+        isAdmin: true,
+        date: item.status === 'sent' ? 'Just now' : '',
+        message: item.message,
+        attachments: item.files.map(file => ({ id: file.fileName, url: file.dataUrl, fileName: file.fileName })),
+        localStatus: item.status,
+      })),
+  ]
+  const lastTracked = [...items].reverse().find(item => item.localStatus)
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
+  }, [items.length, lastTracked?.localStatus])
 
   return (
     <div className="review-thread-wrap">
-      <div className="review-thread-messages">
-        {(app.thread || []).length === 0
+      <div className="review-thread-messages" ref={listRef}>
+        {items.length === 0
           ? <div className="review-thread-empty">No Messages yet.</div>
-          : (app.thread || []).map((msg) => (
-            <div key={msg.id} className={`thread-msg-row ${msg.isAdmin ? 'thread-msg-row--admin' : ''}`}>
+          : items.map((msg) => (
+            <div key={msg.key} className={`thread-msg-row ${msg.isAdmin ? 'thread-msg-row--admin' : ''}`}>
               <div className={`thread-msg-avatar ${msg.isAdmin ? 'thread-msg-avatar--admin' : 'thread-msg-avatar--mall'}`}>
                 {msg.name.charAt(0)}
               </div>
@@ -57,9 +112,9 @@ export default function ThreadTab({ app, onSendNote }) {
                 <div className="thread-msg-meta">
                   <span className={`thread-msg-name ${msg.isAdmin ? '' : 'thread-msg-name--mall'}`}>{msg.name}</span>
                   {msg.isAdmin && <span className="thread-msg-admin-badge">Admin</span>}
-                  <span className="thread-msg-date">{msg.date}</span>
+                  {msg.date && <span className="thread-msg-date">{msg.date}</span>}
                 </div>
-                <div className="thread-msg-text">{msg.message}</div>
+                {msg.message && <div className="thread-msg-text">{msg.message}</div>}
                 {msg.attachments?.length > 0 && (
                   <div className="thread-msg-attachments">
                     {msg.attachments.map(attachment => (
@@ -67,6 +122,23 @@ export default function ThreadTab({ app, onSendNote }) {
                         <img src={attachment.url} alt={attachment.fileName} className="thread-msg-attachment-preview" />
                       </a>
                     ))}
+                  </div>
+                )}
+                {msg.localStatus === 'sending' && (
+                  <div className="thread-msg-status">
+                    <span className="thread-msg-status-spinner" aria-hidden="true" />
+                    <span>Sending...</span>
+                  </div>
+                )}
+                {msg.localStatus === 'failed' && (
+                  <div className="thread-msg-status thread-msg-status--failed">
+                    <span>Failed to send</span>
+                    <button type="button" onClick={() => handleRetry(msg.tempId)}>Retry</button>
+                  </div>
+                )}
+                {msg.localStatus === 'sent' && lastTracked?.key === msg.key && (
+                  <div className="thread-msg-status thread-msg-status--sent">
+                    <span>&#10003; Sent</span>
                   </div>
                 )}
               </div>

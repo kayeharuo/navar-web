@@ -15,3 +15,14 @@
 .application-testing .application-testing-submit { width: 100%; background: #2563EB; color: #FFF; }
 .application-testing button:disabled { opacity: .6; cursor: not-allowed; }
 .application-testing-message { margin-top: 18px; font-weight: 600; }
+
+.application-testing-info { margin: 0; padding: 10px 12px; border-radius: 8px; background: #EFF6FF; color: #1D4ED8; font-size: 13px; font-weight: 600; }
+.application-testing-blocked { margin: 0; padding: 10px 12px; border-radius: 8px; background: #FEF2F2; color: #B91C1C; font-size: 13px; font-weight: 600; }
+.application-testing-file { font-weight: 500; font-size: 12px; color: #4B5563; }
+.application-testing-progress { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: #6B7280; }
+.application-testing-dots { display: flex; gap: 6px; }
+.application-testing-dot { width: 8px; height: 8px; border-radius: 50%; background: #E2E8F0; }
+.application-testing-dot--done { background: #93C5FD; }
+.application-testing-dot--active { background: #2563EB; }
+.application-testing-nav { display: flex; justify-content: space-between; gap: 12px; }
+.application-testing .application-testing-nav .application-testing-submit { width: auto; margin-left: auto; }

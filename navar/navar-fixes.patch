@@ -1,0 +1,168 @@
+diff --git a/navar/navar-backend/modules/applicationManagement/routes.js b/navar/navar-backend/modules/applicationManagement/routes.js
+index 0a1c071..271fc2d 100644
+--- a/navar/navar-backend/modules/applicationManagement/routes.js
++++ b/navar/navar-backend/modules/applicationManagement/routes.js
+@@ -45,7 +45,12 @@ async function serializeMessages(supabase, messages, includeAttachments = true)
+ 	if (attachments.error) throw attachments.error
+ 	const attachmentsByMessage = new Map()
+ 	for (const attachment of attachments.data || []) {
+-		const url = await signedImageUrl(supabase, attachment.thread_message_attachment_storage_path, 300)
++		let url = null
++		try {
++			url = await signedImageUrl(supabase, attachment.thread_message_attachment_storage_path, 300)
++		} catch (error) {
++			console.error('Attachment signed URL failed:', attachment.thread_message_attachment_storage_path, error.message)
++		}
+ 		const item = {
+ 			id: attachment.thread_message_attachment_id,
+ 			fileName: attachment.thread_message_attachment_file_name,
+@@ -406,7 +411,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
+ 	})
+ 
+ 	app.get('/api/ar-developments/:id/thread', async (request, reply) => {
+-		const result = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', Number(request.params.id)).maybeSingle()
++		const result = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
+ 		if (result.error) throw result.error
+ 		if (!result.data) return { threadId: null, messages: [] }
+ 		const messages = await app.supabase.from('thread_message').select('*').eq('thread_id', result.data.thread_id).order('message_sent_at')
+@@ -418,7 +423,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
+ 		const id = Number(request.params.id)
+ 		const content = String(request.body?.content || '').trim()
+ 		if (!content) return reply.code(400).send({ message: 'Message content is required.' })
+-		let thread = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', id).maybeSingle()
++		let thread = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', id).order('thread_id').limit(1).maybeSingle()
+ 		if (thread.error) throw thread.error
+ 		if (!thread.data) {
+ 			thread = await app.supabase.from('thread').insert({
+@@ -436,11 +441,11 @@ module.exports = function registerApplicationManagementRoutes(app) {
+ 			message_sender: request.admin.id,
+ 		}).select('*').single()
+ 		if (message.error) throw message.error
+-		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
++		return (await serializeMessages(app.supabase, [message.data], false))[0]
+ 	})
+ 
+ 	app.get('/api/applications/:id/thread', async (request, reply) => {
+-		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).maybeSingle()
++		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
+ 		if (result.error) throw result.error
+ 		if (!result.data) return { threadId: null, messages: [] }
+ 		const messages = await app.supabase.from('thread_message').select('*').eq('thread_id', result.data.thread_id).order('message_sent_at')
+@@ -464,8 +469,12 @@ module.exports = function registerApplicationManagementRoutes(app) {
+ 		if (parsedAttachments.reduce((total, attachment) => total + attachment.parsed.size, 0) > MAX_THREAD_TOTAL_BYTES) {
+ 			return reply.code(400).send({ message: 'The total image size per message cannot exceed 20 MB.' })
+ 		}
+-		let thread = await app.supabase.from('thread').select('thread_id').eq('application_id', id).maybeSingle()
+-		if (!thread.data) thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: id }).select('thread_id').single()
++		let thread = await app.supabase.from('thread').select('thread_id').eq('application_id', id).order('thread_id').limit(1).maybeSingle()
++		if (thread.error) throw thread.error
++		if (!thread.data) {
++			thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: id }).select('thread_id').single()
++			if (thread.error) throw thread.error
++		}
+ 		const message = await app.supabase.from('thread_message').insert({ message_sender_type: 'admin', message_sent_at: now(), message_content: content || '', thread_id: thread.data.thread_id, message_sender: request.admin.id }).select('*').single()
+ 		if (message.error) throw message.error
+ 		for (const attachment of parsedAttachments) {
+@@ -484,7 +493,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
+ 			})
+ 			if (inserted.error) throw inserted.error
+ 		}
+-		return (await serializeMessages(app.supabase, [message.data]))[0]
++		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
+ 	})
+ 
+ 	app.get('/api/application-floor-plans/:id/url', async (request, reply) => {
+diff --git a/navar/navar-backend/server.js b/navar/navar-backend/server.js
+index f397d1d..3eb0ceb 100644
+--- a/navar/navar-backend/server.js
++++ b/navar/navar-backend/server.js
+@@ -47,9 +47,12 @@ app.setErrorHandler((error, request, reply) => {
+ 	return reply.code(statusCode).send({ message: 'Something went wrong.' })
+ })
+ 
++const startedAt = new Date().toISOString()
+ app.get('/health', async () => ({
+ 	status: 'ok',
+-	service: 'navar-backend'
++	service: 'navar-backend',
++	pid: process.pid,
++	startedAt
+ }))
+ 
+ const { requireAuth, requireSuperAdmin, requirePrimarySuperAdmin } = createAuthGuards(supabase)
+diff --git a/navar/navar-frontend/src/pages/ApplicationManagement.jsx b/navar/navar-frontend/src/pages/ApplicationManagement.jsx
+index fb94810..0c4b8ec 100644
+--- a/navar/navar-frontend/src/pages/ApplicationManagement.jsx
++++ b/navar/navar-frontend/src/pages/ApplicationManagement.jsx
+@@ -32,12 +32,25 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [],
+     if (!source) return
+     setActiveTab(isStallApplication ? 'stall' : 'new')
+     if (isStallApplication) setReviewingApp(source)
+-    else if (reviewingApp?.id !== applicationId || reviewingApp.scaleReference === undefined) handleReviewApp(source)
++    else if (reviewingApp?.id !== applicationId || reviewingApp.scaleReference === undefined) loadApplication(source)
+   }, [applications, location.search, reviewingApp, stallApplications])
+ 
+   const openThread = new URLSearchParams(location.search).get('view') === 'thread'
+ 
+-  async function handleReviewApp(app) {
++  // The URL (?applicationId=...) is what auto-opens the panel, so it has to be
++  // cleared whenever the panel is closed or a different row is opened by hand.
++  function clearReviewParams() {
++    if (new URLSearchParams(location.search).has('applicationId')) {
++      navigate(location.pathname, { replace: true })
++    }
++  }
++
++  function closeReview() {
++    setReviewingApp(null)
++    clearReviewParams()
++  }
++
++  async function loadApplication(app) {
+     if (app.draft) return
+     try {
+       setReviewingApp(await apiRequest(`/api/applications/${app.id}`))
+@@ -46,6 +59,16 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [],
+     }
+   }
+ 
++  function handleReviewApp(app) {
++    clearReviewParams()
++    return loadApplication(app)
++  }
++
++  function handleReviewStallApp(app) {
++    clearReviewParams()
++    setReviewingApp(app)
++  }
++
+   const liveProjects = useMemo(() => {
+     const approvedLiveApps = (applications || [])
+       .filter(app => app.applicationStatus === 'Approved' && app.arDevelopment === 'Live')
+@@ -168,7 +191,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [],
+           <StallApplicationsTable
+             applications={stallApplications}
+             onApplicationsChange={setStallApplications}
+-            onReviewApp={setReviewingApp}
++            onReviewApp={handleReviewStallApp}
+             liveProjects={liveProjects}
+           />
+         )}
+@@ -177,7 +200,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [],
+       {currentReviewApp && activeTab === 'new' && (
+         <ReviewPanel
+           app={currentReviewApp}
+-          onClose={() => setReviewingApp(null)}
++          onClose={closeReview}
+           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, false)}
+           onApprove={(id) => handleApprove(id, false)}
+           onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, false)}
+@@ -188,7 +211,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [],
+       {currentReviewStallApp && activeTab === 'stall' && (
+         <ReviewPanel
+           app={currentReviewStallApp}
+-          onClose={() => setReviewingApp(null)}
++          onClose={closeReview}
+           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, true)}
+           onApprove={(id) => handleApprove(id, true)}
+           onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, true)}

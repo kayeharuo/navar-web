@@ -45,7 +45,8 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
         (type === "STORE_ENTRANCE" && storeUnit ? STORE_UNITS.find(s => s.unit === storeUnit)?.brand || "" : "") ||
         (type === "STALL" ? stallName : "");
     const canPlace = !!effectiveLabel &&
-        (type !== "STORE_ENTRANCE" || !!storeUnit);
+        (type !== "STORE_ENTRANCE" || !!storeUnit) &&
+        (type !== "STALL" || !!stallName);
     const handleConfirm = () => {
         if (!canPlace)
             return;
@@ -73,7 +74,7 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
           Place Node
         </div>
         <div style={{ fontSize: 11, color: "#64748B", fontFamily: M, marginBottom: 18 }}>
-          {floor} · x={Math.round(x)}, y={Math.round(y)}
+          {floor} · x={x.toFixed(1)} px, y={y.toFixed(1)} px
         </div>
 
         {/* Node Type */}

@@ -4,6 +4,7 @@ import TestingModal from './TestingModal'
 import ThreadModal from './ThreadModal'
 import PublishModal from './PublishModal'
 import ARDevDetail from './ARDevDetail'
+import SuspendedModal from './SuspendedModal'
 import ToBeAddedStallsModal from './ToBeAddedStallsModal'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../config/api'
@@ -58,6 +59,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   const [publishProject, setPublishProject] = useState(null)
   const [detailProject, setDetailProject] = useState(null)
   const [stallsModalProject, setStallsModalProject] = useState(null)
+  const [suspendedProject, setSuspendedProject] = useState(null)
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -132,7 +134,10 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   }
 
   async function handleEditMap(project) {
-    if (project.arStatus === 'Suspended') return
+    if (project.arStatus === 'Suspended') {
+      setSuspendedProject(project)
+      return
+    }
     if (project.arStatus === 'Pending') {
       const confirmed = window.confirm(`Edit the map for ${project.mallName}? This will move the AR development to Node Mapping.`)
       if (!confirmed) return
@@ -370,7 +375,6 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
                       <button
                         className="ar-dev-action-btn ar-dev-action-btn--edit-map"
                         onClick={() => handleEditMap(project)}
-                        disabled={project.arStatus === 'Suspended'}
                         title={project.arStatus === 'Suspended' ? 'Map editing is suspended while this application is under revision' : 'Open the node editor'}
                       >
                         Edit Map
@@ -495,6 +499,13 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
           project={detailProject}
           onClose={() => setDetailProject(null)}
           onStallStatusChange={handleStallStatusChange}
+        />
+      )}
+
+      {suspendedProject && (
+        <SuspendedModal
+          project={suspendedProject}
+          onClose={() => setSuspendedProject(null)}
         />
       )}
 

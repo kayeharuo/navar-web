@@ -16,10 +16,11 @@ const Label = ({ children }) => (<div style={{
     }}>
     {children}
   </div>);
-export function CalibrationModal({ floor, calibPts, onConfirm, onCancel }) {
-    const [meters, setMeters] = useState("");
-    const [refLine, setRefLine] = useState("");
-    const [ple, setPle] = useState("2.0");
+export function CalibrationModal({ floor, calibPts, initial, suggested, onConfirm, onCancel }) {
+    // initial = the scale already saved for this floor; suggested = what the mall admin typed in the application.
+    const [meters, setMeters] = useState(initial?.meters ? String(initial.meters) : suggested?.meters ? String(suggested.meters) : "");
+    const [refLine, setRefLine] = useState(initial?.refLine || suggested?.label || "");
+    const [ple, setPle] = useState(initial?.pathLossExponent != null ? String(initial.pathLossExponent) : "2.0");
     const pxLen = calibPts.length === 2 ? Math.round(pxDist(calibPts[0], calibPts[1])) : 0;
     const mVal = parseFloat(meters);
     const pleVal = parseFloat(ple);

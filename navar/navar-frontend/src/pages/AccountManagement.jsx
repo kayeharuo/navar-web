@@ -75,6 +75,9 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
     isPrimary: account.isPrimary ? 'yes' : 'no',
   } : emptyForm)
   const [errors, setErrors] = useState({})
+  const [submitNotice, setSubmitNotice] = useState('')
+  // Mall admin creation is shown but not wired up yet.
+  const mallAdminCreateUnavailable = !isEdit && roleTab === 'mall-admin'
 
   const activePrimaryForMall = useMemo(() => {
     if (!form.mall) return null
@@ -100,6 +103,10 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
   function handleSubmit() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
+    if (mallAdminCreateUnavailable) {
+      setSubmitNotice('Mall admin account creation is not available yet. Nothing was saved.')
+      return
+    }
     return onSave({
       role: roleTab,
       name: form.name.trim(),
@@ -201,12 +208,16 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
         </div>
         {!isEdit && (
           <div className="acct-modal-role-tabs">
-            <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setForm(emptyForm); setErrors({}) }}>Super Admin</button>
-            <button className={`acct-modal-role-tab${roleTab === 'mall-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('mall-admin'); setForm(emptyForm); setErrors({}) }}>Mall Admin</button>
+            <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setErrors({}); setSubmitNotice('') }}>Super Admin</button>
+            <button className={`acct-modal-role-tab${roleTab === 'mall-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('mall-admin'); setErrors({}); setSubmitNotice('') }}>Mall Admin</button>
           </div>
         )}
         <div className="acct-modal-body">
+          {mallAdminCreateUnavailable && (
+            <p className="acct-primary-locked-note">Mall admin account creation is not available yet. You can fill in the form, but nothing will be saved.</p>
+          )}
           {(isEdit ? (account?.mall !== undefined ? 'mall-admin' : 'super-admin') : roleTab) === 'super-admin' ? superAdminFields : mallAdminFields}
+          {submitNotice && <span className="acct-form-error">{submitNotice}</span>}
         </div>
         <div className="acct-modal-footer">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
