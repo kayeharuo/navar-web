@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { KeyRound, UserRoundX } from 'lucide-react'
 import '../styles/accountManagement/accountManagement.css'
 import { apiRequest as sendRequest } from '../config/api'
 import { withRequestTimeout } from '../components/mallManagement/followupRequest'
@@ -22,14 +23,6 @@ function IconKey() {
   return (
     <svg width="42" height="41" viewBox="0 0 42 41" fill="none">
       <path d="M37.4436 4.45429C34.9728 2.03937 31.7404 0.507404 28.2681 0.105608C24.7957-0.296188 21.2859 0.45562 18.305 2.23971C15.3242 4.02381 13.0461 6.73612 11.8385 9.93897C10.6309 13.1418 10.5641 16.6484 11.649 19.8928L0.911947 30.3724C0.621801 30.6533 0.391764 30.9878 0.235211 31.3562C0.0786576 31.7247-0.00129 32.1199 1.57399e-05 32.5188V37.9635C1.57399e-05 38.7689 0.327788 39.5412 0.911226 40.1106C1.49466 40.6801 2.28598 41 3.11108 41H9.33322C9.74577 41 10.1414 40.84 10.4331 40.5553C10.7249 40.2706 10.8887 39.8844 10.8887 39.4818V36.4453H13.9998C14.4124 36.4453 14.808 36.2854 15.0997 36.0006C15.3915 35.7159 15.5554 35.3297 15.5554 34.9271V31.8906H18.6664C18.8708 31.8908 19.0731 31.8516 19.262 31.7754C19.4508 31.6992 19.6224 31.5875 19.767 31.4465L21.6258 29.6303C23.1817 30.1243 24.8079 30.3747 26.4441 30.3724H26.4635C29.5385 30.3687 32.5434 29.4757 35.0986 27.806C37.6538 26.1363 39.6446 23.7649 40.8196 20.9914C41.9946 18.2179 42.301 15.1667 41.7001 12.2234C41.0992 9.27997 39.618 6.57643 37.4436 4.45429Z" fill="black"/>
-    </svg>
-  )
-}
-
-function IconWarning() {
-  return (
-    <svg width="44" height="37" viewBox="0 0 44 37" fill="none">
-      <path d="M43.3713 30.3565L26.1945 2.2608C25.7653 1.57247 25.1525 1.00174 24.4169 0.605178C23.6814 0.208619 22.8485 0 22.001 0C21.1534 0 20.3206 0.208619 19.585 0.605178C18.8494 1.00174 18.2367 1.57247 17.8074 2.2608L0.630646 30.3565C0.217649 31.0222 0 31.7795 0 32.5506C0 33.3216 0.217649 34.0789 0.630646 34.7446C1.05438 35.4371 1.66611 36.011 2.40305 36.4073C3.14 36.8036 3.97562 37.0081 4.82418 36.9998H39.1778C40.0257 37.0074 40.8605 36.8026 41.5967 36.4063C42.3329 36.0101 42.944 35.4366 43.3674 34.7446C43.781 34.0792 43.9993 33.3221 44 32.5511C44.0007 31.78 43.7837 31.0226 43.3713 30.3565ZM20.4296 14.8V22.1999C20.4296 22.5924 20.5952 22.9689 20.8899 23.2464C21.1846 23.524 21.5842 23.6799 22.001 23.6799C22.4177 23.6799 22.8174 23.524 23.1121 23.2464C23.4068 22.9689 23.5723 22.5924 23.5723 22.1999V14.8C23.5723 14.4075 23.4068 14.031 23.1121 13.7535C22.8174 13.4759 22.4177 13.32 22.001 13.32C21.5842 13.32 21.1846 13.4759 20.8899 13.7535C20.5952 14.031 20.4296 14.4075 20.4296 14.8ZM22.001 26.6399C21.5348 26.6399 21.0791 26.7701 20.6915 27.014C20.3039 27.2579 20.0018 27.6046 19.8234 28.0103C19.645 28.4159 19.5983 28.8623 19.6892 29.2929C19.7802 29.7236 20.0047 30.1191 20.3343 30.4296C20.6639 30.7401 21.0839 30.9515 21.5411 31.0372C21.9984 31.1228 22.4723 31.0789 22.903 30.9108C23.3337 30.7428 23.7018 30.4583 23.9608 30.0932C24.2198 29.7281 24.358 29.2989 24.358 28.8598C24.358 28.2711 24.1097 27.7064 23.6676 27.2901C23.2256 26.8738 22.6261 26.6399 22.001 26.6399Z" fill="black"/>
     </svg>
   )
 }
@@ -263,7 +256,7 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
   return (
     <div className="acct-modal-overlay">
       <div className="acct-confirm-modal">
-        <div className="acct-confirm-icon"><IconKey /></div>
+        <div className="acct-confirm-icon"><KeyRound size={44} strokeWidth={1.8} color="#7C3AED" aria-hidden="true" /></div>
         <div>
           <h3 className="acct-confirm-title">Reset Password</h3>
           <p className="acct-confirm-desc">Send {account.name} an email to set a new password. Their current password remains valid until they complete the reset.</p>
@@ -311,7 +304,7 @@ function DeactivateModal({ account, onClose, onConfirm }) {
   return (
     <div className="acct-modal-overlay">
       <div className="acct-confirm-modal">
-        <div className="acct-confirm-icon"><IconWarning /></div>
+        <div className="acct-confirm-icon"><UserRoundX size={44} strokeWidth={1.8} color="#DC2626" aria-hidden="true" /></div>
         <div>
           <h3 className="acct-confirm-title">Deactivate Account</h3>
           <p className="acct-confirm-desc">{account.name} will lose access immediately.</p>
