@@ -34,6 +34,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     floors: initialData?.floors != null ? String(initialData.floors) : '',
     latitude: initialData?.latitude ?? null,
     longitude: initialData?.longitude ?? null,
+    agreementType: initialData?.tier || initialData?.agreementType || '',
   })
 
   const [logo, setLogo] = useState(null)
@@ -127,6 +128,9 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       province: location.province ? undefined : current.province,
       zipCode: location.zipCode ? undefined : current.zipCode,
     }))
+    window.requestAnimationFrame(() => {
+      fieldRefs.current.address?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
   }
 
   function validate() {
@@ -142,9 +146,10 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       errs.floors = 'At least 1 floor is required.'
     else if (!floorsSaved)
       errs.floors = 'Floor details are required.'
-    if (operatingHours.length === 0)
-      errs.operatingHours = 'At least one operating schedule is required.'
+    if (new Set(operatingHours.flatMap(schedule => schedule.days)).size !== 7)
+      errs.operatingHours = 'Set operating hours or mark Closed for all seven days.'
     if (!isEdit && !logo && !logoPreview) errs.logo = 'Logo is required.'
+    if (!form.agreementType) errs.agreementType = 'Agreement type is required.'
     return errs
   }
 
@@ -192,6 +197,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       logo,
       logoUrl: logoPreview,
       logoDataUrl,
+      agreementType: form.agreementType,
     })
   }
 
@@ -325,12 +331,18 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               {errors.majorBeacons && <p className="mall-field-error">{errors.majorBeacons}</p>}
             </div>
 
-            {/* Agreement Type is selected after the mall administrator subscribes. */}
-            <div className="mall-field-group">
+            {/* Agreement Type */}
+            <div ref={element => { fieldRefs.current.agreementType = element }} className={`mall-field-group${shakingFields.includes('agreementType') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">
-                AGREEMENT TYPE
+                AGREEMENT TYPE <span className="mall-field-required">*</span>
               </label>
-              <input className="mall-field-input mall-field-input--disabled" value="Pending" disabled />
+              <select className={`mall-field-input${errors.agreementType ? ' mall-field-input--error' : ''}`} value={form.agreementType} onChange={e => setField('agreementType', e.target.value)}>
+                <option value="">Select agreement type</option>
+                <option value="Basic">Basic</option>
+                <option value="Standard">Standard</option>
+                <option value="Premium">Premium</option>
+              </select>
+              {errors.agreementType && <p className="mall-field-error">{errors.agreementType}</p>}
             </div>
 
             <div className="mall-field-group mall-field-group--full">

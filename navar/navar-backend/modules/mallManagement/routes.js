@@ -1,4 +1,6 @@
-const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const fullDayNames = { mon: 'Monday', tue: 'Tuesday', tues: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', thur: 'Thursday', thurs: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }
+const normalizeDayName = value => fullDayNames[String(value || '').trim().toLowerCase()] || dayNames.find(day => day.toLowerCase() === String(value || '').trim().toLowerCase()) || value
 const defaultMallCoverageArea = 'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm'
 const displayStatus = value => String(value || '-').replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 const { uploadImage, downloadImage, contentTypeFromBuffer } = require('../storage/imageStorage')
@@ -23,17 +25,6 @@ function toByteaHex(dataUrl) {
 	if (!dataUrl || typeof dataUrl !== 'string') return null
 	const encoded = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
 	return `\\x${Buffer.from(encoded, 'base64').toString('hex')}`
-}
-
-function isClosedNow(open, close) {
-	if (!open || !close) return true
-	const current = new Date()
-	const currentMinutes = current.getHours() * 60 + current.getMinutes()
-	const [openHour, openMinute] = open.split(':').map(Number)
-	const [closeHour, closeMinute] = close.split(':').map(Number)
-	const openMinutes = openHour * 60 + openMinute
-	const closeMinutes = closeHour * 60 + closeMinute
-	return currentMinutes < openMinutes || currentMinutes >= closeMinutes
 }
 
 function formatDate(value) {
@@ -195,9 +186,9 @@ function createMallService(supabase) {
 			floors: mall.MALL_FLOOR_COUNT,
 			floorDetails: floors.map(floor => ({ floorNo: String(floor.FLOOR_NUM), label: floor.FLOOR_LABEL })),
 			operatingHours: hours.reduce((groups, hour) => {
-				const existing = groups.find(group => group.open === hour.OPTHRS_OPEN_TIME && group.close === hour.OPTHRS_CLOSE_TIME)
+				const existing = groups.find(group => group.open === hour.OPTHRS_OPEN_TIME && group.close === hour.OPTHRS_CLOSE_TIME && group.closed === hour.OPTHRS_IS_CLOSED)
 				if (existing) existing.days.push(hour.OPTHRS_DAY_OF_WEEK)
-				else groups.push({ days: [hour.OPTHRS_DAY_OF_WEEK], open: hour.OPTHRS_OPEN_TIME?.slice(0, 5), close: hour.OPTHRS_CLOSE_TIME?.slice(0, 5) })
+				else groups.push({ days: [hour.OPTHRS_DAY_OF_WEEK], open: hour.OPTHRS_OPEN_TIME?.slice(0, 5), close: hour.OPTHRS_CLOSE_TIME?.slice(0, 5), closed: hour.OPTHRS_IS_CLOSED })
 				return groups
 			}, []),
 			agreementStatus: status,
@@ -314,6 +305,76 @@ function createMallService(supabase) {
 			}
 		}
 
+		// Handle agreement type / contract creation
+		if (payload.agreementType) {
+			const tierResult = await supabase
+				.from('subscription_tier')
+				.select('*')
+				.eq('s_tier_label', payload.agreementType)
+				.single()
+			if (tierResult.error) {
+				request.log.error({ code: tierResult.error.code, message: tierResult.error.message, agreementType: payload.agreementType }, 'Subscription tier lookup failed')
+				return reply.code(400).send({ message: `Invalid agreement type "${payload.agreementType}".` })
+			}
+			const tier = upperKeys(tierResult.data)
+
+			if (mallId) {
+				// Editing — update existing contract or create a new current one
+				const existingContract = await supabase
+					.from('contract')
+					.select('contract_id, contract_is_current')
+					.eq('mall_id', id)
+					.eq('contract_is_current', true)
+					.maybeSingle()
+				if (existingContract.data) {
+					await supabase.from('contract').update({
+						s_tier_id: tier.S_TIER_ID,
+						contract_version: 1,
+						contract_is_current: true,
+						contract_annual_fee: tier.S_TIER_ANNUAL_FEE,
+						contract_onboarding_fee: tier.S_TIER_ONBOARDING_FEE,
+						contract_grace_period_days: tier.S_TIER_GRACE_PERIOD_DAYS,
+						contract_reinstatement_rate: tier.S_TIER_REINSTATEMENT_RATE,
+						contract_updated_at: timestamp,
+						admin_id: request.admin.id,
+					}).eq('contract_id', existingContract.data.contract_id)
+				} else {
+					await supabase.from('contract').insert({
+						mall_id: id,
+						s_tier_id: tier.S_TIER_ID,
+						contract_version: 1,
+						contract_is_current: true,
+						contract_annual_fee: tier.S_TIER_ANNUAL_FEE,
+						contract_onboarding_fee: tier.S_TIER_ONBOARDING_FEE,
+						contract_grace_period_days: tier.S_TIER_GRACE_PERIOD_DAYS,
+						contract_reinstatement_rate: tier.S_TIER_REINSTATEMENT_RATE,
+						contract_created_at: timestamp,
+						contract_updated_at: timestamp,
+						admin_id: request.admin.id,
+					})
+				}
+			} else {
+				// New mall — always create a contract
+				const contractResult = await supabase.from('contract').insert({
+					mall_id: id,
+					s_tier_id: tier.S_TIER_ID,
+					contract_version: 1,
+					contract_is_current: true,
+					contract_annual_fee: tier.S_TIER_ANNUAL_FEE,
+					contract_onboarding_fee: tier.S_TIER_ONBOARDING_FEE,
+					contract_grace_period_days: tier.S_TIER_GRACE_PERIOD_DAYS,
+					contract_reinstatement_rate: tier.S_TIER_REINSTATEMENT_RATE,
+					contract_created_at: timestamp,
+					contract_updated_at: timestamp,
+					admin_id: request.admin.id,
+				})
+				if (contractResult.error) {
+					request.log.error({ code: contractResult.error.code, message: contractResult.error.message }, 'Contract creation failed')
+					return reply.code(400).send({ message: 'Unable to create contract for mall.' })
+				}
+			}
+		}
+
 		const floorRows = (payload.floorDetails || []).map((floor, index) => ({
 			FLOOR_NUM: Number(floor.floorNo) || index + 1,
 			FLOOR_LABEL: floor.label,
@@ -347,10 +408,10 @@ function createMallService(supabase) {
 			}
 		}
 		const hourRows = (payload.operatingHours || []).flatMap(schedule => schedule.days.map(day => ({
-			OPTHRS_DAY_OF_WEEK: day,
-			OPTHRS_OPEN_TIME: schedule.open,
-			OPTHRS_CLOSE_TIME: schedule.close,
-			OPTHRS_IS_CLOSED: isClosedNow(schedule.open, schedule.close),
+			OPTHRS_DAY_OF_WEEK: normalizeDayName(day),
+			OPTHRS_OPEN_TIME: schedule.closed ? null : schedule.open,
+			OPTHRS_CLOSE_TIME: schedule.closed ? null : schedule.close,
+			OPTHRS_IS_CLOSED: Boolean(schedule.closed),
 			OPTHRS_IS_MALL: true,
 			OPTHRS_IS_STORE: false,
 			OPTHRS_IS_INQUIRY: false,
@@ -591,7 +652,7 @@ async function registerMallManagementRoutes(app) {
 			.eq('admin_is_deactivated', false)
 		if (recipients.error) throw recipients.error
 		const recipientAdmins = (recipients.data || []).filter(admin =>
-			admin.admin_role === 'mall_admin' && String(admin.mall_id) === String(mallId)
+			admin.admin_role === 'super_admin' || (admin.admin_role === 'mall_admin' && String(admin.mall_id) === String(mallId))
 		)
 		if (!recipientAdmins.length) return
 
@@ -636,18 +697,7 @@ async function registerMallManagementRoutes(app) {
 				.eq('admin_notif_is_archived', includeArchived ? true : false)
 				.order('admin_notif_created_at', { ascending: false })
 			if (result.error) throw result.error
-			const mallOnlyTypes = new Set([
-				'application_approved',
-				'application_revision_requested',
-				'ar_development_status_changed',
-				'beacon_ticket',
-				'ticket_status_changed',
-				'beacon_status_changed',
-			])
-			const visibleNotifications = request.admin.role === 'super_admin'
-				? (result.data || []).filter(notification => !mallOnlyTypes.has(notification.admin_notif_type) && !mallOnlyTypes.has(notification.admin_notif_source_type))
-				: result.data || []
-			return visibleNotifications.map(notification => ({
+			return (result.data || []).map(notification => ({
 				id: notification.admin_notif_id,
 				type: notification.admin_notif_type,
 				title: notification.admin_notif_title,

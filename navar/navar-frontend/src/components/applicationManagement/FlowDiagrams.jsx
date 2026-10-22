@@ -4,7 +4,7 @@ const APP_FLOW_STEPS = [
   { label: 'Submitted', sub: 'Needs Review', variant: 'blue' },
   { arrow: 'swap' },
   { label: 'For Revision', sub: 'Sent back', variant: 'red' },
-  { arrow: 'right' },
+  { arrow: 'swap' },
   { label: 'Approved', sub: 'Unlocks AR dev', variant: 'green' },
 ]
 

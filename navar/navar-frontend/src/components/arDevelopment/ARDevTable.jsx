@@ -4,14 +4,14 @@ import TestingModal from './TestingModal'
 import ThreadModal from './ThreadModal'
 import PublishModal from './PublishModal'
 import ARDevDetail from './ARDevDetail'
-import SuspendedModal from './SuspendedModal'
+import OnHoldModal from './OnHoldModal'
 import ToBeAddedStallsModal from './ToBeAddedStallsModal'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../config/api'
 
 const TIER_ORDER = { Premium: 0, Standard: 1, Basic: 2 }
 
-const STATUS_FILTERS = ['All', 'Pending', 'Node Mapping', 'Suspended', 'Navigation Testing', 'Ready for activation', 'Live']
+const STATUS_FILTERS = ['All', 'Pending', 'Node Mapping', 'On Hold', 'Testing', 'Ready', 'Live', 'Unpublished']
 
 function SearchIcon() {
   return (
@@ -26,9 +26,9 @@ function getArStatusVariant(status) {
   const map = {
     'Pending': 'pending',
     'Node Mapping': 'node-mapping',
-    'Suspended': 'suspended',
-    'Navigation Testing': 'nav-testing',
-    'Ready for activation': 'ready',
+    'On Hold': 'on-hold',
+    'Testing': 'nav-testing',
+    'Ready': 'ready',
     'Live': 'live',
     'Unpublished': 'unpublished',
   }
@@ -52,6 +52,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [cardIndex, setCardIndex] = useState(0)
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [testingProject, setTestingProject] = useState(null)
@@ -59,7 +60,10 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   const [publishProject, setPublishProject] = useState(null)
   const [detailProject, setDetailProject] = useState(null)
   const [stallsModalProject, setStallsModalProject] = useState(null)
-  const [suspendedProject, setSuspendedProject] = useState(null)
+  const [onHoldProject, setOnHoldProject] = useState(null)
+  const [changingProject, setChangingProject] = useState(null)
+  const [targetStatus, setTargetStatus] = useState('node_mapping')
+  const [busy, setBusy] = useState(false)
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -85,6 +89,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     if (!projectId) return
     const project = items.find(item => item.id === projectId)
     if (project) {
+      if (!project.hasThread) { setDetailProject(project); return }
       setThreadProject(project)
       apiRequest(`/api/ar-developments/${project.id}/thread`)
         .then(result => setThreadProject(current => current?.id === project.id ? { ...current, thread: result.messages || [] } : current))
@@ -93,13 +98,8 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
   }, [items, searchParams])
 
   useEffect(() => {
-    if (!incomingProjects || incomingProjects.length === 0) return
-    setItems(prev => {
-      const existingIds = new Set(prev.map(p => p.id))
-      const newItems = incomingProjects.filter(p => !existingIds.has(p.id))
-      if (newItems.length === 0) return prev
-      return sortProjects([...prev, ...newItems])
-    })
+    if (!incomingProjects?.length) return
+    apiRequest('/api/ar-developments').then(projects => setItems(sortProjects(projects))).catch(error => setLoadError(error.message))
   }, [incomingProjects])
 
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
 
         return {
           ...project,
-          arStatus: project.arStatus === 'Live' ? 'Unpublished' : project.arStatus,
+          arStatus: project.arStatus,
           stallApplication: stallApproval,
           stallAdditions,
           lastUpdated: stallApproval.lastUpdated || project.lastUpdated,
@@ -128,14 +128,20 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     })
   }, [stallApplications])
 
-  function updateItem(id, changes) {
-    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    setItems(prev => prev.map(p => p.id === id ? { ...p, ...changes, lastUpdated: now } : p))
+  async function runAction(project, endpoint, body) {
+    setBusy(true); setLoadError('')
+    try {
+      await apiRequest(`/api/ar-developments/${project.id}/${endpoint}`, { method: 'POST', ...(body ? { body: JSON.stringify(body) } : {}) })
+      setItems(sortProjects(await apiRequest('/api/ar-developments')))
+      setChangingProject(null)
+      return true
+    } catch (error) { setLoadError(error.message); return false }
+    finally { setBusy(false) }
   }
 
   async function handleEditMap(project) {
-    if (project.arStatus === 'Suspended') {
-      setSuspendedProject(project)
+    if (project.arStatus === 'On Hold') {
+      setOnHoldProject(project)
       return
     }
     if (project.arStatus === 'Pending') {
@@ -160,27 +166,13 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     setTestingProject(project)
   }
 
-  function handleTestingProceed() {
-    if (!testingProject) return
-    updateItem(testingProject.id, { arStatus: 'Navigation Testing' })
-    setTestingProject(null)
+  async function handleTestingProceed() {
+    if (testingProject && await runAction(testingProject, 'submit-testing')) setTestingProject(null)
   }
 
-  function handleMarkAsReady(id) {
+  async function handleMarkAsReady(id) {
     const project = items.find(p => p.id === id)
-    if (!project) return
-    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    const systemMsg = {
-      id: Date.now(),
-      sender: 'system',
-      name: 'NavAR System',
-      date: now,
-      message: `Confirmation request sent to ${project.adminName}. Email sent to ${project.adminEmail} with map summary (${project.nodes ?? 0} nodes, ${project.edges ?? 0} edges, ${project.floors} floors).`,
-    }
-    setItems(prev => prev.map(p => p.id === id
-      ? { ...p, arStatus: 'Ready for activation', thread: [...(p.thread || []), systemMsg], lastUpdated: now }
-      : p
-    ))
+    if (project) await runAction(project, 'mark-ready')
   }
 
   async function handleViewThread(project) {
@@ -194,12 +186,11 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     }
   }
 
-  async function handleSendNote(id, note) {
-    try {
+  async function handleSendNote(id, note, attachments = []) {
       const sentMessage = await apiRequest(`/api/ar-developments/${id}/thread`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: note }),
+        body: JSON.stringify({ content: note, attachments }),
       })
       const message = { ...sentMessage, sender: sentMessage.isAdmin ? 'admin' : 'mall' }
       const updatedAt = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -211,24 +202,11 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
         ? { ...prev, thread: [...(prev.thread || []), message] }
         : prev
       )
-    } catch (error) {
-      console.error('AR development thread request failed:', error)
-      window.alert(error.message)
-    }
+      return message
   }
 
-  function handlePublishConfirm() {
-    if (!publishProject) return
-    updateItem(publishProject.id, { arStatus: 'Live' })
-    setPublishProject(null)
-  }
-
-  function handleUnpublish(id) {
-    updateItem(id, { arStatus: 'Unpublished' })
-  }
-
-  function handleReactivate(id) {
-    updateItem(id, { arStatus: 'Ready for activation' })
+  async function handlePublishConfirm() {
+    if (publishProject && await runAction(publishProject, 'publish')) setPublishProject(null)
   }
 
   function handleStallStatusChange(projectId, stallId, newStatus) {
@@ -263,15 +241,41 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
     const matchesSearch = !q
       || p.mallName.toLowerCase().includes(q)
       || p.city.toLowerCase().includes(q)
-      || p.adminName.toLowerCase().includes(q)
+      || (p.adminName || '').toLowerCase().includes(q)
     return matchesFilter && matchesSearch
   }))
+
+  function renderActions(project) {
+    return (
+                    <div className="ar-dev-action-cell">
+                      <button className="ar-dev-action-btn" onClick={() => setDetailProject(project)}>View details</button>
+                      {!project.readOnly && !project.mallApprovedAt && ['Pending','Node Mapping','On Hold'].includes(project.arStatus) && <button className="ar-dev-action-btn ar-dev-action-btn--edit-map" disabled={busy} onClick={() => handleEditMap(project)}>Edit Map</button>}
+                      {project.stallApplication?.applicationStatus === 'Approved' && project.stallAdditions && project.stallAdditions.length > 0 && (
+                        <button
+                          className="ar-dev-action-btn ar-dev-action-btn--stall-additions"
+                          onClick={() => setStallsModalProject(project)}
+                          title="To Be Added Stalls"
+                        >
+                          To Be Added Stalls ({project.stallAdditions.filter(s => s.status === 'pending').length})
+                        </button>
+                      )}
+
+                      {!project.readOnly && !project.mallApprovedAt && project.arStatus === 'Node Mapping' && <button className="ar-dev-action-btn ar-dev-action-btn--test" disabled={busy} onClick={() => handleSubmitForTesting(project)}>Submit for Testing</button>}
+                      {!project.readOnly && !project.mallApprovedAt && project.arStatus === 'Testing' && <button className="ar-dev-action-btn ar-dev-action-btn--mark-ready" disabled={busy} onClick={() => handleMarkAsReady(project.id)}>Mark as Ready</button>}
+                      {!project.readOnly && !project.mallApprovedAt && ['Testing','Ready'].includes(project.arStatus) && <button className="ar-dev-action-btn" onClick={() => { setChangingProject(project); setTargetStatus('node_mapping') }}>Change Status</button>}
+                      {project.hasThread && <button className="ar-dev-action-btn ar-dev-action-btn--view-thread" onClick={() => handleViewThread(project)}>View Thread</button>}
+                      {!project.readOnly && project.mallApprovedAt && project.arStatus === 'Ready' && <button className="ar-dev-action-btn ar-dev-action-btn--publish" disabled={busy} onClick={() => setPublishProject(project)}>Retry publishing</button>}
+                      {project.arStatus === 'Ready' && !project.mallApprovedAt && project.readyAt && <span className="workflow-wait">Waiting {project.waitingDays || 0} days for mall approval</span>}
+                      {project.arStatus === 'On Hold' && <span className="workflow-wait">Resumes at {project.resumeStatus?.replaceAll('_', ' ')}</span>}
+
+                    </div>
+    )
+  }
 
   const inDevCount = items.filter(p => p.arStatus !== 'Live').length
 
   return (
     <>
-      {loadError && <div className="app-mgmt-callout app-mgmt-callout--error" role="alert">{loadError}</div>}
       {/* Header */}
       <div className="ar-dev-header">
         <h1 className="ar-dev-title">AR Development</h1>
@@ -365,90 +369,13 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
                   </td>
                   <td>
                     <span className={`ar-status-badge ar-status-badge--${getArStatusVariant(project.arStatus)}`}>
-                      {project.arStatus === 'Ready for activation' ? 'Ready for Activation' : project.arStatus}
+                      {project.arStatus === 'Ready' ? 'Ready for Activation' : project.arStatus}
                     </span>
                   </td>
                   <td>{project.dateAdded}</td>
                   <td>{project.lastUpdated}</td>
                   <td>
-                    <div className="ar-dev-action-cell">
-                      <button
-                        className="ar-dev-action-btn ar-dev-action-btn--edit-map"
-                        onClick={() => handleEditMap(project)}
-                        title={project.arStatus === 'Suspended' ? 'Map editing is suspended while this application is under revision' : 'Open the node editor'}
-                      >
-                        Edit Map
-                      </button>
-
-                      {project.stallApplication?.applicationStatus === 'Approved' && project.stallAdditions && project.stallAdditions.length > 0 && (
-                        <button
-                          className="ar-dev-action-btn ar-dev-action-btn--stall-additions"
-                          onClick={() => setStallsModalProject(project)}
-                          title="To Be Added Stalls"
-                        >
-                          To Be Added Stalls ({project.stallAdditions.filter(s => s.status === 'pending').length})
-                        </button>
-                      )}
-
-                      {project.arStatus === 'Node Mapping' && (
-                        <button
-                          className="ar-dev-action-btn ar-dev-action-btn--test"
-                          onClick={() => handleSubmitForTesting(project)}
-                        >
-                          Submit for Testing
-                        </button>
-                      )}
-
-                      {project.arStatus === 'Navigation Testing' && (
-                        <button
-                          className="ar-dev-action-btn ar-dev-action-btn--mark-ready"
-                          onClick={() => handleMarkAsReady(project.id)}
-                        >
-                          Mark as Ready
-                        </button>
-                      )}
-
-                      {project.arStatus === 'Ready for activation' && (
-                        <>
-                          <button
-                            className="ar-dev-action-btn ar-dev-action-btn--view-thread"
-                            onClick={() => handleViewThread(project)}
-                          >
-                            View Thread
-                          </button>
-                          {(() => {
-                            const isApproved = project.thread && project.thread.some(msg => msg.sender === 'mall')
-                            return (
-                              <button
-                                className={`ar-dev-action-btn ar-dev-action-btn--publish${!isApproved ? ' ar-dev-action-btn--publish-disabled' : ''}`}
-                                onClick={() => isApproved && setPublishProject(project)}
-                                disabled={!isApproved}
-                              >
-                                Publish
-                              </button>
-                            )
-                          })()}
-                        </>
-                      )}
-
-                      {project.arStatus === 'Live' && (
-                        <button
-                          className="ar-dev-action-btn ar-dev-action-btn--unpublish"
-                          onClick={() => handleUnpublish(project.id)}
-                        >
-                          Unpublish
-                        </button>
-                      )}
-
-                      {project.arStatus === 'Unpublished' && (
-                        <button
-                          className="ar-dev-action-btn ar-dev-action-btn--reactivate"
-                          onClick={() => handleReactivate(project.id)}
-                        >
-                          Reactivate
-                        </button>
-                      )}
-                    </div>
+                    {renderActions(project)}
                   </td>
                 </tr>
               ))}
@@ -464,6 +391,15 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
         </div>
       </div>
 
+      <div className="workflow-mobile-cards">
+        {loading ? <p>Loading projects...</p> : !filtered.length ? <p>No projects found.</p> : (() => {
+          const index = Math.min(cardIndex, filtered.length - 1)
+          const project = filtered[index]
+          return <><article><h3>{project.mallName}</h3><p>Version {project.version} / {project.arStatus}</p><p>{project.city} / {project.floors} floors</p>{renderActions(project)}</article><nav aria-label="AR project cards"><button disabled={index === 0} onClick={() => setCardIndex(index - 1)}>Previous</button><span>{index + 1} / {filtered.length}</span><button disabled={index === filtered.length - 1} onClick={() => setCardIndex(index + 1)}>Next</button></nav></>
+        })()}
+      </div>
+
+      {changingProject && <div className="ar-modal-overlay"><div className="ar-modal-box"><h3 className="ar-modal-title">Change Status</h3><p className="ar-modal-subtitle">Move {changingProject.mallName} back from {changingProject.arStatus} to an earlier development stage. To advance from Testing, use Mark as Ready.</p><label>New status<select className="ar-status-select" value={targetStatus} onChange={e => setTargetStatus(e.target.value)}><option value="node_mapping">Node Mapping</option>{changingProject.arStatus === 'Ready' && <option value="testing">Testing</option>}</select></label><div className="ar-modal-actions"><button className="ar-modal-btn-proceed" disabled={busy} onClick={() => runAction(changingProject, 'change-status', { target: targetStatus })}>Save status</button><button className="ar-modal-btn-cancel" disabled={busy} onClick={() => setChangingProject(null)}>Cancel</button></div></div></div>}
       {/* Modals */}
       {testingProject && (
         <TestingModal
@@ -476,6 +412,7 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
 
       {threadProject && (
         <ThreadModal
+          key={threadProject.id}
           project={threadProject}
           onClose={() => setThreadProject(null)}
           onSendNote={handleSendNote}
@@ -496,17 +433,32 @@ export default function ARDevTable({ incomingProjects, stallApplications = [] })
 
       {detailProject && (
         <ARDevDetail
+          key={detailProject.id}
           project={detailProject}
+          versions={items.filter(p => p.mallId === detailProject.mallId).sort((a,b) => b.version - a.version)}
+          onVersionChange={setDetailProject}
           onClose={() => setDetailProject(null)}
           onStallStatusChange={handleStallStatusChange}
         />
       )}
 
-      {suspendedProject && (
-        <SuspendedModal
-          project={suspendedProject}
-          onClose={() => setSuspendedProject(null)}
+      {onHoldProject && (
+        <OnHoldModal
+          project={onHoldProject}
+          onClose={() => setOnHoldProject(null)}
         />
+      )}
+
+      {loadError && (
+        <div className="ar-modal-overlay" style={{ zIndex: 600 }} role="alertdialog" aria-modal="true" aria-labelledby="ar-error-title">
+          <div className="ar-modal-box">
+            <h3 className="ar-modal-title" id="ar-error-title">Action could not be completed</h3>
+            <p className="ar-modal-subtitle">{loadError}</p>
+            <div className="ar-modal-actions">
+              <button className="ar-modal-btn-proceed" autoFocus onClick={() => setLoadError('')}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {stallsModalProject && (

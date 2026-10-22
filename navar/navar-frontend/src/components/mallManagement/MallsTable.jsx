@@ -33,7 +33,7 @@ const initialMalls = [] /*
     dateAdded: 'August 15, 2024',
     lastUpdated: 'March 5, 2026',
     note: null,
-    operatingHours: [{ days: ['Mon','Tue','Wed','Thu','Fri'], open: '10:00', close: '21:00' }],
+    operatingHours: [{ days: ['Monday','Tuesday','Wednesday','Thursday','Friday'], open: '10:00', close: '21:00' }],
     floorDetails: [
       { floorNo: 'B1', label: 'Basement' },
       { floorNo: 'GF', label: 'Ground Floor' },
@@ -87,7 +87,7 @@ const initialMalls = [] /*
     dateAdded: 'August 15, 2024',
     lastUpdated: 'March 5, 2026',
     note: '27 days overdue',
-    operatingHours: [{ days: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], open: '10:00', close: '21:00' }],
+    operatingHours: [{ days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'], open: '10:00', close: '21:00' }],
     floorDetails: [
       { floorNo: 'GF', label: 'Ground Floor' },
       { floorNo: '2F', label: '2nd Floor' },
@@ -120,7 +120,7 @@ const initialMalls = [] /*
     dateAdded: 'July 1, 2024',
     lastUpdated: 'February 10, 2026',
     note: null,
-    operatingHours: [{ days: ['Mon','Tue','Wed','Thu','Fri'], open: '10:00', close: '20:00' }],
+    operatingHours: [{ days: ['Monday','Tuesday','Wednesday','Thursday','Friday'], open: '10:00', close: '20:00' }],
     floorDetails: [
       { floorNo: 'GF', label: 'Ground Floor' },
       { floorNo: '2F', label: '2nd Floor' },
@@ -480,15 +480,8 @@ export default function MallsTable() {
   async function handleAddSave(data) {
     try {
       const savedMall = await apiRequest('/api/malls', { method: 'POST', body: JSON.stringify(data) })
-      // A newly added mall has no subscription workflow records yet.
-      const mall = {
-        ...savedMall,
-        agreementStatus: 'Pending',
-        application: '-',
-        arDevelopment: '-',
-      }
       setMalls(prev => {
-        const nextMalls = [...prev, mall]
+        const nextMalls = [...prev, savedMall]
         mallListCache = nextMalls
         return nextMalls
       })

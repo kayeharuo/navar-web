@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { X, Plus } from 'lucide-react'
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }
+const fullDay = day => DAY_NAMES[day] || day
 
 function formatTime(time) {
   if (!time) return ''
@@ -37,10 +39,11 @@ function formatDays(days) {
 }
 
 export default function OperatingHoursBuilder({ value, onChange }) {
-  const [current, setCurrent] = useState({ days: [], open: '09:00', close: '18:00' })
+  const [current, setCurrent] = useState({ days: [], open: '09:00', close: '18:00', closed: false })
   const [error, setError] = useState('')
 
-  const usedDays = value.flatMap(s => s.days)
+  const normalizedValue = value.map(schedule => ({ ...schedule, days: schedule.days.map(fullDay) }))
+  const usedDays = normalizedValue.flatMap(s => s.days)
 
   function toggleDay(day) {
     if (usedDays.includes(day)) return
@@ -56,13 +59,13 @@ export default function OperatingHoursBuilder({ value, onChange }) {
       setError('Select at least one day.')
       return
     }
-    if (!current.open || !current.close) {
+    if (!current.closed && (!current.open || !current.close)) {
       setError('Enter open and close times.')
       return
     }
     setError('')
-    onChange([...value, { ...current }])
-    setCurrent({ days: [], open: '09:00', close: '18:00' })
+    onChange([...normalizedValue, { ...current, open: current.closed ? null : current.open, close: current.closed ? null : current.close }])
+    setCurrent({ days: [], open: '09:00', close: '18:00', closed: false })
   }
 
   function removeSchedule(index) {
@@ -91,12 +94,17 @@ export default function OperatingHoursBuilder({ value, onChange }) {
       </div>
 
       <div className="op-hours-time-row">
+        <label className="op-hours-closed-toggle">
+          <input type="checkbox" checked={current.closed} onChange={e => setCurrent(c => ({ ...c, closed: e.target.checked }))} />
+          <span>Closed</span>
+        </label>
         <div className="op-hours-time-group">
           <label className="op-hours-time-label">Opens</label>
           <input
             type="time"
             className="op-hours-time-input"
             value={current.open}
+            disabled={current.closed}
             onChange={e => setCurrent(c => ({ ...c, open: e.target.value }))}
           />
         </div>
@@ -107,6 +115,7 @@ export default function OperatingHoursBuilder({ value, onChange }) {
             type="time"
             className="op-hours-time-input"
             value={current.close}
+            disabled={current.closed}
             onChange={e => setCurrent(c => ({ ...c, close: e.target.value }))}
           />
         </div>
@@ -120,11 +129,11 @@ export default function OperatingHoursBuilder({ value, onChange }) {
 
       {value.length > 0 && (
         <ul className="op-hours-list">
-          {value.map((schedule, index) => (
+          {normalizedValue.map((schedule, index) => (
             <li key={index} className="op-hours-item">
               <span className="op-hours-item-dot" />
               <span className="op-hours-item-text">
-                <strong>{formatDays(schedule.days)}</strong>: {formatTime(schedule.open)} – {formatTime(schedule.close)}
+                <strong>{formatDays(schedule.days)}</strong>: {schedule.closed ? 'Closed' : `${formatTime(schedule.open)} – ${formatTime(schedule.close)}`}
               </span>
               <button
                 type="button"

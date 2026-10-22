@@ -47,7 +47,7 @@ app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
 app.setErrorHandler((error, request, reply) => {
 	request.log.error({ err: error }, 'Request failed')
 	const statusCode = error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500
-	return reply.code(statusCode).send({ message: 'Something went wrong.' })
+	return reply.code(statusCode).send({ message: error.workflowMessage || 'Something went wrong.' })
 })
 
 const startedAt = new Date().toISOString()
@@ -66,9 +66,33 @@ app.register(async protectedApp => {
 	protectedApp.addHook('preHandler', requireSuperAdmin)
 	registerInquiryRoutes(protectedApp)
 	registerMallManagementRoutes(protectedApp)
-	registerApplicationManagementRoutes(protectedApp)
+	protectedApp.register(async workflowApp => {
+		registerApplicationManagementRoutes(workflowApp)
+	})
 	registerNodeMapRoutes(protectedApp)
 })
+
+// Separate mall-portal API: same verified identity, ownership checked in its module.
+app.register(async mallWorkflowApp => {
+ mallWorkflowApp.addHook('preHandler', requireAuth())
+ require('./modules/applicationManagement/mallWorkflowRoutes')(mallWorkflowApp)
+})
+
+// Opt in after applying migration 23. No schema changes run on server startup.
+if (process.env.WORKFLOW_REMINDERS_ENABLED === 'true') {
+ let running = false
+ const tick = async () => {
+  if (running) return
+  running = true
+  try { await require('./modules/applicationManagement/reminders').runReadyReminders(supabase) }
+  catch (error) { app.log.error({ code: error.code }, 'Ready reminder job failed') }
+  finally { running = false }
+ }
+ const timer = setInterval(tick, 60 * 60 * 1000)
+ timer.unref()
+ app.addHook('onReady', tick)
+ app.addHook('onClose', async () => clearInterval(timer))
+}
 
 registerAccountManagementRoutes(app, { supabase, requireAuth, requireSuperAdmin, requirePrimarySuperAdmin })
 app.register(async testingApp => {

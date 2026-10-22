@@ -10,10 +10,12 @@ function UploadFileIcon() {
 
 export default function RequestRevisionModal({ mallName, onCancel, onSubmit, isStallApplication = false }) {
   const [notes, setNotes] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit() {
-    if (!notes.trim()) return
-    onSubmit(notes.trim())
+  async function handleSubmit() {
+    setSubmitting(true)
+    try { await onSubmit(notes.trim()) }
+    finally { setSubmitting(false) }
   }
 
   return (
@@ -27,18 +29,20 @@ export default function RequestRevisionModal({ mallName, onCancel, onSubmit, isS
           {isStallApplication && ' Please verify all stalls have been added to the store list.'}
         </p>
         <div className="app-modal-label">
-          REVISION NOTES <span className="app-modal-label-required">*</span>
+          REVISION NOTES (OPTIONAL)
         </div>
         <textarea
           className="app-modal-textarea"
           placeholder="Describe what needs to be corrected..."
+          maxLength={10000}
           value={notes}
           onChange={e => setNotes(e.target.value)}
         />
         <div className="app-modal-actions">
-          <button className="app-modal-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className="app-modal-btn-revision" onClick={handleSubmit} disabled={!notes.trim()}>
-            Send Revision Request
+          <button className="app-modal-btn-cancel" disabled={submitting} onClick={onCancel}>Cancel</button>
+          <button className="app-modal-btn-revision" disabled={submitting} onClick={handleSubmit}>
+            {submitting && <span className="app-btn-spinner" aria-hidden="true" />}
+            {submitting ? 'Sending...' : 'Send Revision Request'}
           </button>
         </div>
       </div>

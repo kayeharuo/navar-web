@@ -34,7 +34,17 @@ module.exports = function registerApplicationTestingRoutes(app) {
 		}
 	})
 
-	app.post('/api/testing/applications', { bodyLimit: 50 * 1024 * 1024 }, async (request, reply) => {
+	app.post('/api/testing/applications', { bodyLimit: 50 * 1024 * 1024, schema: { body: {
+   type: 'object', additionalProperties: false, required: ['mallId','floors'], properties: {
+    mallId: { type: 'integer', minimum: 1 }, reasonCategory: { type: 'string', maxLength: 100 }, reasonNotes: { type: 'string', maxLength: 5000 },
+    floors: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'object', additionalProperties: false, required: ['floorId','referenceLine','meterLength','image'], properties: {
+     floorId: { type: 'integer', minimum: 1 }, referenceLine: { type: 'string', minLength: 1, maxLength: 2000 }, meterLength: { type: 'number', exclusiveMinimum: 0 },
+     accessibilityRoute: { type: 'string', maxLength: 5000 }, emergencyRoute: { type: 'string', maxLength: 5000 },
+     image: { type: 'object', additionalProperties: false, required: ['fileName','dataUrl'], properties: { fileName: { type: 'string', maxLength: 255 }, mimeType: { type: 'string', enum: ['image/png','image/jpeg'] }, fileSize: { type: 'integer', minimum: 1, maximum: 10485760 }, dataUrl: { type: 'string', maxLength: 14000000 } } },
+     entryPoints: { type: 'array', maxItems: 100, items: { type: 'object', additionalProperties: false, properties: { label: { type: 'string', maxLength: 500 }, description: { type: 'string', maxLength: 2000 } } } },
+    } } },
+   },
+  } } }, async (request, reply) => {
 		const body = request.body || {}
 		const mallId = Number(body.mallId)
 		const selectedFloors = Array.isArray(body.floors) ? body.floors : []
@@ -52,12 +62,21 @@ module.exports = function registerApplicationTestingRoutes(app) {
 		const eligibility = await getVersionEligibility(app.supabase, mallId)
 		if (!eligibility.allowed) return reply.code(409).send({ message: eligibility.reason })
 		const version = eligibility.nextVersion
+  if (version > 1) {
+   const allFloors = await app.supabase.from('floor').select('floor_id').eq('mall_id', mallId)
+   if (allFloors.error) throw allFloors.error
+   if (new Set(floorIds).size !== floorIds.length || allFloors.data.length !== floorIds.length) return reply.code(400).send({ message: 'Include exactly one floor plan for every existing floor.' })
+   if (typeof body.reasonCategory !== 'string' || !body.reasonCategory.trim() || body.reasonCategory.length > 100 || typeof body.reasonNotes !== 'string' || !body.reasonNotes.trim() || body.reasonNotes.length > 5000) return reply.code(400).send({ message: 'A reason category and notes are required for version 2+.' })
+  }
+  // Validate every image before creating the request.
+  if (selectedFloors.some(f => { const image = parseImageDataUrl(f.image?.dataUrl); return !image || !['image/png','image/jpeg'].includes(image.mimeType) || image.size > MAX_FLOOR_PLAN_BYTES })) return reply.code(400).send({ message: 'Every floor needs a PNG/JPEG floor plan up to 10 MB.' })
 		const application = await app.supabase.from('application').insert({
-			application_version: version, application_status: 'submitted',
+			application_version: version, application_status: version > 1 ? 'pending' : 'submitted',
+			application_attempt: eligibility.attempt || 1, application_reason_category: version > 1 ? body.reasonCategory.trim() : null, application_reason_notes: version > 1 ? body.reasonNotes.trim() : null,
 			application_created_at: now(), application_updated_at: now(), mall_id: mallId,
 		}).select('application_id, application_version, application_status').single()
 		// The database enforces the same rule with a trigger, so surface its message cleanly.
-		if (application.error?.code === 'P0001') return reply.code(409).send({ message: application.error.message })
+		if (application.error?.code === 'P0001') return reply.code(409).send({ message: 'Version eligibility changed. Refresh before submitting again.' })
 		if (application.error) throw application.error
 		try {
 			for (const floor of selectedFloors) {
@@ -92,8 +111,11 @@ module.exports = function registerApplicationTestingRoutes(app) {
 		} catch (error) {
 			await app.supabase.from('application').delete().eq('application_id', application.data.application_id)
 			request.log.error({ code: error.code, message: error.message }, 'Test application creation failed')
-			return reply.code(400).send({ message: error.message || 'Unable to create test application.' })
+			return reply.code(400).send({ message: 'Unable to create test application. Check the floor plans and try again.' })
 		}
+		const thread = await app.supabase.from('thread').insert({ thread_source: 'development_application', thread_created_at: now(), application_id: application.data.application_id })
+		if (thread.error) throw thread.error
+		await app.supabase.rpc('workflow_event', { p_app: application.data.application_id, p_actor: request.admin.id, p_action: 'application_submitted', p_message: `Application version ${version} submitted for review.`, p_ar: null }).throwOnError()
 		return reply.code(201).send({ ...application.data, mallName: mall.data.mall_name })
 	})
 }

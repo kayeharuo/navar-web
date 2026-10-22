@@ -30,7 +30,7 @@ const SAMPLE_MALLS = [
       { id: 2, storeName: 'Zara', unitNos: ['L2-01'], floorLabel: 'Floor 2', brand: 'Zara', brandLogo: null, category: 'Fashion & Apparel', contactPerson: 'Juan Dela Cruz', contactNo: '+63 918 765 4321', email: 'juan@zara.ph', status: 'mapped', description: '', active: true, dateAdded: 'Mar 12, 2026', lastUpdated: 'Mar 16, 2026' },
     ],
     operatingHours: [
-      { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], open: '10:00', close: '21:00' },
+      { days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], open: '10:00', close: '21:00' },
     ],
     storesCount: 2,
     beacons: [],

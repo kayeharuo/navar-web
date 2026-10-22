@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { X, ImageIcon } from 'lucide-react'
 import AuthImage from '../ui/AuthImage'
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }
 const DEFAULT_MALL_COVERAGE_AREA = 'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm'
 
 function formatTime(time) {
@@ -17,7 +18,7 @@ function formatTime(time) {
 function formatDays(days) {
   if (!days || days.length === 0) return ''
   if (days.length === 7) return 'Daily'
-  const sorted = [...days].sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b))
+  const sorted = days.map(day => DAY_NAMES[day] || day).sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b))
   const groups = []
   let group = [sorted[0]]
   for (let i = 1; i < sorted.length; i++) {
@@ -33,7 +34,7 @@ function formatDays(days) {
 function formatOperatingHours(hours) {
   if (!hours || hours.length === 0) return '—'
   return hours
-    .map(h => `${formatDays(h.days)}: ${formatTime(h.open)} – ${formatTime(h.close)}`)
+    .map(h => `${formatDays(h.days)}: ${h.closed ? 'Closed' : `${formatTime(h.open)} – ${formatTime(h.close)}`}`)
     .join('\n')
 }
 

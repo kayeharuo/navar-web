@@ -213,9 +213,6 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onC
           </div>
         )}
         <div className="acct-modal-body">
-          {mallAdminCreateUnavailable && (
-            <p className="acct-primary-locked-note">Mall admin account creation is not available yet. You can fill in the form, but nothing will be saved.</p>
-          )}
           {(isEdit ? (account?.mall !== undefined ? 'mall-admin' : 'super-admin') : roleTab) === 'super-admin' ? superAdminFields : mallAdminFields}
           {submitNotice && <span className="acct-form-error">{submitNotice}</span>}
         </div>

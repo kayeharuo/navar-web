@@ -1,0 +1,2738 @@
+{
+  "tables": {
+    "stall": [
+      "stall_id",
+      "stall_description",
+      "stall_created_at",
+      "stall_updated_at",
+      "floor_id",
+      "s_application_id",
+      "store_id"
+    ],
+    "admin_password_request": [
+      "apr_request_fingerprint",
+      "apr_request_kind",
+      "apr_issued_at",
+      "apr_expires_at",
+      "apr_claimed_at",
+      "apr_suspended_at",
+      "apr_auth_user_id"
+    ],
+    "contract_payment_request": [
+      "contract_payment_request_id",
+      "contract_fee_type",
+      "contract_payment_status",
+      "contract_checkout_url",
+      "contract_confirmation_message",
+      "contract_confirmed_at",
+      "contract_paid_at",
+      "contract_payment_reference",
+      "contract_payment_created_at",
+      "contract_id"
+    ],
+    "email_log": [
+      "email_log_id",
+      "email_log_type",
+      "email_log_to_email",
+      "email_log_subject",
+      "email_log_body",
+      "email_log_status",
+      "email_log_fail_reason",
+      "email_log_sent_at",
+      "email_log_triggered_by",
+      "mall_id"
+    ],
+    "operating_hours": [
+      "opthrs_id",
+      "opthrs_is_mall",
+      "opthrs_is_inquiry",
+      "opthrs_is_store",
+      "opthrs_day_of_week",
+      "opthrs_open_time",
+      "opthrs_close_time",
+      "opthrs_is_closed",
+      "mall_id",
+      "inquiry_id",
+      "store_id"
+    ],
+    "notif_preference": [
+      "notifpref_id",
+      "notifpref_nav_updates",
+      "notifpref_prom_alerts",
+      "user_id"
+    ],
+    "navigation_plan": [
+      "plan_id",
+      "plan_created_at",
+      "plan_is_active",
+      "user_id",
+      "mall_id"
+    ],
+    "battery": [
+      "battery_id",
+      "battery_brand",
+      "battery_status",
+      "battery_installed_at",
+      "battery_replaced_at",
+      "beacon_id"
+    ],
+    "user_session": [
+      "session_id",
+      "session_start",
+      "session_last_activity",
+      "session_is_active",
+      "user_id",
+      "mall_id"
+    ],
+    "brand": [
+      "brand_id",
+      "brand_name",
+      "brand_logo",
+      "brand_logo_path",
+      "brand_category",
+      "brand_description",
+      "brand_created_at",
+      "brand_updated_at"
+    ],
+    "audit_log": [
+      "audit_log_id",
+      "audit_log_module",
+      "audit_log_action",
+      "audit_log_details",
+      "audit_log_performed_at",
+      "audit_log_performed_by",
+      "mall_id"
+    ],
+    "thread": [
+      "thread_id",
+      "thread_source",
+      "thread_created_at",
+      "application_id",
+      "ar_development_id",
+      "s_application_id"
+    ],
+    "admin_notification": [
+      "admin_notif_id",
+      "admin_notif_type",
+      "admin_notif_title",
+      "admin_notif_message",
+      "admin_notif_action_url",
+      "admin_notif_action_label",
+      "admin_notif_source_type",
+      "admin_notif_source_id",
+      "admin_notif_source_label",
+      "admin_notif_actor_role",
+      "admin_notif_is_read",
+      "admin_notif_is_archived",
+      "admin_notif_created_at",
+      "admin_notif_read_at",
+      "admin_notif_actor_id",
+      "admin_id",
+      "mall_id"
+    ],
+    "store_payment_method": [
+      "store_pm_id",
+      "store_pm_name",
+      "store_pm_created_at",
+      "store_pm_updated_at",
+      "store_id"
+    ],
+    "wallet": [
+      "wallet_id",
+      "wallet_balance",
+      "wallet_updated_at",
+      "mall_id"
+    ],
+    "ar_development": [
+      "ar_development_id",
+      "ar_development_status",
+      "ar_development_version",
+      "ar_development_map_revision",
+      "ar_development_activated_at",
+      "ar_development_created_at",
+      "ar_development_updated_at",
+      "application_id"
+    ],
+    "analytics_hourly_snapshot": [
+      "hourly_id",
+      "hourly_date",
+      "hourly_hour",
+      "hourly_session_count",
+      "mall_id"
+    ],
+    "beacon": [
+      "beacon_id",
+      "beacon_code",
+      "beacon_label",
+      "beacon_minor",
+      "beacon_tx_power",
+      "beacon_status",
+      "beacon_location",
+      "beacon_node_count",
+      "beacon_installed_at",
+      "beacon_maintained_at",
+      "mall_id",
+      "floor_id"
+    ],
+    "thread_message": [
+      "message_id",
+      "message_sender_type",
+      "message_sent_at",
+      "message_content",
+      "thread_id",
+      "message_sender"
+    ],
+    "user_mall_visit": [
+      "visit_id",
+      "visit_first_visit_date",
+      "visit_total_session_count",
+      "user_id",
+      "mall_id"
+    ],
+    "payment": [
+      "payment_id",
+      "payment_type",
+      "payment_amount",
+      "payment_method",
+      "payment_ref_num",
+      "payment_notes",
+      "payment_paid_at",
+      "contract_id",
+      "wallet_id",
+      "s_application_id"
+    ],
+    "store": [
+      "store_id",
+      "store_name",
+      "store_unit_count",
+      "store_contact_person",
+      "store_contact_num",
+      "store_email",
+      "store_has_cr",
+      "store_status",
+      "store_created_at",
+      "store_updated_at",
+      "brand_id"
+    ],
+    "beacon_ticket_log": [
+      "ticket_log_id",
+      "ticket_log_status",
+      "ticket_log_notes",
+      "ticket_log_changed_at",
+      "ticket_log_changed_by",
+      "ticket_id"
+    ],
+    "navigation_session": [
+      "navsesh_id",
+      "navsesh_start_time",
+      "navsesh_arrived_time",
+      "navsesh_date",
+      "navsesh_is_completed",
+      "navsesh_is_emergency",
+      "navsesh_route_pref",
+      "user_id",
+      "mall_id",
+      "store_id",
+      "last_known_node_id",
+      "destination_node_id",
+      "ar_development_id"
+    ],
+    "application_entry_point": [
+      "app_entry_point_id",
+      "app_entry_point_label",
+      "app_entry_point_description",
+      "app_entry_point_created_at",
+      "app_entry_point_updated_at",
+      "application_id",
+      "floor_id"
+    ],
+    "mall": [
+      "mall_id",
+      "mall_name",
+      "mall_state",
+      "mall_city",
+      "mall_zipcode",
+      "mall_address",
+      "mall_latitude",
+      "mall_longitude",
+      "mall_floor_count",
+      "mall_description",
+      "mall_logo",
+      "mall_logo_path",
+      "mall_beacon_major",
+      "mall_coverage_area",
+      "mall_created_at",
+      "mall_updated_at"
+    ],
+    "beacon_node_assignment": [
+      "assignment_id",
+      "assignment_created_at",
+      "assignment_updated_at",
+      "beacon_id",
+      "node_id",
+      "ar_development_id"
+    ],
+    "thread_message_attachment": [
+      "thread_message_attachment_id",
+      "thread_message_attachment_type",
+      "thread_message_attachment_storage_path",
+      "thread_message_attachment_file_name",
+      "thread_message_attachment_mime_type",
+      "thread_message_attachment_file_size",
+      "thread_message_attachment_created_at",
+      "thread_message_id"
+    ],
+    "store_visit": [
+      "store_visit_id",
+      "store_visit_timestamp",
+      "store_id",
+      "user_id",
+      "mall_id"
+    ],
+    "account_invite": [
+      "a_invite_id",
+      "a_invite_token",
+      "a_invite_expires_at",
+      "a_invite_is_used",
+      "a_invite_created_at",
+      "admin_id"
+    ],
+    "admin": [
+      "admin_id",
+      "admin_profile_picture",
+      "admin_profile_path",
+      "admin_role",
+      "admin_email",
+      "admin_full_name",
+      "admin_contact_num",
+      "admin_job_title",
+      "admin_is_primary",
+      "admin_account_status",
+      "admin_is_deactivated",
+      "admin_deactivated_on",
+      "admin_last_login",
+      "admin_created_at",
+      "admin_updated_at",
+      "mall_id",
+      "store_id",
+      "admin_auth_user_id"
+    ],
+    "inquiry": [
+      "inquiry_id",
+      "inquiry_email_token",
+      "inquiry_mall_name",
+      "inquiry_mall_state",
+      "inquiry_mall_city",
+      "inquiry_mall_zip_code",
+      "inquiry_mall_address",
+      "inquiry_mall_floor_count",
+      "inquiry_mall_logo",
+      "inquiry",
+      "inquiry_mall_description",
+      "inquiry_contact_person",
+      "inquiry_contact_num",
+      "inquiry_contact_email",
+      "inquiry_contact_job_title",
+      "inquiry_interested_tier",
+      "inquiry_status",
+      "inquiry_coverage_area",
+      "inquiry_created_at",
+      "inquiry_updated_at",
+      "mall_id"
+    ],
+    "auth.users": [
+      "auth_user_id"
+    ],
+    "floor": [
+      "floor_id",
+      "floor_num",
+      "floor_label",
+      "floor_created_at",
+      "floor_updated_at",
+      "mall_id"
+    ],
+    "beacon_scan_log": [
+      "bscan_id",
+      "bscan_rssi_value",
+      "bscan_is_strongest_signal",
+      "bscan_scanned_at",
+      "beacon_id",
+      "navsesh_id",
+      "resolved_node_id"
+    ],
+    "unit": [
+      "unit_id",
+      "unit_label",
+      "unit_status",
+      "unit_created_at",
+      "unit_updated_at",
+      "floor_id",
+      "store_id"
+    ],
+    "floor_calibration": [
+      "calibration_id",
+      "calibration_ref_label",
+      "calibration_ref_start_x",
+      "calibration_ref_start_y",
+      "calibration_ref_end_x",
+      "calibration_ref_end_y",
+      "calibration_real_meters",
+      "calibration_pixel_per_meter",
+      "calibration_path_loss_exponent",
+      "calibration_created_at",
+      "calibration_updated_at",
+      "floor_id",
+      "ar_development_id"
+    ],
+    "notification": [
+      "notif_id",
+      "notif_type",
+      "notif_title",
+      "notif_message",
+      "notif_action_url",
+      "notif_action_label",
+      "notif_is_read",
+      "notif_is_archived",
+      "notif_created_at",
+      "notif_read_at",
+      "notif_target_role",
+      "mall_id",
+      "notif_recipient"
+    ],
+    "accessibility_preference": [
+      "pref_id",
+      "pref_require_esc",
+      "pref_require_stair",
+      "pref_require_elev",
+      "pref_require_ramp",
+      "pref_updated_at",
+      "user_id"
+    ],
+    "navigation_plan_destination": [
+      "plan_dest_id",
+      "plan_dest_distance_from_current",
+      "plan_dest_priority_rank",
+      "plan_dest_is_completed",
+      "plan_id",
+      "destination_store_id",
+      "destination_node_id",
+      "navsesh_id"
+    ],
+    "tenant": [
+      "tenant_id",
+      "tenant_name",
+      "tenant_type",
+      "tenant_contact_person",
+      "tenant_contact_num",
+      "tenant_email",
+      "tenant_status",
+      "tenant_created_at",
+      "tenant_updated_at",
+      "store_id"
+    ],
+    "edge": [
+      "edge_id",
+      "edge_distance",
+      "edge_path_type",
+      "edge_is_accessible",
+      "edge_is_cross_floor",
+      "edge_created_at",
+      "edge_updated_at",
+      "start_node_id",
+      "end_node_id",
+      "ar_development_id"
+    ],
+    "stall_floor_plan": [
+      "s_floor_plan_id",
+      "s_floor_plan_image",
+      "s_floor_plan_created_at",
+      "s_floor_plan_updated_at",
+      "floor_id",
+      "s_application_id"
+    ],
+    "store_additional_info": [
+      "addinfo_id",
+      "addinfo_text",
+      "addinfo_created_at",
+      "addinfo_updated_at",
+      "store_id"
+    ],
+    "promotion_interaction": [
+      "interaction_id",
+      "interaction_timestamp",
+      "promotion_id",
+      "user_id"
+    ],
+    "app_user": [
+      "user_id",
+      "user_role",
+      "user_name",
+      "user_email",
+      "user_gender",
+      "user_dob",
+      "user_created_at",
+      "user_deleted_at",
+      "user_last_login",
+      "user_auth_user_id"
+    ],
+    "application": [
+      "application_id",
+      "application_version",
+      "application_status",
+      "application_created_at",
+      "application_updated_at",
+      "mall_id"
+    ],
+    "subscription_tier": [
+      "s_tier_id",
+      "s_tier_key",
+      "s_tier_label",
+      "s_tier_max_gfa",
+      "s_tier_max_floors",
+      "s_tier_included_tenant_count",
+      "s_tier_beacon_allocation",
+      "s_tier_annual_fee",
+      "s_tier_onboarding_fee",
+      "s_tier_grace_period_days",
+      "s_tier_reinstatement_rate",
+      "s_tier_additional_stall_fee",
+      "s_tier_map_updates_per_year",
+      "s_tier_max_admin_account",
+      "s_tier_analytics_level",
+      "s_tier_ar_priority",
+      "s_tier_remote_response_sla",
+      "s_tier_onsite_dispatch_sla",
+      "s_tier_diagnosis",
+      "s_tier_replacement_unit_cost",
+      "s_tier_spare_units_onsite",
+      "s_tier_battery_replacement",
+      "s_tier_created_at",
+      "s_tier_updated_at"
+    ],
+    "transaction_history": [
+      "trans_id",
+      "trans_type",
+      "trans_amount",
+      "trans_reference",
+      "trans_description",
+      "trans_status",
+      "created_at",
+      "wallet_id"
+    ],
+    "contract": [
+      "contract_id",
+      "contract_status",
+      "contract_version",
+      "contract_is_current",
+      "contract_annual_fee",
+      "\u00e2\u00a0contract_onboarding_fee",
+      "contract_grace_period_days",
+      "contract_reinstatement_rate",
+      "contract_start",
+      "contract_end",
+      "contract_notes",
+      "contract_created_at",
+      "contract_updated_at",
+      "admin_id",
+      "s_tier_id",
+      "mall_id"
+    ],
+    "stall_application": [
+      "s_application_id",
+      "s_application_status",
+      "s_application_created_at",
+      "s_application_updated_at",
+      "mall_id"
+    ],
+    "beacon_ticket": [
+      "ticket_id",
+      "ticket_issue",
+      "ticket_current_status",
+      "ticket_reported_at",
+      "ticket_reported_by",
+      "ticket_assigned_to",
+      "beacon_id"
+    ],
+    "system_settings": [
+      "settings_id",
+      "settings_beacon_uuid",
+      "settings_created_at"
+    ],
+    "suspension": [
+      "suspension_id",
+      "suspension_reason",
+      "suspension_penalty_amount",
+      "suspension_notes",
+      "suspension_suspended_at",
+      "suspension_lifted_at",
+      "suspension_lifted_by",
+      "contract_id"
+    ],
+    "node": [
+      "node_id",
+      "node_label",
+      "node_type",
+      "node_x_coordinate",
+      "node_y_coordinate",
+      "node_pixel_x",
+      "node_pixel_y",
+      "node_is_store_entrance",
+      "node_is_accessible",
+      "node_created_at",
+      "node_updated_at",
+      "floor_id",
+      "store_id",
+      "unit_id",
+      "node_cross_floor_link_id"
+    ],
+    "application_floor_plan": [
+      "app_floor_plan_id",
+      "app_floor_plan_image",
+      "app_floor_plan_storage_path",
+      "app_floor_plan_file_name",
+      "app_floor_plan_mime_type",
+      "app_floor_plan_file_size",
+      "app_floor_plan_reference_line",
+      "app_floor_plan_meter_length",
+      "app_floor_plan_accessibility_route",
+      "app_floor_plan_emergency_route",
+      "app_floor_plan_created_at",
+      "app_floor_plan_updated_at",
+      "application_id",
+      "floor_id"
+    ],
+    "analytics_daily_snapshot": [
+      "daily_id",
+      "daily_date",
+      "daily_total_sessions",
+      "daily_completed_sessions",
+      "daily_avg_duration_seconds",
+      "daily_new_users",
+      "daily_returning_users",
+      "daily_top_destination_node_type",
+      "daily_revenue",
+      "daily_top_store_id",
+      "mall_id"
+    ],
+    "inquiry_message": [
+      "i_message_id",
+      "i_message_sender_type",
+      "i_message_sender_email",
+      "i_message_message",
+      "i_message_sent_at",
+      "i_message_is_read",
+      "inquiry_id"
+    ],
+    "promotion": [
+      "promotion_id",
+      "promotion_title",
+      "promotion_description",
+      "promotion_type",
+      "promotion_start_date",
+      "promotion_end_date",
+      "promotion_status",
+      "promotion_created_at",
+      "promotion_updated_at",
+      "store_id"
+    ],
+    "mall_admin_account": [
+      "admin_id",
+      "mall_username",
+      "mall_setup_completed_at",
+      "mall_created_at"
+    ]
+  },
+  "keys": {
+    "stall": {
+      "stall_id": "pk",
+      "stall_description": "",
+      "stall_created_at": "",
+      "stall_updated_at": "",
+      "floor_id": "fk",
+      "s_application_id": "fk",
+      "store_id": "fk"
+    },
+    "admin_password_request": {
+      "apr_request_fingerprint": "pk",
+      "apr_request_kind": "",
+      "apr_issued_at": "",
+      "apr_expires_at": "",
+      "apr_claimed_at": "",
+      "apr_suspended_at": "",
+      "apr_auth_user_id": "fk"
+    },
+    "contract_payment_request": {
+      "contract_payment_request_id": "pk",
+      "contract_fee_type": "",
+      "contract_payment_status": "",
+      "contract_checkout_url": "",
+      "contract_confirmation_message": "",
+      "contract_confirmed_at": "",
+      "contract_paid_at": "",
+      "contract_payment_reference": "",
+      "contract_payment_created_at": "",
+      "contract_id": "fk"
+    },
+    "email_log": {
+      "email_log_id": "pk",
+      "email_log_type": "",
+      "email_log_to_email": "",
+      "email_log_subject": "",
+      "email_log_body": "",
+      "email_log_status": "",
+      "email_log_fail_reason": "",
+      "email_log_sent_at": "",
+      "email_log_triggered_by": "fk",
+      "mall_id": "fk"
+    },
+    "operating_hours": {
+      "opthrs_id": "pk",
+      "opthrs_is_mall": "",
+      "opthrs_is_inquiry": "",
+      "opthrs_is_store": "",
+      "opthrs_day_of_week": "",
+      "opthrs_open_time": "",
+      "opthrs_close_time": "",
+      "opthrs_is_closed": "",
+      "mall_id": "fk",
+      "inquiry_id": "fk",
+      "store_id": "fk"
+    },
+    "notif_preference": {
+      "notifpref_id": "pk",
+      "notifpref_nav_updates": "",
+      "notifpref_prom_alerts": "",
+      "user_id": "fk"
+    },
+    "navigation_plan": {
+      "plan_id": "pk",
+      "plan_created_at": "",
+      "plan_is_active": "",
+      "user_id": "fk",
+      "mall_id": "fk"
+    },
+    "battery": {
+      "battery_id": "pk",
+      "battery_brand": "",
+      "battery_status": "",
+      "battery_installed_at": "",
+      "battery_replaced_at": "",
+      "beacon_id": "fk"
+    },
+    "user_session": {
+      "session_id": "pk",
+      "session_start": "",
+      "session_last_activity": "",
+      "session_is_active": "",
+      "user_id": "fk",
+      "mall_id": "fk"
+    },
+    "brand": {
+      "brand_id": "pk",
+      "brand_name": "",
+      "brand_logo": "",
+      "brand_logo_path": "",
+      "brand_category": "",
+      "brand_description": "",
+      "brand_created_at": "",
+      "brand_updated_at": ""
+    },
+    "audit_log": {
+      "audit_log_id": "pk",
+      "audit_log_module": "",
+      "audit_log_action": "",
+      "audit_log_details": "",
+      "audit_log_performed_at": "",
+      "audit_log_performed_by": "fk",
+      "mall_id": "fk"
+    },
+    "thread": {
+      "thread_id": "pk",
+      "thread_source": "",
+      "thread_created_at": "",
+      "application_id": "fk",
+      "ar_development_id": "fk",
+      "s_application_id": "fk"
+    },
+    "admin_notification": {
+      "admin_notif_id": "pk",
+      "admin_notif_type": "",
+      "admin_notif_title": "",
+      "admin_notif_message": "",
+      "admin_notif_action_url": "",
+      "admin_notif_action_label": "",
+      "admin_notif_source_type": "",
+      "admin_notif_source_id": "",
+      "admin_notif_source_label": "",
+      "admin_notif_actor_role": "",
+      "admin_notif_is_read": "",
+      "admin_notif_is_archived": "",
+      "admin_notif_created_at": "",
+      "admin_notif_read_at": "",
+      "admin_notif_actor_id": "fk",
+      "admin_id": "fk",
+      "mall_id": "fk"
+    },
+    "store_payment_method": {
+      "store_pm_id": "pk",
+      "store_pm_name": "",
+      "store_pm_created_at": "",
+      "store_pm_updated_at": "",
+      "store_id": "fk"
+    },
+    "wallet": {
+      "wallet_id": "pk",
+      "wallet_balance": "",
+      "wallet_updated_at": "",
+      "mall_id": "fk"
+    },
+    "ar_development": {
+      "ar_development_id": "pk",
+      "ar_development_status": "",
+      "ar_development_version": "",
+      "ar_development_map_revision": "",
+      "ar_development_activated_at": "",
+      "ar_development_created_at": "",
+      "ar_development_updated_at": "",
+      "application_id": "fk"
+    },
+    "analytics_hourly_snapshot": {
+      "hourly_id": "pk",
+      "hourly_date": "",
+      "hourly_hour": "",
+      "hourly_session_count": "",
+      "mall_id": "fk"
+    },
+    "beacon": {
+      "beacon_id": "pk",
+      "beacon_code": "",
+      "beacon_label": "",
+      "beacon_minor": "",
+      "beacon_tx_power": "",
+      "beacon_status": "",
+      "beacon_location": "",
+      "beacon_node_count": "",
+      "beacon_installed_at": "",
+      "beacon_maintained_at": "",
+      "mall_id": "fk",
+      "floor_id": "fk"
+    },
+    "thread_message": {
+      "message_id": "pk",
+      "message_sender_type": "",
+      "message_sent_at": "",
+      "message_content": "",
+      "thread_id": "fk",
+      "message_sender": "fk"
+    },
+    "user_mall_visit": {
+      "visit_id": "pk",
+      "visit_first_visit_date": "",
+      "visit_total_session_count": "",
+      "user_id": "fk",
+      "mall_id": "fk"
+    },
+    "payment": {
+      "payment_id": "pk",
+      "payment_type": "",
+      "payment_amount": "",
+      "payment_method": "",
+      "payment_ref_num": "",
+      "payment_notes": "",
+      "payment_paid_at": "",
+      "contract_id": "fk",
+      "wallet_id": "fk",
+      "s_application_id": "fk"
+    },
+    "store": {
+      "store_id": "pk",
+      "store_name": "",
+      "store_unit_count": "",
+      "store_contact_person": "",
+      "store_contact_num": "",
+      "store_email": "",
+      "store_has_cr": "",
+      "store_status": "",
+      "store_created_at": "",
+      "store_updated_at": "",
+      "brand_id": "fk"
+    },
+    "beacon_ticket_log": {
+      "ticket_log_id": "pk",
+      "ticket_log_status": "",
+      "ticket_log_notes": "",
+      "ticket_log_changed_at": "",
+      "ticket_log_changed_by": "fk",
+      "ticket_id": "fk"
+    },
+    "navigation_session": {
+      "navsesh_id": "pk",
+      "navsesh_start_time": "",
+      "navsesh_arrived_time": "",
+      "navsesh_date": "",
+      "navsesh_is_completed": "",
+      "navsesh_is_emergency": "",
+      "navsesh_route_pref": "",
+      "user_id": "fk",
+      "mall_id": "fk",
+      "store_id": "fk",
+      "last_known_node_id": "fk",
+      "destination_node_id": "fk",
+      "ar_development_id": "fk"
+    },
+    "application_entry_point": {
+      "app_entry_point_id": "pk",
+      "app_entry_point_label": "",
+      "app_entry_point_description": "",
+      "app_entry_point_created_at": "",
+      "app_entry_point_updated_at": "",
+      "application_id": "fk",
+      "floor_id": "fk"
+    },
+    "mall": {
+      "mall_id": "pk",
+      "mall_name": "",
+      "mall_state": "",
+      "mall_city": "",
+      "mall_zipcode": "",
+      "mall_address": "",
+      "mall_latitude": "",
+      "mall_longitude": "",
+      "mall_floor_count": "",
+      "mall_description": "",
+      "mall_logo": "",
+      "mall_logo_path": "",
+      "mall_beacon_major": "",
+      "mall_coverage_area": "",
+      "mall_created_at": "",
+      "mall_updated_at": ""
+    },
+    "beacon_node_assignment": {
+      "assignment_id": "pk",
+      "assignment_created_at": "",
+      "assignment_updated_at": "",
+      "beacon_id": "fk",
+      "node_id": "fk",
+      "ar_development_id": "fk"
+    },
+    "thread_message_attachment": {
+      "thread_message_attachment_id": "pk",
+      "thread_message_attachment_type": "",
+      "thread_message_attachment_storage_path": "",
+      "thread_message_attachment_file_name": "",
+      "thread_message_attachment_mime_type": "",
+      "thread_message_attachment_file_size": "",
+      "thread_message_attachment_created_at": "",
+      "thread_message_id": "fk"
+    },
+    "store_visit": {
+      "store_visit_id": "pk",
+      "store_visit_timestamp": "",
+      "store_id": "fk",
+      "user_id": "fk",
+      "mall_id": "fk"
+    },
+    "account_invite": {
+      "a_invite_id": "pk",
+      "a_invite_token": "",
+      "a_invite_expires_at": "",
+      "a_invite_is_used": "",
+      "a_invite_created_at": "",
+      "admin_id": "fk"
+    },
+    "admin": {
+      "admin_id": "pk",
+      "admin_profile_picture": "",
+      "admin_profile_path": "",
+      "admin_role": "",
+      "admin_email": "",
+      "admin_full_name": "",
+      "admin_contact_num": "",
+      "admin_job_title": "",
+      "admin_is_primary": "",
+      "admin_account_status": "",
+      "admin_is_deactivated": "",
+      "admin_deactivated_on": "",
+      "admin_last_login": "",
+      "admin_created_at": "",
+      "admin_updated_at": "",
+      "mall_id": "fk",
+      "store_id": "fk",
+      "admin_auth_user_id": "fk"
+    },
+    "inquiry": {
+      "inquiry_id": "pk",
+      "inquiry_email_token": "",
+      "inquiry_mall_name": "",
+      "inquiry_mall_state": "",
+      "inquiry_mall_city": "",
+      "inquiry_mall_zip_code": "",
+      "inquiry_mall_address": "",
+      "inquiry_mall_floor_count": "",
+      "inquiry_mall_logo": "",
+      "inquiry": "",
+      "inquiry_mall_description": "",
+      "inquiry_contact_person": "",
+      "inquiry_contact_num": "",
+      "inquiry_contact_email": "",
+      "inquiry_contact_job_title": "",
+      "inquiry_interested_tier": "",
+      "inquiry_status": "",
+      "inquiry_coverage_area": "",
+      "inquiry_created_at": "",
+      "inquiry_updated_at": "",
+      "mall_id": "fk"
+    },
+    "auth.users": {
+      "auth_user_id": "pk"
+    },
+    "floor": {
+      "floor_id": "pk",
+      "floor_num": "",
+      "floor_label": "",
+      "floor_created_at": "",
+      "floor_updated_at": "",
+      "mall_id": "fk"
+    },
+    "beacon_scan_log": {
+      "bscan_id": "pk",
+      "bscan_rssi_value": "",
+      "bscan_is_strongest_signal": "",
+      "bscan_scanned_at": "",
+      "beacon_id": "fk",
+      "navsesh_id": "fk",
+      "resolved_node_id": "fk"
+    },
+    "unit": {
+      "unit_id": "pk",
+      "unit_label": "",
+      "unit_status": "",
+      "unit_created_at": "",
+      "unit_updated_at": "",
+      "floor_id": "fk",
+      "store_id": "fk"
+    },
+    "floor_calibration": {
+      "calibration_id": "pk",
+      "calibration_ref_label": "",
+      "calibration_ref_start_x": "",
+      "calibration_ref_start_y": "",
+      "calibration_ref_end_x": "",
+      "calibration_ref_end_y": "",
+      "calibration_real_meters": "",
+      "calibration_pixel_per_meter": "",
+      "calibration_path_loss_exponent": "",
+      "calibration_created_at": "",
+      "calibration_updated_at": "",
+      "floor_id": "fk",
+      "ar_development_id": "fk"
+    },
+    "notification": {
+      "notif_id": "pk",
+      "notif_type": "",
+      "notif_title": "",
+      "notif_message": "",
+      "notif_action_url": "",
+      "notif_action_label": "",
+      "notif_is_read": "",
+      "notif_is_archived": "",
+      "notif_created_at": "",
+      "notif_read_at": "",
+      "notif_target_role": "",
+      "mall_id": "fk",
+      "notif_recipient": "fk"
+    },
+    "accessibility_preference": {
+      "pref_id": "pk",
+      "pref_require_esc": "",
+      "pref_require_stair": "",
+      "pref_require_elev": "",
+      "pref_require_ramp": "",
+      "pref_updated_at": "",
+      "user_id": "fk"
+    },
+    "navigation_plan_destination": {
+      "plan_dest_id": "pk",
+      "plan_dest_distance_from_current": "",
+      "plan_dest_priority_rank": "",
+      "plan_dest_is_completed": "",
+      "plan_id": "fk",
+      "destination_store_id": "fk",
+      "destination_node_id": "fk",
+      "navsesh_id": "fk"
+    },
+    "tenant": {
+      "tenant_id": "pk",
+      "tenant_name": "",
+      "tenant_type": "",
+      "tenant_contact_person": "",
+      "tenant_contact_num": "",
+      "tenant_email": "",
+      "tenant_status": "",
+      "tenant_created_at": "",
+      "tenant_updated_at": "",
+      "store_id": "fk"
+    },
+    "edge": {
+      "edge_id": "pk",
+      "edge_distance": "",
+      "edge_path_type": "",
+      "edge_is_accessible": "",
+      "edge_is_cross_floor": "",
+      "edge_created_at": "",
+      "edge_updated_at": "",
+      "start_node_id": "fk",
+      "end_node_id": "fk",
+      "ar_development_id": "fk"
+    },
+    "stall_floor_plan": {
+      "s_floor_plan_id": "pk",
+      "s_floor_plan_image": "",
+      "s_floor_plan_created_at": "",
+      "s_floor_plan_updated_at": "",
+      "floor_id": "fk",
+      "s_application_id": "fk"
+    },
+    "store_additional_info": {
+      "addinfo_id": "pk",
+      "addinfo_text": "",
+      "addinfo_created_at": "",
+      "addinfo_updated_at": "",
+      "store_id": "fk"
+    },
+    "promotion_interaction": {
+      "interaction_id": "pk",
+      "interaction_timestamp": "",
+      "promotion_id": "fk",
+      "user_id": "fk"
+    },
+    "app_user": {
+      "user_id": "pk",
+      "user_role": "",
+      "user_name": "",
+      "user_email": "",
+      "user_gender": "",
+      "user_dob": "",
+      "user_created_at": "",
+      "user_deleted_at": "",
+      "user_last_login": "",
+      "user_auth_user_id": "fk"
+    },
+    "application": {
+      "application_id": "pk",
+      "application_version": "",
+      "application_status": "",
+      "application_created_at": "",
+      "application_updated_at": "",
+      "mall_id": "fk"
+    },
+    "subscription_tier": {
+      "s_tier_id": "pk",
+      "s_tier_key": "",
+      "s_tier_label": "",
+      "s_tier_max_gfa": "",
+      "s_tier_max_floors": "",
+      "s_tier_included_tenant_count": "",
+      "s_tier_beacon_allocation": "",
+      "s_tier_annual_fee": "",
+      "s_tier_onboarding_fee": "",
+      "s_tier_grace_period_days": "",
+      "s_tier_reinstatement_rate": "",
+      "s_tier_additional_stall_fee": "",
+      "s_tier_map_updates_per_year": "",
+      "s_tier_max_admin_account": "",
+      "s_tier_analytics_level": "",
+      "s_tier_ar_priority": "",
+      "s_tier_remote_response_sla": "",
+      "s_tier_onsite_dispatch_sla": "",
+      "s_tier_diagnosis": "",
+      "s_tier_replacement_unit_cost": "",
+      "s_tier_spare_units_onsite": "",
+      "s_tier_battery_replacement": "",
+      "s_tier_created_at": "",
+      "s_tier_updated_at": ""
+    },
+    "transaction_history": {
+      "trans_id": "pk",
+      "trans_type": "",
+      "trans_amount": "",
+      "trans_reference": "",
+      "trans_description": "",
+      "trans_status": "",
+      "created_at": "",
+      "wallet_id": "fk"
+    },
+    "contract": {
+      "contract_id": "pk",
+      "contract_status": "",
+      "contract_version": "",
+      "contract_is_current": "",
+      "contract_annual_fee": "",
+      "\u00e2\u00a0contract_onboarding_fee": "",
+      "contract_grace_period_days": "",
+      "contract_reinstatement_rate": "",
+      "contract_start": "",
+      "contract_end": "",
+      "contract_notes": "",
+      "contract_created_at": "",
+      "contract_updated_at": "",
+      "admin_id": "fk",
+      "s_tier_id": "fk",
+      "mall_id": "fk"
+    },
+    "stall_application": {
+      "s_application_id": "pk",
+      "s_application_status": "",
+      "s_application_created_at": "",
+      "s_application_updated_at": "",
+      "mall_id": "fk"
+    },
+    "beacon_ticket": {
+      "ticket_id": "pk",
+      "ticket_issue": "",
+      "ticket_current_status": "",
+      "ticket_reported_at": "",
+      "ticket_reported_by": "fk",
+      "ticket_assigned_to": "fk",
+      "beacon_id": "fk"
+    },
+    "system_settings": {
+      "settings_id": "pk",
+      "settings_beacon_uuid": "",
+      "settings_created_at": ""
+    },
+    "suspension": {
+      "suspension_id": "pk",
+      "suspension_reason": "",
+      "suspension_penalty_amount": "",
+      "suspension_notes": "",
+      "suspension_suspended_at": "",
+      "suspension_lifted_at": "",
+      "suspension_lifted_by": "fk",
+      "contract_id": "fk"
+    },
+    "node": {
+      "node_id": "pk",
+      "node_label": "",
+      "node_type": "",
+      "node_x_coordinate": "",
+      "node_y_coordinate": "",
+      "node_pixel_x": "",
+      "node_pixel_y": "",
+      "node_is_store_entrance": "",
+      "node_is_accessible": "",
+      "node_created_at": "",
+      "node_updated_at": "",
+      "floor_id": "fk",
+      "store_id": "fk",
+      "unit_id": "fk",
+      "node_cross_floor_link_id": "fk"
+    },
+    "application_floor_plan": {
+      "app_floor_plan_id": "pk",
+      "app_floor_plan_image": "",
+      "app_floor_plan_storage_path": "",
+      "app_floor_plan_file_name": "",
+      "app_floor_plan_mime_type": "",
+      "app_floor_plan_file_size": "",
+      "app_floor_plan_reference_line": "",
+      "app_floor_plan_meter_length": "",
+      "app_floor_plan_accessibility_route": "",
+      "app_floor_plan_emergency_route": "",
+      "app_floor_plan_created_at": "",
+      "app_floor_plan_updated_at": "",
+      "application_id": "fk",
+      "floor_id": "fk"
+    },
+    "analytics_daily_snapshot": {
+      "daily_id": "pk",
+      "daily_date": "",
+      "daily_total_sessions": "",
+      "daily_completed_sessions": "",
+      "daily_avg_duration_seconds": "",
+      "daily_new_users": "",
+      "daily_returning_users": "",
+      "daily_top_destination_node_type": "",
+      "daily_revenue": "",
+      "daily_top_store_id": "fk",
+      "mall_id": "fk"
+    },
+    "inquiry_message": {
+      "i_message_id": "pk",
+      "i_message_sender_type": "",
+      "i_message_sender_email": "",
+      "i_message_message": "",
+      "i_message_sent_at": "",
+      "i_message_is_read": "",
+      "inquiry_id": "fk"
+    },
+    "promotion": {
+      "promotion_id": "pk",
+      "promotion_title": "",
+      "promotion_description": "",
+      "promotion_type": "",
+      "promotion_start_date": "",
+      "promotion_end_date": "",
+      "promotion_status": "",
+      "promotion_created_at": "",
+      "promotion_updated_at": "",
+      "store_id": "fk"
+    },
+    "mall_admin_account": {
+      "admin_id": "pk, fk",
+      "mall_username": "",
+      "mall_setup_completed_at": "",
+      "mall_created_at": ""
+    }
+  },
+  "ids": {
+    "8LJsA2Ry0Mph": "stall",
+    "jZbzt7aM4SzL": "admin_password_request",
+    "B_jzVdI-mIEu": "contract_payment_request",
+    "_ncFNO3NxpTz": "email_log",
+    "poQNaQe8v4pW": "operating_hours",
+    "jt7LqZZAoMpw": "notif_preference",
+    "vOKUn~26ykws": "navigation_plan",
+    "vWHsR~KsJJDx": "battery",
+    "lJVE28K2ikan": "user_session",
+    "F0PF8k~PE3E-": "brand",
+    "PqcFuYmyvwz0": "audit_log",
+    "_GaF3eMIR02_": "thread",
+    "2DiCUcvV4YWK": "admin_notification",
+    "pa.t8G-LBMfB": "store_payment_method",
+    "3d0G~gi~.zPL": "wallet",
+    "elaFhCy~J0r3": "ar_development",
+    "hElPsBRNOZP4": "analytics_hourly_snapshot",
+    "QY4L5sTTCfjl": "beacon",
+    "uLaF9tD9Kdnz": "thread_message",
+    "DslP_QgJEQxw": "user_mall_visit",
+    "mg0GuiqGbO7A": "payment",
+    "nrwEGMyb1h_X": "store",
+    "6n8L80DgRqj9": "beacon_ticket_log",
+    "AuwEenmKoyyw": "navigation_session",
+    "v0~EE.qMcsUi": "application_entry_point",
+    "bpwE33z2e9xo": "mall",
+    "1YBRsn03Wr8W": "beacon_node_assignment",
+    "sqbElFZgHFjk": "thread_message_attachment",
+    "nctQu4und0T~": "store_visit",
+    "5DYGQlvIFCuz": "account_invite",
+    "Sp.E3aZatGSF": "admin",
+    "IGYG1__esuy_": "inquiry",
+    "iNIvxM.Xn2PM": "auth.users",
+    "SBUE~YrbALKs": "floor",
+    "5~hMu3fuDA48": "beacon_scan_log",
+    "DAwE8n30ru~m": "unit",
+    "ZvkMHHfrALfG": "floor_calibration",
+    "4H8LyQRGGnMb": "notification",
+    "InUEnObL1.sk": "accessibility_preference",
+    "xQKUUSJPXNot": "navigation_plan_destination",
+    "SU-L516vCEwc": "tenant",
+    "oEUEM6AUf7oG": "edge",
+    "aIJsfde1R5Xa": "stall_floor_plan",
+    "OcGU7Afuo~hZ": "store_additional_info",
+    "xjtQGzgB-b~8": "promotion_interaction",
+    "kowEEcATvFDK": "app_user",
+    "Va~E8NOUi2Ye": "application",
+    "ZPYGZix0CQlf": "subscription_tier",
+    "I1.Lj27Xr4v3": "transaction_history",
+    "dEbF7WfOi66P": "contract",
+    "WkJsWdYYq22a": "stall_application",
+    "Mb8Lw6lf4R.a": "beacon_ticket",
+    "jt7LKpKwhUrP": "system_settings",
+    "ITbF8D5J_tK5": "suspension",
+    "ZxUEBJ7RYweD": "node",
+    "3i~EqqvgC9p3": "application_floor_plan",
+    "dxlPDo_i4IMx": "analytics_daily_snapshot",
+    "UMYGsHhl~72C": "inquiry_message",
+    "mT-LVzptCxbz": "promotion",
+    "jHmyU49kGFZP": "mall_admin_account"
+  },
+  "lines": [
+    {
+      "id": "QK4LMb6UqPvG",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "M-UEVI.bjTvp",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "InUEnObL1.sk"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "q0JsJRNBvXT7",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "WkJsWdYYq22a"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "_GaF3eMIR02_"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "E3PFIUaWro7c",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "F0PF8k~PE3E-"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "LO9LLd9jHSbh",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "AuwEenmKoyyw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "mY0G11m-6fTv",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "_ncFNO3NxpTz"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "7tbE~L5MIqt.",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "uLaF9tD9Kdnz"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "sqbElFZgHFjk"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "2ytQsyFURmXL",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "nctQu4und0T~"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "ovcFI-dAN3ga",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "_ncFNO3NxpTz"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "-09L5CvVfBtr",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "4H8LyQRGGnMb"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "TS0GN6zv~z77",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "ZPYGZix0CQlf"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "dEbF7WfOi66P"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "ktQNoht9Krkc",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "poQNaQe8v4pW"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "baKsbg2s4vh5",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "WkJsWdYYq22a"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "mg0GuiqGbO7A"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "zTJsDhOH3dF1",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "8LJsA2Ry0Mph"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "auLUO2HKFGwD",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "vOKUn~26ykws"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "Et8Lgr.W7noG",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "Mb8Lw6lf4R.a"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "d7JMPfdhVFIh",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "DAwE8n30ru~m"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "cLiCotr~K2QQ",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "2DiCUcvV4YWK"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "jBtQiLY8AE9U",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "xjtQGzgB-b~8"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "SwbFXvHYC6ml",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "elaFhCy~J0r3"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "_GaF3eMIR02_"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "CO4Lt.8RYtT_",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "IGYG1__esuy_"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "twbFj9EBnPCo",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Va~E8NOUi2Ye"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "_GaF3eMIR02_"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "hClPd3sNHbPD",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "dxlPDo_i4IMx"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "81bzj3YosKEm",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "iNIvxM.Xn2PM"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "jZbzt7aM4SzL"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "DulPwGunC8EI",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "DslP_QgJEQxw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "M3IuoFJajY~T",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "Ei7L_Kv~svDE",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "3d0G~gi~.zPL"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "mg0GuiqGbO7A"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "AW0GFa9MxD_8",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "PqcFuYmyvwz0"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "6AkMZzB-cTZx",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "ZvkMHHfrALfG"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "rG0Gd-ep_xqS",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "M.BR2RpRo04O",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "1YBRsn03Wr8W"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "Nv0vn3j4qq.~",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "poQNaQe8v4pW"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "agiMygb5Q5Zm",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "AuwEenmKoyyw"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "5~hMu3fuDA48"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "gNVE7VeOIlb2",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "lJVE28K2ikan"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "8zLUbVvZyWCx",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "xQKUUSJPXNot"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "zM8LdtPJnhcy",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "4H8LyQRGGnMb"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "sexuFtUIRisB",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "QY4L5sTTCfjl"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "QOVEJlhyZaa2",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "lJVE28K2ikan"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "YRJsO9QnK3Vv",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "WkJsWdYYq22a"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "8LJsA2Ry0Mph"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "LZ0GHI.UaxJ5",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "ITbF8D5J_tK5"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "G09L7XuxZn7x",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "AuwEenmKoyyw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "NqVEVqhRzeId",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "oEUEM6AUf7oG"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "albFEuPgp_dp",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Va~E8NOUi2Ye"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "v0~EE.qMcsUi"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "eGlPo_J0ik~1",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "hElPsBRNOZP4"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "AaVEU4Hs2ut-",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "DAwE8n30ru~m"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "dmkzRDZV7HSF",
+      "endpoint1": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "B_jzVdI-mIEu"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "dEbF7WfOi66P"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "G3-Lx0wlXZDI",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "mT-LVzptCxbz"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "6JJsd4.0y5Tx",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "WkJsWdYYq22a"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "aIJsfde1R5Xa"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "QP0G0RH0fVNY",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "uLaF9tD9Kdnz"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "dv8LBTCTQTK3",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "QY4L5sTTCfjl"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "Mb8Lw6lf4R.a"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "tWKU-v3CP-iz",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "vOKUn~26ykws"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "xQKUUSJPXNot"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "A3.LPlpgaHM3",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "3d0G~gi~.zPL"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "I1.Lj27Xr4v3"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "fu8LxL6edned",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "6n8L80DgRqj9"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "iL0GuPYz1q.-",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "5DYGQlvIFCuz"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "JhcFH2ThcSQS",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "dEbF7WfOi66P"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "ITbF8D5J_tK5"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": ".YHsM62TOp06",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "QY4L5sTTCfjl"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "vWHsR~KsJJDx"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "3ibFzg-7es7K",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "3i~EqqvgC9p3"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "avlP~gSS63Qb",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "DslP_QgJEQxw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "RJiCkFqYLL4v",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "2DiCUcvV4YWK"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "GAtQsITJaDQ2",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "mT-LVzptCxbz"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "xjtQGzgB-b~8"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "~xbF.C7T1XX7",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "_GaF3eMIR02_"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "uLaF9tD9Kdnz"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "5nJs0-Fjpqp1",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "WkJsWdYYq22a"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "897LG9mkzceZ",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "jt7LqZZAoMpw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "pX0GYild59ga",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "PqcFuYmyvwz0"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "uS0GefqQOeJ-",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "dEbF7WfOi66P"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "bPIv4vjpTsYt",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "iNIvxM.Xn2PM"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "EfGUdVuMkc-7",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "OcGU7Afuo~hZ"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "~wtQmYpF0JRB",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "nctQu4und0T~"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "lzLUnMzJNVo9",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "xQKUUSJPXNot"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "QhbFYjLAzk~q",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Va~E8NOUi2Ye"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "3i~EqqvgC9p3"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "Su8L4SlqPWCB",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Mb8Lw6lf4R.a"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "6n8L80DgRqj9"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "FfiMrxGv5e-x",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "QY4L5sTTCfjl"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "5~hMu3fuDA48"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "wcVE6Dl3mCqr",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "9oVEy4ZlceF8",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "AuwEenmKoyyw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "XPIvuGJzrwLb",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "kowEEcATvFDK"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "iNIvxM.Xn2PM"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "oj~LPjcCA_.K",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "elaFhCy~J0r3"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "oEUEM6AUf7oG"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "tRJsWbla5HNV",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "8LJsA2Ry0Mph"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "ww0vY~3gIhUX",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "IGYG1__esuy_"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "poQNaQe8v4pW"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "CBkMnJpgq~gs",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "elaFhCy~J0r3"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "ZvkMHHfrALfG"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "AV0Gp70o.eCZ",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "dEbF7WfOi66P"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "mg0GuiqGbO7A"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "U4PFmeqhnZ~v",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "DAwE8n30ru~m"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "ZALU7T28L-Ul",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "AuwEenmKoyyw"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "xQKUUSJPXNot"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "Ui_Lafr3kxF0",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "SU-L516vCEwc"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "vrVEQ4KAvsTB",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "ZxUEBJ7RYweD"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "Y64LH3.uIavG",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "QY4L5sTTCfjl"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "UglPk6..WlWn",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "elaFhCy~J0r3"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "AuwEenmKoyyw"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "OR0GFqOngf1N",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "dEbF7WfOi66P"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "3ubFfy~hDGUd",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "elaFhCy~J0r3"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Va~E8NOUi2Ye"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "~b.tsnXQ4EvK",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "pa.t8G-LBMfB"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "fU0G_MnmV.OB",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "3d0G~gi~.zPL"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "rztQ~FT_ra~_",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "nctQu4und0T~"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "ytLUiwA4FWGg",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "lJVE28K2ikan"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "vOKUn~26ykws"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "PgbF-jwlW0BL",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "bpwE33z2e9xo"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "Va~E8NOUi2Ye"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "8O0GcIHmGW0k",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "IGYG1__esuy_"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "UMYGsHhl~72C"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "hdCRn3DVOa4_",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "elaFhCy~J0r3"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "1YBRsn03Wr8W"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "nDlPwB2Pxyuj",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "nrwEGMyb1h_X"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "dxlPDo_i4IMx"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "1KJsjY739SC7",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "SBUE~YrbALKs"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Zero Or More Arrow",
+        "connectedTo": "aIJsfde1R5Xa"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "pbCR48UulFWB",
+      "endpoint1": {
+        "style": "CFN ERD Zero Or One Arrow",
+        "connectedTo": "QY4L5sTTCfjl"
+      },
+      "endpoint2": {
+        "style": "CFN ERD One Or More Arrow",
+        "connectedTo": "1YBRsn03Wr8W"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    },
+    {
+      "id": "1KmyLByFWD9p",
+      "endpoint1": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "Sp.E3aZatGSF"
+      },
+      "endpoint2": {
+        "style": "CFN ERD Exactly One Arrow",
+        "connectedTo": "jHmyU49kGFZP"
+      },
+      "textAreas": [],
+      "customData": [],
+      "linkedData": []
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
+export default function ARDevDetail({ project, onClose, onStallStatusChange, versions = [], onVersionChange }) {
   const [activeTab, setActiveTab] = useState('main')
   const [stalls, setStalls] = useState(project.stallAdditions || [])
 
@@ -23,7 +23,7 @@ export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
 
   return (
     <>
-      <div className="ar-detail-overlay" onClick={e => e.target === e.currentTarget && onClose()} />
+      <div className="ar-detail-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="ar-detail-panel">
         <div className="ar-detail-header">
           <div>
@@ -35,6 +35,7 @@ export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
 
         <div className="ar-detail-divider" />
 
+        <div className="workflow-version-tabs">{versions.map(v => <button key={v.id} aria-pressed={v.id === project.id} onClick={() => onVersionChange(v)}>Version {v.version}</button>)}</div>
         <div className="ar-detail-tabs">
           <button
             className={`ar-detail-tab ${activeTab === 'main' ? 'ar-detail-tab--active' : ''}`}
@@ -55,11 +56,11 @@ export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
         <div className="ar-detail-divider" />
 
         <div className="ar-detail-body">
-          {activeTab === 'main' ? (
+          {!project.hasThread ? <p>This version is not ready yet.</p> : activeTab === 'main' ? (
             <div>
               <div className="ar-detail-section">
                 <span className="ar-detail-label">AR STATUS</span>
-                <span className="ar-detail-value">{project.arStatus}</span>
+                <span className="ar-detail-value">{project.arStatus}{project.readOnly ? " / Read-only" : ""}</span>
               </div>
               <div className="ar-detail-section">
                 <span className="ar-detail-label">VERSION</span>
@@ -116,6 +117,7 @@ export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
                       </div>
                     </div>
                     <button
+                      disabled={project.readOnly}
                       onClick={() => handleStallStatusChange(stall.id, stall.status === 'pending' ? 'published' : 'pending')}
                       style={{
                         padding: '4px 12px',
@@ -152,6 +154,7 @@ export default function ARDevDetail({ project, onClose, onStallStatusChange }) {
             ✓ All stalls published. Main AR development is ready to publish.
           </div>
         )}
+      </div>
       </div>
     </>
   )
