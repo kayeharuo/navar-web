@@ -27,6 +27,7 @@ export async function apiRequest(path, options = {}) {
     throw new Error(`Cannot connect to the backend at ${API_URL}. Start the backend server and try again.`, { cause: error })
   }
 
+  if (response.ok && responseType === 'stream') return response.body
   const body = responseType === 'blob' ? await response.blob() : await response.json().catch(() => null)
   if (!response.ok) {
     if (response.status === 401) await supabase.auth.signOut()

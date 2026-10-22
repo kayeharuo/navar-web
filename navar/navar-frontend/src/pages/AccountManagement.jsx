@@ -1,9 +1,19 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import '../styles/accountManagement/accountManagement.css'
-import { apiRequest } from '../config/api'
+import { apiRequest as sendRequest } from '../config/api'
+import { withRequestTimeout } from '../components/mallManagement/followupRequest'
+
+async function apiRequest(path, options = {}) {
+  try { return await withRequestTimeout(signal => sendRequest(path, {...options, signal}), options.method ? 90000 : 20000) }
+  catch (error) {
+    if (error.name === 'TimeoutError') throw new Error(options.method ? 'This request has not been confirmed. Refresh accounts and check their status before retrying; it may still finish on the server.' : 'Loading accounts took too long. Please refresh and try again.', { cause: error })
+    throw error
+  }
+}
 import MessageModal from '../components/ui/MessageModal'
 import BusyButton from '../components/ui/BusyButton'
-import { useRealtimeRefresh } from '../config/realtime'
+import '../styles/panels.css'
+import AccountDetailsPanel from '../components/panels/AccountDetailsPanel'
 
 /* ─── SVG Icons ─── */
 function IconLock() {
@@ -39,34 +49,19 @@ function IconCheck() {
 }
 
 /* ─── Sample Data ─── */
-const MALLS = [
-  'SM Seaside City Cebu',
-  'Pacific Mall Cebu',
-  'Robinsons Galleria Cebu',
-  'Parkmall Mandaue',
-  'Gaisano Grand Liloan',
-  'SM City Cebu',
-  'Ayala Center Cebu',
-]
 
 function formatDate(d) {
+  if (!d || Number.isNaN(new Date(d).getTime())) return '-'
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 /* ────────────────────────────────────────
    MODAL: Create / Edit Account
 ──────────────────────────────────────── */
-function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, onSave }) {
+function AccountFormModal({ mode, account, createTabInit, mallAdmins, malls, onClose, onSave }) {
   const isEdit = mode === 'edit'
   const [roleTab, setRoleTab] = useState(isEdit ? (account?.mall !== undefined ? 'mall-admin' : 'super-admin') : (createTabInit || 'super-admin'))
 
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
 
   const emptyForm = {
     name: '', email: '', jobTitle: '', contact: '', mall: '', isPrimary: 'no',
@@ -76,25 +71,27 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
     email: account.email || '',
     jobTitle: account.jobTitle || '',
     contact: account.contact || '',
-    mall: account.mall || '',
+    mall: String(account.mallId || ''),
     isPrimary: account.isPrimary ? 'yes' : 'no',
   } : emptyForm)
   const [errors, setErrors] = useState({})
 
   const activePrimaryForMall = useMemo(() => {
     if (!form.mall) return null
-    return mallAdmins.find(a => a.mall === form.mall && a.isPrimary && a.status === 'active' && a.id !== account?.id) || null
+    return mallAdmins.find(a => String(a.mallId) === String(form.mall) && a.isPrimary && !a.isDeactivated && a.id !== account?.id) || null
   }, [form.mall, mallAdmins, account])
 
   function validate() {
     const e = {}
     if (!form.name.trim()) e.name = 'Full name is required.'
-    if (!form.email.trim()) e.email = 'Email address is required.'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address.'
+    if (form.name.trim().length > 100) e.name = 'Use at most 100 characters.'
+    if (form.contact && !/^[+]?[0-9][0-9 ()-]{6,19}$/.test(form.contact)) e.contact = 'Enter a valid contact number.'
     if (roleTab === 'mall-admin') {
       if (!form.contact.trim()) e.contact = 'Contact number is required.'
       if (!form.mall) e.mall = 'Assigned mall is required.'
-      if (form.isPrimary === 'yes' && activePrimaryForMall) {
-        e.isPrimary = `${form.mall} already has an active primary admin. Cannot assign another.`
+      if (!isEdit && form.isPrimary === 'yes' && activePrimaryForMall) {
+        e.isPrimary = `${activePrimaryForMall.mall} already has a primary admin, including accounts awaiting setup.`
       }
     }
     return e
@@ -118,21 +115,21 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
     <>
       <div className="acct-form-group">
         <label className="acct-form-label">FULL NAME <span className="acct-form-label-required">*</span></label>
-        <input className={`acct-form-input${errors.name ? ' acct-form-input--error' : ''}`} placeholder="e.g., Maria Santos" value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setErrors(ev => ({ ...ev, name: '' })) }} />
+        <input className={`acct-form-input${errors.name ? ' acct-form-input--error' : ''}`} placeholder="e.g., Maria Santos" maxLength={100} value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setErrors(ev => ({ ...ev, name: '' })) }} />
         {errors.name && <span className="acct-form-error">{errors.name}</span>}
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">EMAIL ADDRESS <span className="acct-form-label-required">*</span></label>
-            <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" value={form.email} readOnly={isEdit} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
+            <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" maxLength={100} value={form.email} readOnly={isEdit} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
         {errors.email && <span className="acct-form-error">{errors.email}</span>}
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">JOB TITLE</label>
-        <input className="acct-form-input" placeholder="e.g., IT Manager, Operations Head" value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))} />
+        <input className="acct-form-input" placeholder="e.g., IT Manager, Operations Head" maxLength={100} value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))} />
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">CONTACT NUMBER</label>
-        <input className="acct-form-input" placeholder="Contact number" type="number" inputMode="numeric" min="0" value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value.replace(/\D/g, '') }))} />
+        <input className={`acct-form-input${errors.contact ? ' acct-form-input--error' : ''}`} placeholder="Contact number" type="tel" inputMode="tel" maxLength={20} value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value.replace(/[^+0-9 ()-]/g, '') }))} />
       </div>
     </>
   )
@@ -141,30 +138,30 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
     <>
       <div className="acct-form-group">
         <label className="acct-form-label">FULL NAME <span className="acct-form-label-required">*</span></label>
-        <input className={`acct-form-input${errors.name ? ' acct-form-input--error' : ''}`} placeholder="e.g., Maria Santos" value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setErrors(ev => ({ ...ev, name: '' })) }} />
+        <input className={`acct-form-input${errors.name ? ' acct-form-input--error' : ''}`} placeholder="e.g., Maria Santos" maxLength={100} value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setErrors(ev => ({ ...ev, name: '' })) }} />
         {errors.name && <span className="acct-form-error">{errors.name}</span>}
       </div>
       <div className="acct-form-row">
         <div className="acct-form-group">
           <label className="acct-form-label">EMAIL ADDRESS <span className="acct-form-label-required">*</span></label>
-            <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" value={form.email} readOnly={isEdit} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
+            <input className={`acct-form-input${errors.email ? ' acct-form-input--error' : ''}`} placeholder="user@company.ph" type="email" maxLength={100} value={form.email} readOnly={isEdit} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(ev => ({ ...ev, email: '' })) }} />
           {errors.email && <span className="acct-form-error">{errors.email}</span>}
         </div>
         <div className="acct-form-group">
           <label className="acct-form-label">JOB TITLE</label>
-          <input className="acct-form-input" placeholder="e.g., IT Manager, Operations Head" value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))} />
+          <input className="acct-form-input" placeholder="e.g., IT Manager, Operations Head" maxLength={100} value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))} />
         </div>
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">CONTACT NUMBER <span className="acct-form-label-required">*</span></label>
-        <input className={`acct-form-input${errors.contact ? ' acct-form-input--error' : ''}`} placeholder="Contact number" type="number" inputMode="numeric" min="0" value={form.contact} onChange={e => { setForm(f => ({ ...f, contact: e.target.value.replace(/\D/g, '') })); setErrors(ev => ({ ...ev, contact: '' })) }} />
+        <input className={`acct-form-input${errors.contact ? ' acct-form-input--error' : ''}`} placeholder="Contact number" type="tel" inputMode="tel" maxLength={20} value={form.contact} onChange={e => { setForm(f => ({ ...f, contact: e.target.value.replace(/[^+0-9 ()-]/g, '') })); setErrors(ev => ({ ...ev, contact: '' })) }} />
         {errors.contact && <span className="acct-form-error">{errors.contact}</span>}
       </div>
       <div className="acct-form-group">
         <label className="acct-form-label">ASSIGNED MALL <span className="acct-form-label-required">*</span></label>
-        <select className={`acct-form-select${errors.mall ? ' acct-form-input--error' : ''}`} value={form.mall} onChange={e => { setForm(f => ({ ...f, mall: e.target.value, isPrimary: 'no' })); setErrors(ev => ({ ...ev, mall: '', isPrimary: '' })) }}>
+        <select disabled={isEdit} className={`acct-form-select${errors.mall ? ' acct-form-input--error' : ''}`} value={form.mall} onChange={e => { setForm(f => ({ ...f, mall: e.target.value, isPrimary: 'no' })); setErrors(ev => ({ ...ev, mall: '', isPrimary: '' })) }}>
           <option value="">-- Select a Mall --</option>
-          {MALLS.map(m => <option key={m} value={m}>{m}</option>)}
+          {malls.map(m => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
         </select>
         {errors.mall && <span className="acct-form-error">{errors.mall}</span>}
       </div>
@@ -172,11 +169,11 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
         <label className="acct-form-label">IS PRIMARY <span className="acct-form-label-required">*</span></label>
         <div className="acct-radio-group">
           <label className="acct-radio-label">
-            <input type="radio" name="isPrimary" value="yes" checked={form.isPrimary === 'yes'} disabled={!!activePrimaryForMall} onChange={() => { setForm(f => ({ ...f, isPrimary: 'yes' })); setErrors(ev => ({ ...ev, isPrimary: '' })) }} />
+            <input type="radio" name="isPrimary" value="yes" checked={form.isPrimary === 'yes'} disabled={isEdit || !!activePrimaryForMall} onChange={() => { setForm(f => ({ ...f, isPrimary: 'yes' })); setErrors(ev => ({ ...ev, isPrimary: '' })) }} />
             Yes
           </label>
           <label className="acct-radio-label">
-            <input type="radio" name="isPrimary" value="no" checked={form.isPrimary === 'no'} onChange={() => { setForm(f => ({ ...f, isPrimary: 'no' })); setErrors(ev => ({ ...ev, isPrimary: '' })) }} />
+            <input type="radio" name="isPrimary" disabled={isEdit} value="no" checked={form.isPrimary === 'no'} onChange={() => { setForm(f => ({ ...f, isPrimary: 'no' })); setErrors(ev => ({ ...ev, isPrimary: '' })) }} />
             No
           </label>
         </div>
@@ -189,7 +186,7 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
   )
 
   return (
-    <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="acct-modal-overlay">
       <div className="acct-create-modal">
         <div className="acct-modal-header">
           <div className="acct-modal-title-row">
@@ -204,8 +201,8 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
         </div>
         {!isEdit && (
           <div className="acct-modal-role-tabs">
-            <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setErrors({}) }}>Super Admin</button>
-            <button className="acct-modal-role-tab" disabled>Mall Admin</button>
+            <button className={`acct-modal-role-tab${roleTab === 'super-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('super-admin'); setForm(emptyForm); setErrors({}) }}>Super Admin</button>
+            <button className={`acct-modal-role-tab${roleTab === 'mall-admin' ? ' acct-modal-role-tab--active' : ''}`} onClick={() => { setRoleTab('mall-admin'); setForm(emptyForm); setErrors({}) }}>Mall Admin</button>
           </div>
         )}
         <div className="acct-modal-body">
@@ -224,23 +221,16 @@ function AccountFormModal({ mode, account, createTabInit, mallAdmins, onClose, o
    MODAL: Account Created
 ──────────────────────────────────────── */
 function AccountCreatedModal({ account, onClose }) {
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
 
   return (
-    <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="acct-modal-overlay">
       <div className="acct-created-modal">
         <div className="acct-modal-header">
           <div className="acct-modal-title-row">
             <h2 className="acct-modal-title">Account Created</h2>
             <button className="acct-modal-close" onClick={onClose}>X</button>
           </div>
-          <p className="acct-modal-subtitle">An invitation email was sent to this address.</p>
+          <p className="acct-modal-subtitle">{account.warning || 'An invitation email was submitted to this address.'}</p>
           <div className="acct-modal-divider" />
         </div>
         <div className="acct-modal-body">
@@ -260,8 +250,8 @@ function AccountCreatedModal({ account, onClose }) {
             ))}
           </div>
           <div className="acct-magic-link-box">
-            <p className="acct-magic-link-title">Invitation sent to {account.email}</p>
-            <p className="acct-magic-link-text">The recipient must use the invitation email to set a password before signing in.</p>
+            <p className="acct-magic-link-title">{account.warning ? 'Invitation delivery unconfirmed' : `Invitation submitted to ${account.email}`}</p>
+            <p className="acct-magic-link-text">{account.warning || 'The recipient must use the invitation email to set a password before signing in.'}</p>
           </div>
         </div>
         <div className="acct-modal-footer">
@@ -276,26 +266,19 @@ function AccountCreatedModal({ account, onClose }) {
    MODAL: Reset Password (confirm)
 ──────────────────────────────────────── */
 function ResetPasswordModal({ account, onClose, onConfirm }) {
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
 
   return (
-    <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="acct-modal-overlay">
       <div className="acct-confirm-modal">
         <div className="acct-confirm-icon"><IconLock /></div>
         <div>
-          <h3 className="acct-confirm-title">Set Password</h3>
-          <p className="acct-confirm-desc">Send {account.name} an email to set a new password. Their current password stops working immediately.</p>
+          <h3 className="acct-confirm-title">Reset Password</h3>
+          <p className="acct-confirm-desc">Send {account.name} an email to set a new password. Their current password remains valid until they complete the reset.</p>
         </div>
         <div className="acct-confirm-notice">{account.name} will set a new password from the secure email.</div>
         <div className="acct-confirm-actions">
           <button className="acct-modal-btn-cancel" onClick={onClose}>Cancel</button>
-          <BusyButton className="acct-confirm-btn-proceed" onClick={onConfirm}>Set Password</BusyButton>
+          <BusyButton className="acct-confirm-btn-proceed" onClick={onConfirm}>Send Reset Link</BusyButton>
         </div>
       </div>
     </div>
@@ -306,26 +289,19 @@ function ResetPasswordModal({ account, onClose, onConfirm }) {
   MODAL: Email Sent
 ──────────────────────────────────────── */
 function MagicLinkSentModal({ email, onClose }) {
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
 
   return (
-    <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="acct-modal-overlay">
       <div className="acct-magic-sent-modal">
         <div className="acct-magic-sent-body">
           <IconKey />
           <div>
             <h3 className="acct-confirm-title">Email Sent</h3>
-            <p className="acct-confirm-desc">A secure email was sent to {email?.split('@')[0].replace(/[^a-zA-Z\s]/g, ' ')} so they can set a password.</p>
+            <p className="acct-confirm-desc">The email provider accepted the password-link email for {email}.</p>
           </div>
           <div className="acct-magic-link-box">
             <p className="acct-magic-link-title">Email sent to {email}</p>
-            <p className="acct-magic-link-text">The recipient can use the email to set a password.</p>
+            <p className="acct-magic-link-text">Ask the recipient to check their inbox and spam folder and use the newest link.</p>
           </div>
         </div>
         <div className="acct-magic-sent-footer">
@@ -342,23 +318,16 @@ function MagicLinkSentModal({ email, onClose }) {
 function DeactivateModal({ account, onClose, onConfirm }) {
   const isPrimaryMallAdmin = account?.mall !== undefined && account?.isPrimary
 
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
 
   return (
-    <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="acct-modal-overlay">
       <div className="acct-confirm-modal">
         <div className="acct-confirm-icon"><IconWarning /></div>
         <div>
           <h3 className="acct-confirm-title">Deactivate Account</h3>
           <p className="acct-confirm-desc">{account.name} will lose access immediately.</p>
           {isPrimaryMallAdmin && (
-            <p className="acct-confirm-warning">⚠ {account.mall} will not have a primary admin until a new one is assigned.</p>
+            <p className="acct-confirm-warning">⚠ {account.mall} will lose access through this primary admin until the account is reactivated.</p>
           )}
         </div>
         <div className="acct-confirm-actions">
@@ -374,16 +343,9 @@ function DeactivateModal({ account, onClose, onConfirm }) {
    MODAL: Reactivate Account
 ──────────────────────────────────────── */
 function ReactivateModal({ account, onClose, onConfirm }) {
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
 
   return (
-    <div className="acct-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="acct-modal-overlay">
       <div className="acct-confirm-modal">
         <div className="acct-confirm-icon"><IconCheck /></div>
         <div>
@@ -452,42 +414,53 @@ export default function AccountManagement() {
   const [createTabInit, setCreateTabInit] = useState('super-admin')
 
   const [superAdmins, setSuperAdmins] = useState([])
-  const [mallAdmins] = useState([])
+  const [mallAdmins, setMallAdmins] = useState([])
   const [deactSuper, setDeactSuper] = useState([])
-  const [deactMall] = useState([])
+  const [deactMall, setDeactMall] = useState([])
   const [requestError, setRequestError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [malls, setMalls] = useState([])
+  const [details, setDetails] = useState(null)
+  const loadSequence = useRef(0)
+  const actionInFlight = useRef(false)
+  const [actionBusy, setActionBusy] = useState(false)
 
   useEffect(() => {
-    loadAccounts()
+    loadAccounts(true)
+    return () => { loadSequence.current += 1 }
   }, [])
 
-  function loadAccounts() {
-    setLoading(true)
-    Promise.all([apiRequest('/api/admin-accounts'), apiRequest('/api/auth/me')])
-      .then(([accounts, me]) => {
+  function loadAccounts(initial = false) {
+    const sequence = ++loadSequence.current
+    if (initial) setLoading(true)
+    return Promise.all([apiRequest('/api/admin-accounts'), apiRequest('/api/auth/me'), apiRequest('/api/admin-accounts/malls')])
+      .then(([accounts, me, mallOptions]) => {
+        if (sequence !== loadSequence.current) return
+        setMalls(mallOptions)
         setCurrentAdminId(me.id)
-        const currentAccount = accounts.find(account => account.id === me.id)
+        const currentAccount = accounts.find(account => String(account.id) === String(me.id))
         setCurrentAdminPrimary(me.isPrimary === true || currentAccount?.isPrimary === true)
         const mapped = accounts.map(account => ({
           ...account,
           isPrimary: account.isPrimary === true,
+          lifecycle: account.status,
           status: account.isDeactivated ? 'deactivated' : account.status === 'partial' ? 'pending' : 'active',
+          deactivatedOn: formatDate(account.deactivatedOn),
           contact: account.contactNum || '',
           created: account.createdAt ? formatDate(account.createdAt) : '-',
           lastUpdated: account.updatedAt ? formatDate(account.updatedAt) : '-',
           lastLogin: account.lastLogin ? formatDate(account.lastLogin) : 'Never',
         }))
-        setSuperAdmins(mapped.filter(account => account.status !== 'deactivated'))
-        setDeactSuper(mapped.filter(account => account.status === 'deactivated'))
+        setDetails(current => current ? mapped.find(account => account.id === current.id) || null : null)
+        setSuperAdmins(mapped.filter(account => account.role === 'super_admin' && !account.isDeactivated))
+        setMallAdmins(mapped.filter(account => account.role === 'mall_admin' && !account.isDeactivated))
+        setDeactSuper(mapped.filter(account => account.role === 'super_admin' && account.isDeactivated))
+        setDeactMall(mapped.filter(account => account.role === 'mall_admin' && account.isDeactivated))
       })
-      .catch(error => setRequestError(error.message))
-      .finally(() => setLoading(false))
+      .catch(error => { if (sequence === loadSequence.current) setRequestError(error.message) })
+      .finally(() => { if (sequence === loadSequence.current) setLoading(false) })
   }
 
-  useRealtimeRefresh(payload => {
-    if (payload.table === 'admin' || payload.table === 'audit_log') loadAccounts()
-  })
 
   /* ── Computed stats ── */
   const pendingCount = superAdmins.filter(a => a.status === 'pending').length + mallAdmins.filter(a => a.status === 'pending').length
@@ -496,9 +469,8 @@ export default function AccountManagement() {
 
   /* ── Search filter ── */
   function filterList(list) {
-    if (!search.trim()) return list
-    const q = search.toLowerCase()
-    return list.filter(a => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q) || (a.mall || '').toLowerCase().includes(q) || (a.jobTitle || '').toLowerCase().includes(q))
+    const q = search.trim().toLowerCase()
+    return list.filter(a => [a.name, a.email, a.mall, a.jobTitle].some(value => (value || '').toLowerCase().includes(q)))
   }
 
   /* ── Handlers ── */
@@ -508,15 +480,14 @@ export default function AccountManagement() {
   }
 
   async function handleSaveCreate({ role, name, email, jobTitle, contact, mall, isPrimary }) {
-    if (role !== 'super-admin') return
     try {
       const created = await apiRequest('/api/admin-accounts', {
         method: 'POST',
-        body: JSON.stringify({ email: email.toLowerCase(), name, job_title: jobTitle, contact_num: contact }),
+        body: JSON.stringify({ email: email.toLowerCase(), name, job_title: jobTitle, contact_num: contact, role: role === 'mall-admin' ? 'mall_admin' : 'super_admin', ...(role === 'mall-admin' ? {mall_id: Number(mall), is_primary: isPrimary} : {}) }),
       })
       const newAccount = { id: created.id, name: created.name, email: created.email, jobTitle, contact, status: 'pending', created: formatDate(new Date()), lastUpdated: formatDate(new Date()), lastLogin: 'Never' }
-      setSuperAdmins(prev => [...prev, newAccount])
-      setCreatedAccount({ ...newAccount, role, mall, isPrimary })
+      await loadAccounts()
+      setCreatedAccount({ ...newAccount, role, mall: malls.find(m => String(m.id) === String(mall))?.name, isPrimary, warning: created.warning })
       setModal('created')
     } catch (error) {
       setRequestError(error.message)
@@ -525,13 +496,13 @@ export default function AccountManagement() {
 
   async function handleSaveEdit({ name, jobTitle, contact }) {
     try {
-      const updated = await apiRequest(`/api/admin-accounts/${selectedAccount.id}`, {
+      await apiRequest(`/api/admin-accounts/${selectedAccount.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name, job_title: jobTitle, contact_num: contact }),
       })
-      const now = formatDate(new Date())
-      setSuperAdmins(prev => prev.map(account => account.id === selectedAccount.id ? { ...account, name: updated.name, jobTitle: updated.jobTitle || '', contact: updated.contactNum || '', lastUpdated: now } : account))
-      closeModal()
+      await loadAccounts()
+      setModal(null)
+      setSelectedAccount(null)
     } catch (error) {
       setRequestError(error.message)
     }
@@ -549,7 +520,8 @@ export default function AccountManagement() {
       setModal('magic-sent')
     } catch (error) {
       setRequestError(error.message)
-      closeModal()
+      setModal(null)
+      setSelectedAccount(null)
     }
   }
 
@@ -563,6 +535,13 @@ export default function AccountManagement() {
     }
   }
 
+  function deactivationReason(account) {
+    if (!canManageAccounts) return 'Only the primary Super Admin can deactivate accounts.'
+    if (String(account.id) === String(currentAdminId)) return 'You cannot deactivate your own account.'
+    if (account.role === 'super_admin' && account.isPrimary) return 'The primary Super Admin account is protected.'
+    return ''
+  }
+
   function handleDeactivate(account) {
     setSelectedAccount(account)
     setModal('deactivate')
@@ -570,11 +549,11 @@ export default function AccountManagement() {
 
   async function handleConfirmDeactivate() {
     try {
-      await apiRequest(`/api/admin-accounts/${selectedAccount.id}/deactivate`, { method: 'POST' })
-      const now = formatDate(new Date())
-      setSuperAdmins(prev => prev.filter(account => account.id !== selectedAccount.id))
-      setDeactSuper(prev => [...prev, { ...selectedAccount, status: 'deactivated', deactivatedOn: now }])
-      closeModal()
+      const result = await apiRequest(`/api/admin-accounts/${selectedAccount.id}/deactivate`, { method: 'POST' })
+      await loadAccounts()
+      if (result.warning) setRequestError(result.warning)
+      setModal(null)
+      setSelectedAccount(null)
     } catch (error) {
       setRequestError(error.message)
     }
@@ -591,15 +570,24 @@ export default function AccountManagement() {
       await loadAccounts()
       setModal(null)
       setSelectedAccount(null)
-      setActiveTab('super-admins')
+      setActiveTab(selectedAccount.role === 'mall_admin' ? 'mall-admins' : 'super-admins')
     } catch (error) {
       setRequestError(error.message)
     }
   }
 
   function closeModal() {
+    if (actionInFlight.current) return
     setModal(null)
     setSelectedAccount(null)
+  }
+
+  async function runAction(action, ...args) {
+    if (actionInFlight.current) return
+    actionInFlight.current = true
+    setActionBusy(true)
+    setRequestError('')
+    try { return await action(...args) } finally { actionInFlight.current = false; setActionBusy(false) }
   }
 
   /* ── Tab config ── */
@@ -627,9 +615,9 @@ export default function AccountManagement() {
             <tbody>
               {superList.length === 0 && <tr className="acct-empty-row"><td colSpan={9}>No accounts found.</td></tr>}
               {superList.map(a => {
-                const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
+                const accountStatus = a.lifecycle === 'partial' ? 'Partial' : 'Official'
                 return (
-                  <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
+                  <tr key={a.id} tabIndex={0} onClick={event => { if (!event.target.closest('button')) setDetails(a) }} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setDetails(a) } }} className={a.status === 'pending' ? 'row--pending' : ''}>
                     <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Pending</span>}</div></td>
                     <td>{a.email}</td>
                     <td>{a.jobTitle || '-'}</td>
@@ -640,11 +628,11 @@ export default function AccountManagement() {
                     <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
                     <td>
                     <div className="acct-actions">
-                      <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
+                      <button disabled={actionBusy} className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
                       {a.status === 'pending'
-                        ? canManageAccounts && <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend invite</button>
-                        : canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
-                      {canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>}
+                        ? canManageAccounts && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--resend" onClick={() => runAction(handleResendLink, a)}>Resend invite</button>
+                        : canManageAccounts && a.id !== currentAdminId && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
+                      <button disabled={actionBusy || !!deactivationReason(a)} title={deactivationReason(a) || 'Deactivate this account'} className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
                     </div>
                     </td>
                   </tr>
@@ -664,9 +652,9 @@ export default function AccountManagement() {
             <tbody>
               {mallList.length === 0 && <tr className="acct-empty-row"><td colSpan={11}>No accounts found.</td></tr>}
               {mallList.map(a => {
-                const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
+                const accountStatus = a.lifecycle === 'partial' ? 'Partial' : 'Official'
                 return (
-                  <tr key={a.id} className={a.status === 'pending' ? 'row--pending' : ''}>
+                  <tr key={a.id} tabIndex={0} onClick={event => { if (!event.target.closest('button')) setDetails(a) }} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setDetails(a) } }} className={a.status === 'pending' ? 'row--pending' : ''}>
                     <td><div className="acct-name-cell"><span className="acct-name-label">{a.name}</span>{a.status === 'pending' && <span className="acct-pending-badge">Pending</span>}</div></td>
                     <td>{a.mall}</td>
                     <td>{a.email}</td>
@@ -679,11 +667,11 @@ export default function AccountManagement() {
                     <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
                     <td>
                       <div className="acct-actions">
-                        <button className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
+                        <button disabled={actionBusy} className="acct-action-btn acct-action-btn--edit" onClick={() => { setSelectedAccount(a); setModal('edit') }}>Edit</button>
                         {a.status === 'pending'
-                          ? canManageAccounts && <button className="acct-action-btn acct-action-btn--resend" onClick={() => handleResendLink(a)}>Resend invite</button>
-                          : canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
-                        {canManageAccounts && a.id !== currentAdminId && <button className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>}
+                          ? canManageAccounts && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--resend" onClick={() => runAction(handleResendLink, a)}>Resend invite</button>
+                          : canManageAccounts && a.id !== currentAdminId && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--reset" onClick={() => handleResetPassword(a)}>Reset password</button>}
+                        <button disabled={actionBusy || !!deactivationReason(a)} title={deactivationReason(a) || 'Deactivate this account'} className="acct-action-btn acct-action-btn--deactivate" onClick={() => handleDeactivate(a)}>Deactivate</button>
                       </div>
                     </td>
                   </tr>
@@ -703,7 +691,7 @@ export default function AccountManagement() {
             <tbody>
               {deactSuperList.length === 0 && <tr className="acct-empty-row"><td colSpan={9}>No deactivated accounts.</td></tr>}
               {deactSuperList.map(a => (
-                <tr key={a.id}>
+                <tr key={a.id} tabIndex={0} onClick={event => { if (!event.target.closest('button')) setDetails(a) }} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setDetails(a) } }}>
                   <td><span className="acct-name-label">{a.name}</span></td>
                   <td>{a.email}</td>
                   <td>{a.jobTitle || '-'}</td>
@@ -712,7 +700,7 @@ export default function AccountManagement() {
                   <td>{a.lastUpdated}</td>
                   <td>{a.lastLogin}</td>
                   <td>{a.deactivatedOn}</td>
-                  <td>{canManageAccounts && <button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button>}</td>
+                  <td>{canManageAccounts && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -729,9 +717,9 @@ export default function AccountManagement() {
             <tbody>
               {deactMallList.length === 0 && <tr className="acct-empty-row"><td colSpan={11}>No deactivated accounts.</td></tr>}
               {deactMallList.map(a => {
-                const accountStatus = a.status === 'pending' ? 'Partial' : 'Official'
+                const accountStatus = a.lifecycle === 'partial' ? 'Partial' : 'Official'
                 return (
-                  <tr key={a.id}>
+                  <tr key={a.id} tabIndex={0} onClick={event => { if (!event.target.closest('button')) setDetails(a) }} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setDetails(a) } }}>
                     <td><span className="acct-name-label">{a.name}</span></td>
                     <td>{a.mall}</td>
                     <td>{a.email}</td>
@@ -742,7 +730,7 @@ export default function AccountManagement() {
                     <td>{a.lastLogin}</td>
                     <td>{a.deactivatedOn}</td>
                     <td><span className={`acct-account-status-badge acct-account-status--${accountStatus.toLowerCase()}`}>{accountStatus}</span></td>
-                    <td>{canManageAccounts && <button className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button>}</td>
+                    <td>{canManageAccounts && <button disabled={actionBusy} className="acct-action-btn acct-action-btn--reactivate" onClick={() => handleReactivate(a)}>Reactivate</button>}</td>
                   </tr>
                 )
               })}
@@ -766,9 +754,13 @@ export default function AccountManagement() {
             <span className="acct-mgmt-subtitle-alert">{deactivatedCount} deactivated</span>
           </p>
         </div>
-        <button className="acct-mgmt-add-btn" onClick={() => openCreate('super-admin')}>Add new account</button>
+        <div className="acct-header-actions">
+          <BusyButton className="acct-refresh-btn" disabled={actionBusy || loading} onClick={() => loadAccounts(true)}>Refresh accounts</BusyButton>
+          <button disabled={loading || actionBusy} className="acct-mgmt-add-btn" onClick={() => openCreate('super-admin')}>Add new account</button>
+        </div>
       </div>
 
+      {actionBusy && <div className="acct-request-tools" role="status">Processing account request...</div>}
       {/* Stats */}
       <div className="acct-mgmt-stats">
         <div className="acct-stat-card acct-stat-card--super">
@@ -800,7 +792,7 @@ export default function AccountManagement() {
             <button
               key={t.key}
               className={`acct-tab-btn${activeTab === t.key ? ' acct-tab-btn--active' : ''}`}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => { setActiveTab(t.key); setSearch('') }}
             >
               {t.label}
               <span className={`acct-tab-count${activeTab === t.key ? ' acct-tab-count--super-active' : ''}`}>{t.count}</span>
@@ -812,12 +804,14 @@ export default function AccountManagement() {
             <path d="M8.75 17.5C13.5825 17.5 17.5 13.5825 17.5 8.75C17.5 3.91751 13.5825 0 8.75 0C3.91751 0 0 3.91751 0 8.75C0 13.5825 3.91751 17.5 8.75 17.5Z" stroke="#979797" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M14.9375 14.9373L21.0002 21" stroke="#979797" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <input className="acct-mgmt-search-input" placeholder="Search" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="acct-mgmt-search-input" placeholder="Search accounts" aria-label="Search by name, email, mall or job title" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
       {/* Table */}
       {renderTable()}
+
+      {details && <AccountDetailsPanel account={details} onClose={() => setDetails(null)} />}
 
       {/* Modals */}
       {modal === 'create' && (
@@ -825,8 +819,9 @@ export default function AccountManagement() {
           mode="create"
           createTabInit={createTabInit}
           mallAdmins={mallAdmins}
+          malls={malls}
           onClose={closeModal}
-          onSave={handleSaveCreate}
+          onSave={values => runAction(handleSaveCreate, values)}
         />
       )}
       {modal === 'created' && createdAccount && (
@@ -837,23 +832,24 @@ export default function AccountManagement() {
           mode="edit"
           account={selectedAccount}
           mallAdmins={mallAdmins}
+          malls={malls}
           onClose={closeModal}
-          onSave={handleSaveEdit}
+          onSave={values => runAction(handleSaveEdit, values)}
         />
       )}
       {modal === 'reset' && selectedAccount && (
-        <ResetPasswordModal account={selectedAccount} onClose={closeModal} onConfirm={handleConfirmReset} />
+        <ResetPasswordModal account={selectedAccount} onClose={closeModal} onConfirm={() => runAction(handleConfirmReset)} />
       )}
       {modal === 'magic-sent' && (
         <MagicLinkSentModal email={magicLinkEmail} onClose={closeModal} />
       )}
       {modal === 'deactivate' && selectedAccount && (
-        <DeactivateModal account={selectedAccount} onClose={closeModal} onConfirm={handleConfirmDeactivate} />
+        <DeactivateModal account={selectedAccount} onClose={closeModal} onConfirm={() => runAction(handleConfirmDeactivate)} />
       )}
       {modal === 'reactivate' && selectedAccount && (
-        <ReactivateModal account={selectedAccount} onClose={closeModal} onConfirm={handleConfirmReactivate} />
+        <ReactivateModal account={selectedAccount} onClose={closeModal} onConfirm={() => runAction(handleConfirmReactivate)} />
       )}
-      {requestError && <MessageModal title="Account request failed" message={requestError} onClose={() => setRequestError('')} />}
+      {requestError && <MessageModal title="Account notice" message={requestError} onClose={() => setRequestError('')} />}
     </div>
   )
 }

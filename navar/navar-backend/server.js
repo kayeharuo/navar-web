@@ -5,6 +5,8 @@ const cors = require('@fastify/cors')
 const helmet = require('@fastify/helmet')
 const rateLimit = require('@fastify/rate-limit')
 const { createClient } = require('@supabase/supabase-js')
+const registerInquiryRoutes = require('./modules/inquiries/routes')
+const registerInquiryCorrections = require('./modules/inquiries/correctionsPublic')
 const registerMallManagementRoutes = require('./modules/mallManagement/routes')
 const createAuthGuards = require('./modules/auth/authGuard')
 const registerAccountManagementRoutes = require('./modules/accountManagement/routes')
@@ -53,10 +55,12 @@ app.get('/health', async () => ({
 }))
 
 const { requireAuth, requireSuperAdmin, requirePrimarySuperAdmin } = createAuthGuards(supabase)
+registerInquiryCorrections(app)
 
 app.register(async protectedApp => {
 	protectedApp.addHook('preHandler', requireAuth())
 	protectedApp.addHook('preHandler', requireSuperAdmin)
+	registerInquiryRoutes(protectedApp)
 	registerMallManagementRoutes(protectedApp)
 	registerApplicationManagementRoutes(protectedApp)
 })

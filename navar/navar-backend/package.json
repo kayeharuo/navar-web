@@ -7,7 +7,9 @@
     "dev": "nodemon --watch server.js --watch modules --watch database_schema --watch .env --ext js,json,sql,env --ignore node_modules --ignore logs --delay 1000 --exec node server.js",
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "migrate:images": "node scripts/migrate-images-to-storage.js"
+    "test:inquiries": "node --test test/inquiry-*.test.cjs",
+    "migrate:images": "node scripts/migrate-images-to-storage.js",
+    "test:accounts": "node --test test/account-*.test.cjs"
   },
   "keywords": [],
   "author": "",
@@ -20,9 +22,12 @@
     "@supabase/supabase-js": "^2.116.0",
     "dotenv": "^17.4.2",
     "fastify": "^5.12.4",
+    "imapflow": "^2.5.5",
+    "mailparser": "^3.9.46",
     "nodemailer": "^10.0.13"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "nodemon": "^3.1.10"
   }
 }

@@ -869,3 +869,30 @@
     padding: 24px 20px 20px;
   }
 }
+
+/* Keep account rows on one line and actions visible during horizontal scrolling. */
+.acct-mgmt-table { border-collapse: separate; border-spacing: 0; }
+.acct-mgmt-table td { white-space: nowrap; border-top: 0.2px solid #e8ecf2; }
+.acct-mgmt-table tr[tabindex] { cursor: pointer; }
+.acct-name-cell { flex-direction: row; align-items: center; gap: 8px; }
+.acct-mgmt-table th:last-child, .acct-mgmt-table td:last-child:not([colspan]) { position: sticky; right: 0; z-index: 1; box-shadow: -1px 0 #e8ecf2; }
+.acct-mgmt-table th:last-child { background: #F7F8FA; z-index: 2; }
+.acct-mgmt-table td:last-child:not([colspan]) { background: #fff; }
+.acct-mgmt-table tr:hover td:last-child:not([colspan]) { background: #f5f8ff; }
+.acct-mgmt-table tbody tr.row--pending, .acct-mgmt-table tbody tr.row--pending:hover { opacity: 1; }
+.acct-details-panel { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(580px,100vw); height: 100dvh; max-height: 100dvh; max-width: 100vw; padding: 0; border: 0; background: #fff; color: #000; font-family: Poppins,sans-serif; }
+.acct-details-panel[open] { display: flex; flex-direction: column; }
+.acct-details-panel::backdrop { background: rgb(0 0 0 / 25%); }
+.acct-details-fields { overflow-y: auto; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; padding: 24px 32px; margin: 0; font-size: 13px; }
+.acct-details-fields dt { color: #979797; margin-bottom: 6px; }
+.acct-details-fields dd { margin: 0; overflow-wrap: anywhere; }
+
+.acct-request-tools { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; font-size: 13px; color: #475569; }
+.acct-request-tools button { padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; background: white; color: #334155; cursor: pointer; }
+.acct-actions button:disabled, .acct-request-tools button:disabled { opacity: .55; cursor: wait; }
+
+.acct-header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acct-refresh-btn { padding: 10px 16px; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #334155; font: inherit; font-size: 13px; cursor: pointer; }
+.acct-refresh-btn:disabled { opacity: .55; cursor: wait; }
+.acct-mgmt-toolbar { flex-wrap: wrap; }
+.acct-actions .acct-action-btn--deactivate:disabled { cursor: not-allowed; }

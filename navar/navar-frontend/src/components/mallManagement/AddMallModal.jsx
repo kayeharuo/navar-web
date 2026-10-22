@@ -19,7 +19,7 @@ function getLogoUrl(logo) {
     : logo
 }
 
-export default function AddMallModal({ onClose, onSave, initialData = null, stackedOnInfoPanel = false }) {
+export default function AddMallModal({ onClose, onSave, initialData = null, stackedOnInfoPanel = false, saveError = null }) {
   const isEdit = !!initialData
 
   const [form, setForm] = useState({
@@ -386,6 +386,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
           </div>
         </div>
 
+        {saveError && <p role="alert" className="mall-field-error">{saveError}</p>}
         {/* Footer */}
         <div className="mall-modal-footer">
           <button className="mall-modal-cancel-btn" onClick={onClose}>Cancel</button>

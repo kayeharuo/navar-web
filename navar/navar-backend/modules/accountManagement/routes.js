@@ -1,11 +1,14 @@
 'use strict'
 
-const { createClient } = require('@supabase/supabase-js')
 const crypto = require('crypto')
 const nodemailer = require('nodemailer')
+const { readFileSync } = require('node:fs')
+const { join } = require('node:path')
+const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))
+const { safeOrigin } = require('../inquiries/followup')
 const { uploadImage, signedImageUrl } = require('../storage/imageStorage')
 
-const accountFields = 'admin_id, admin_role, admin_email, admin_full_name, admin_contact_num, admin_job_title, admin_is_primary, admin_account_status, admin_is_deactivated, admin_deactivated_on, admin_last_login, admin_created_at, admin_updated_at, admin_profile_picture, admin_profile_picture_path'
+const accountFields = 'admin_id, admin_role, admin_email, admin_full_name, admin_contact_num, admin_job_title, admin_is_primary, admin_account_status, admin_is_deactivated, admin_deactivated_on, admin_last_login, admin_created_at, admin_updated_at, admin_profile_picture, admin_profile_picture_path, mall_id, mall:mall_id(mall_name)'
 const genericFailure = 'Something went wrong.'
 const profilePicturePattern = '^data:image\\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$'
 const passwordLinkBody = {
@@ -20,7 +23,7 @@ function requestFingerprint(requestId) {
 }
 
 function passwordLinkRedirect(path, requestId) {
-	return `${process.env.APP_BASE_URL || process.env.FRONTEND_ORIGIN}${path}?request=${requestId}`
+	return `${safeOrigin(process.env.APP_BASE_URL || process.env.FRONTEND_ORIGIN, 'http://localhost:5173', process.env)}${path}?request=${requestId}`
 }
 
 async function issuePasswordRequest(supabase, authUserId, kind, requestId) {
@@ -32,15 +35,13 @@ async function issuePasswordRequest(supabase, authUserId, kind, requestId) {
 	})
 }
 
-function createPublishableClient() {
-	const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY
-	if (!key) throw new Error('SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) must be set in .env')
-	return createClient(process.env.SUPABASE_URL, key, {
-		auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-	})
-}
-
-async function sendInviteEmail(email, actionLink) {
+async function sendInviteEmail(email, actionLink, reset = false) {
+    const parsedLink = new URL(actionLink)
+    if (!['https:', 'http:'].includes(parsedLink.protocol)) throw new Error('Invalid password link')
+    const htmlLink = escapeHtml(actionLink)
+    const attachments = ['navar-icon-png.png','navar-wordmark-png.png'].map(filename => ({filename,content:readFileSync(join(__dirname,'../../email_template/inquiry/images',filename)),cid:`account-${filename}@navar`,contentType:'image/png'}))
+    const title = reset ? 'Reset your NavAR password' : "You've been invited to NavAR"
+    const description = reset ? 'A password reset was requested for your NavAR account. Use the button below to choose a new password. If you did not request this change, ignore this email.' : 'An administrator has created an account for you on NavAR. To get started, click the button below to set your password. This link can only be used once.'
 	const user = process.env.SMTP_USER
 	const pass = process.env.SMTP_PASS
 	if (!user || !pass) throw new Error('SMTP_USER and SMTP_PASS are required to resend invites.')
@@ -49,28 +50,31 @@ async function sendInviteEmail(email, actionLink) {
 		port: Number(process.env.SMTP_PORT || 465),
 		secure: (process.env.SMTP_SECURE || 'true') === 'true',
 		auth: { user, pass },
+		connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000,
 	})
-	await transporter.sendMail({
+	try {
+	const sent = await transporter.sendMail({
+        attachments,
 		from: `${process.env.SMTP_FROM_NAME || 'NavAR'} <${process.env.SMTP_FROM || user}>`,
 		to: email,
-		subject: "You've been invited to NavAR",
-		text: `You've been invited to NavAR. Set your password using this link: ${actionLink}`,
+		subject: title,
+		text: `${title}. Set your password using this link: ${actionLink}`,
 		html: `<!DOCTYPE html>
 <html lang="en">
-	<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>You've been invited to NavAR</title></head>
+	<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${title}</title></head>
 	<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
 		<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;"><tr><td align="center">
 			<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
 				<tr><td align="center" style="background-color:#cfe8ff;padding:32px 24px;">
-					<img src="https://kblobarjzrloqjikpbun.supabase.co/storage/v1/object/public/branding/navar-icon-png.png" width="44" height="44" alt="NavAR" style="display:block;margin:0 auto 12px auto;" />
-					<img src="https://kblobarjzrloqjikpbun.supabase.co/storage/v1/object/public/branding/navar-wordmark-png.png" width="140" alt="NavAR" style="display:block;margin:0 auto;height:auto;" />
+					<img src="cid:account-navar-icon-png.png@navar" width="44" height="44" alt="NavAR" style="display:block;margin:0 auto 12px auto;" />
+					<img src="cid:account-navar-wordmark-png.png@navar" width="140" alt="NavAR" style="display:block;margin:0 auto;height:auto;" />
 				</td></tr>
 				<tr><td style="padding:32px 32px 8px 32px;">
-					<p style="margin:0 0 16px 0;font-size:20px;line-height:28px;color:#0f172a;font-weight:bold;">You've been invited to NavAR</p>
-					<p style="margin:0 0 24px 0;font-size:15px;line-height:24px;color:#374151;">An administrator has created an account for you on NavAR. To get started, click the button below to set your password. This link can only be used once.</p>
+					<p style="margin:0 0 16px 0;font-size:20px;line-height:28px;color:#0f172a;font-weight:bold;">${title}</p>
+					<p style="margin:0 0 24px 0;font-size:15px;line-height:24px;color:#374151;">${description}</p>
 				</td></tr>
-				<tr><td align="center" style="padding:0 32px 32px 32px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" style="border-radius:8px;background-color:#0f172a;"><a href="${actionLink}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">Set your password</a></td></tr></table></td></tr>
-				<tr><td style="padding:0 32px 32px 32px;"><p style="margin:0 0 8px 0;font-size:13px;line-height:20px;color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p><p style="margin:0;font-size:13px;line-height:20px;word-break:break-all;"><a href="${actionLink}" style="color:#2563eb;">${actionLink}</a></p></td></tr>
+				<tr><td align="center" style="padding:0 32px 32px 32px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" style="border-radius:8px;background-color:#0f172a;"><a href="${htmlLink}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">Set your password</a></td></tr></table></td></tr>
+				<tr><td style="padding:0 32px 32px 32px;"><p style="margin:0 0 8px 0;font-size:13px;line-height:20px;color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p><p style="margin:0;font-size:13px;line-height:20px;word-break:break-all;"><a href="${htmlLink}" style="color:#2563eb;">${htmlLink}</a></p></td></tr>
 				<tr><td style="padding:0 32px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
 				<tr><td style="padding:24px 32px 32px 32px;"><p style="margin:0;font-size:12px;line-height:18px;color:#9ca3af;">If you weren't expecting this invitation, you can safely ignore this email. Your account will not be activated unless this link is used.</p></td></tr>
 			</table>
@@ -79,12 +83,16 @@ async function sendInviteEmail(email, actionLink) {
 	</body>
 </html>`,
 	})
+	if (!sent.accepted?.length) throw new Error('Email delivery was not confirmed.')
+    } finally { transporter.close() }
 }
 
 function accountResponse(row) {
 	return {
 		id: row.admin_id,
 		role: row.admin_role,
+		mallId: row.mall_id,
+		...(row.admin_role === 'mall_admin' ? { mall: row.mall?.mall_name || 'Unassigned mall' } : {}),
 		email: row.admin_email,
 		name: row.admin_full_name,
 		jobTitle: row.admin_job_title,
@@ -107,9 +115,18 @@ async function writeAudit(supabase, request, action, details) {
 		audit_log_details: details,
 		audit_log_performed_at: new Date().toISOString(),
 		audit_log_performed_by: request.admin.id,
-		audit_log_mall_id: request.admin.mallId,
+		mall_id: request.admin.mallId,
 	})
 	if (result.error) request.log.error({ code: result.error.code }, 'Audit log write failed')
+}
+
+function accountError(error) {
+ if (['PGRST202','PGRST203','42883'].includes(error.code)) return 'An account database function is unavailable. Apply migration 26 and reload the Supabase schema cache.'
+ if (error.code === '23502') return 'A required database field rejected this change. Apply account repair migration 26 to allow Super Admin audit records without a mall.'
+ if (error.code === '23505') return 'An account with these details already exists.'
+ if (['42501','22023','P0002'].includes(error.code)) return error.message
+ if (error.code === 'P0001' && /quota|limit|allowance|subscription|primary/i.test(error.message || '')) return error.message
+ return 'The database rejected the account change. Check the backend log for the error code.'
 }
 
 function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSuperAdmin, requirePrimarySuperAdmin }) {
@@ -121,9 +138,12 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		required: ['email', 'name'],
 		properties: {
 			email: { type: 'string', format: 'email', maxLength: 100 },
-			name: { type: 'string', minLength: 1, maxLength: 100 },
+            role: { type: 'string', enum: ['super_admin', 'mall_admin'], default: 'super_admin' },
+            mall_id: { type: 'integer', minimum: 1 },
+            is_primary: { type: 'boolean', default: false },
+			name: { type: 'string', minLength: 1, maxLength: 100, pattern: '\\S' },
 			job_title: { type: 'string', maxLength: 100 },
-			contact_num: { type: 'string', pattern: '^[0-9]*$', maxLength: 20 },
+			contact_num: { type: 'string', pattern: '^(|[+]?[0-9][0-9 ()-]{6,19})$', maxLength: 20 },
 		},
 	}
 	const editBody = {
@@ -131,24 +151,45 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		additionalProperties: false,
 		minProperties: 1,
 		properties: {
-			name: { type: 'string', minLength: 1, maxLength: 100 },
+			name: { type: 'string', minLength: 1, maxLength: 100, pattern: '\\S' },
 			job_title: { type: 'string', maxLength: 100 },
-			contact_num: { type: 'string', pattern: '^[0-9]*$', maxLength: 20 },
+			contact_num: { type: 'string', pattern: '^(|[+]?[0-9][0-9 ()-]{6,19})$', maxLength: 20 },
 		},
 	}
-	const idParams = { type: 'object', required: ['id'], properties: { id: { type: 'integer' } } }
+	const idParams = { type: 'object', required: ['id'], properties: { id: { type: 'integer', minimum: 1, maximum: 9007199254740991 } } }
 
 	app.get('/api/admin-accounts', { onRequest: adminOnly }, async (request, reply) => {
-		const { data, error } = await supabase.from('admin').select(accountFields).order('admin_created_at', { ascending: false })
-		if (error) {
-			request.log.error({ code: error.code }, 'Admin account list failed')
-			return reply.code(500).send({ message: genericFailure })
-		}
-		return data.map(accountResponse)
-	})
+        reply.header('Cache-Control', 'no-store')
+        const rows = []
+        for (let offset = 0; ; offset += 500) {
+            const { data, error } = await supabase.from('admin').select(accountFields)
+                .in('admin_role', ['super_admin', 'mall_admin'])
+                .order('admin_created_at', { ascending: false }).order('admin_id', { ascending: false }).range(offset, offset + 499)
+            if (error) { request.log.error({ code: error.code }, 'Account list failed'); return reply.code(500).send({ message: genericFailure }) }
+            rows.push(...data)
+            if (data.length < 500) break
+        }
+        return rows.map(accountResponse)
+    })
+
+    app.get('/api/admin-accounts/malls', { onRequest: adminOnly }, async (request, reply) => {
+        reply.header('Cache-Control', 'no-store')
+        const rows = []
+        for (let offset = 0; ; offset += 500) {
+            const result = await supabase.from('mall').select('mall_id,mall_name').order('mall_id').range(offset, offset + 499)
+            if (result.error) return reply.code(503).send({ message: 'Unable to load mall choices.' })
+            rows.push(...result.data.map(row => ({ id: row.mall_id, name: row.mall_name })))
+            if (result.data.length < 500) return rows
+        }
+    })
 
 	app.post('/api/admin-accounts', { onRequest: adminOnly, config: { rateLimit: { max: 5, timeWindow: '15 minutes' } }, schema: { body: accountBody } }, async (request, reply) => {
 		const email = request.body.email.trim().toLowerCase()
+        reply.header('Cache-Control', 'no-store')
+        const mallAccount = request.body.role === 'mall_admin'
+        if (mallAccount && !request.body.contact_num?.trim()) return reply.code(400).send({ message: 'A contact number is required for mall admins.' })
+        if (mallAccount && !request.body.mall_id) return reply.code(400).send({ message: 'Select a mall.' })
+        if (!mallAccount && (request.body.mall_id || request.body.is_primary)) return reply.code(400).send({ message: 'Super Admin accounts cannot be assigned to a mall or made primary here.' })
 		const existing = await supabase.from('admin').select('admin_id').eq('admin_email', email).maybeSingle()
 		if (existing.error) {
 			request.log.error({ code: existing.error.code }, 'Admin account lookup failed')
@@ -157,9 +198,9 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		if (existing.data) return reply.code(409).send({ message: 'An account with this email already exists.' })
 
 		const requestId = crypto.randomUUID()
-		const invited = await supabase.auth.admin.inviteUserByEmail(email, {
-			redirectTo: passwordLinkRedirect('/auth/set-password', requestId),
-		})
+		// Create an identity without sending email; existing Auth identities are never adopted or deleted.
+        const redirectTo = mallAccount ? safeOrigin(process.env.MALL_ADMIN_ORIGIN, 'http://localhost:5174', process.env) + '/complete-setup' : passwordLinkRedirect('/auth/set-password', requestId)
+        const invited = await supabase.auth.admin.createUser({ email, email_confirm: false })
 		if (invited.error || !invited.data?.user) {
 			request.log.error({
 				code: invited.error?.code,
@@ -167,110 +208,78 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 				name: invited.error?.name,
 				message: invited.error?.message,
 			}, 'Admin invite failed at Supabase Auth')
+			if (['email_exists','user_already_exists','email_already_exists'].includes(invited.error?.code)) return reply.code(409).send({ message: 'This email already has a sign-in account. Use another email or review the existing account.' })
 			return reply.code(invited.error?.status >= 500 ? 503 : 400).send({ message: 'The invitation service is unavailable. Please try again later.' })
 		}
-		const requestRecord = await issuePasswordRequest(supabase, invited.data.user.id, 'invite', requestId)
+		const requestRecord = mallAccount ? {} : await issuePasswordRequest(supabase, invited.data.user.id, 'invite', requestId)
 		if (requestRecord.error) {
 			request.log.error({ code: requestRecord.error.code }, 'Invite request record failed')
 			await supabase.auth.admin.deleteUser(invited.data.user.id)
 			return reply.code(400).send({ message: 'This account cannot be created.' })
 		}
 
-		const timestamp = new Date().toISOString()
-		const inserted = await supabase.from('admin').insert({
-			admin_role: 'super_admin',
-			admin_email: email,
-			admin_full_name: request.body.name.trim(),
-			admin_contact_num: request.body.contact_num?.trim() || null,
-			admin_job_title: request.body.job_title?.trim() || null,
-			admin_is_primary: false,
-			admin_is_deactivated: false,
-			admin_deactivated_on: null,
-			admin_last_login: null,
-			admin_created_at: timestamp,
-			admin_updated_at: timestamp,
-			mall_id: null,
-			store_id: null,
-			admin_account_status: 'partial',
-			admin_auth_user_id: invited.data.user.id,
-		}).select(accountFields).single()
+        const inserted = await supabase.rpc('create_managed_admin', { p_actor: request.admin.id, p_auth: invited.data.user.id, p_data: {...request.body, email} })
 		if (inserted.error) {
 			request.log.error({ code: inserted.error.code }, 'Admin profile insert failed')
 			await supabase.auth.admin.deleteUser(invited.data.user.id)
-			return reply.code(400).send({ message: 'This account cannot be created.' })
+			return reply.code(400).send({ message: accountError(inserted.error) })
 		}
 
-		await writeAudit(supabase, request, 'admin_account_created', `Created admin account ${inserted.data.admin_id}`)
-		return reply.code(201).send({ id: inserted.data.admin_id, name: inserted.data.admin_full_name, email: inserted.data.admin_email, status: 'pending' })
+		let warning = null
+        try {
+            const generated = await supabase.auth.admin.generateLink({ type: 'magiclink', email, options: { redirectTo } })
+            if (generated.error || generated.data?.user?.id !== invited.data.user.id || !generated.data?.properties?.action_link) throw new Error('Unable to prepare invitation')
+            await sendInviteEmail(email, generated.data.properties.action_link)
+        }
+        catch { warning = 'Account created, but email delivery was not confirmed. Check the inbox before using Resend invite.' }
+        return reply.code(201).send({ ...accountResponse(inserted.data), warning })
 	})
 
-	app.patch('/api/admin-accounts/:id', { onRequest: adminOnly, schema: { params: idParams, body: editBody } }, async (request, reply) => {
-		const updates = { admin_updated_at: new Date().toISOString() }
-		if (request.body.name !== undefined) updates.admin_full_name = request.body.name.trim()
-		if (request.body.job_title !== undefined) updates.admin_job_title = request.body.job_title.trim() || null
-		if (request.body.contact_num !== undefined) updates.admin_contact_num = request.body.contact_num.trim() || null
-		const result = await supabase.from('admin').update(updates).eq('admin_id', request.params.id).eq('admin_role', 'super_admin').select(accountFields).single()
-		if (result.error) {
-			request.log.error({ code: result.error.code }, 'Admin profile update failed')
-			return reply.code(result.error.code === 'PGRST116' ? 404 : 400).send({ message: genericFailure })
-		}
-		await writeAudit(supabase, request, 'admin_account_updated', `Updated admin account ${request.params.id}`)
-		return accountResponse(result.data)
-	})
+    async function mutate(request, reply, action) {
+        const result = await supabase.rpc('manage_super_admin_account', {
+            p_actor: request.admin.id, p_target: request.params.id, p_action: action, p_data: request.body || {},
+        })
+        if (result.error) {
+            request.log.warn({ code: result.error.code, message: result.error.message, details: result.error.details }, 'Account change rejected')
+            const known = ['42501', '22023', 'P0002'].includes(result.error.code)
+            reply.code(result.error.code === '42501' ? 403 : known ? 409 : 503).send({ message: accountError(result.error) })
+            return null
+        }
+        return result.data
+    }
+    app.patch('/api/admin-accounts/:id', { onRequest: adminOnly, schema: { params: idParams, body: editBody } }, async (request, reply) => {
+        const row = await mutate(request, reply, 'edit')
+        if (row) return accountResponse(row)
+    })
 
-	app.post('/api/admin-accounts/:id/resend-invite', { onRequest: primaryAdminOnly, config: { rateLimit: { max: 5, timeWindow: '15 minutes' } }, schema: { params: idParams } }, async (request, reply) => {
-		const target = await supabase.from('admin').select('admin_auth_user_id, admin_email').eq('admin_id', request.params.id).eq('admin_role', 'super_admin').eq('admin_account_status', 'partial').maybeSingle()
-		if (target.error || !target.data) return reply.code(404).send({ message: genericFailure })
-		const requestId = crypto.randomUUID()
-		const requestRecord = await issuePasswordRequest(supabase, target.data.admin_auth_user_id, 'invite', requestId)
-		if (requestRecord.error) {
-			request.log.error({ code: requestRecord.error.code }, 'Invite resend request record failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		let generated = await supabase.auth.admin.generateLink({
-			type: 'invite',
-			email: target.data.admin_email,
-			options: { redirectTo: passwordLinkRedirect('/auth/set-password', requestId) },
-		})
-		if (generated.error) {
-			request.log.warn({ code: generated.error.code }, 'Invite link rejected; generating setup link for existing Auth user')
-			generated = await supabase.auth.admin.generateLink({
-				type: 'recovery',
-				email: target.data.admin_email,
-				options: { redirectTo: passwordLinkRedirect('/auth/reset-password', requestId) },
-			})
-		}
-		if (generated.error || !generated.data?.properties?.action_link) {
-			request.log.error({ code: generated.error?.code }, 'Setup link generation failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		try {
-			await sendInviteEmail(target.data.admin_email, generated.data.properties.action_link)
-		} catch (error) {
-			request.log.error({ message: error.message }, 'Invite resend email failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		return { message: 'Invitation sent' }
-	})
+    for (const action of ['resend-invite', 'reset-password']) {
+        app.post(`/api/admin-accounts/:id/${action}`, { onRequest: primaryAdminOnly, config: { rateLimit: { max: 5, timeWindow: '15 minutes' } }, schema: { params: idParams } }, async (request, reply) => {
+            // Reserve before generating any link. Concurrent clicks cannot issue duplicate emails.
+            const row = await mutate(request, reply, action)
+            if (!row) return
+            try {
+                const requestId = crypto.randomUUID()
+                const mall = row.admin_role === 'mall_admin'
+                const invite = action === 'resend-invite'
+                let redirectTo
+                if (mall) redirectTo = safeOrigin(process.env.MALL_ADMIN_ORIGIN, 'http://localhost:5174', process.env) + (invite ? '/complete-setup' : '/reset-password')
+                else {
+                    redirectTo = passwordLinkRedirect(invite ? '/auth/set-password' : '/auth/reset-password', requestId)
+                    const recorded = await issuePasswordRequest(supabase, row.admin_auth_user_id, invite ? 'invite' : 'reset', requestId)
+                    if (recorded.error) throw recorded.error
+                }
+                const generated = await supabase.auth.admin.generateLink({ type: invite ? 'magiclink' : 'recovery', email: row.admin_email, options: { redirectTo } })
+                if (generated.error || generated.data?.user?.id !== row.admin_auth_user_id || !generated.data?.properties?.action_link) throw new Error('Identity mismatch or link unavailable')
+                await sendInviteEmail(row.admin_email, generated.data.properties.action_link, !invite)
+                return { message: invite ? 'Invitation submitted to the email provider.' : 'Password reset submitted to the email provider.' }
+            } catch (error) {
+                request.log.warn({ code: error.code || 'ACCOUNT_EMAIL_UNCONFIRMED' }, 'Account email delivery unconfirmed')
+                return reply.code(502).send({ message: 'Email delivery could not be confirmed. Check the inbox before trying again in one minute.' })
+            }
+        })
+    }
 
-	app.post('/api/admin-accounts/:id/reset-password', { onRequest: primaryAdminOnly, config: { rateLimit: { max: 5, timeWindow: '15 minutes' } }, schema: { params: idParams } }, async (request, reply) => {
-		const target = await supabase.from('admin').select('admin_auth_user_id, admin_email').eq('admin_id', request.params.id).eq('admin_role', 'super_admin').eq('admin_account_status', 'official').eq('admin_is_deactivated', false).maybeSingle()
-		if (target.error || !target.data || String(target.data.admin_auth_user_id) === String(request.admin.authUserId)) return reply.code(400).send({ message: genericFailure })
-		const requestId = crypto.randomUUID()
-		const requestRecord = await issuePasswordRequest(supabase, target.data.admin_auth_user_id, 'reset', requestId)
-		if (requestRecord.error) {
-			request.log.error({ code: requestRecord.error.code }, 'Password reset request record failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		const result = await createPublishableClient().auth.resetPasswordForEmail(target.data.admin_email, { redirectTo: passwordLinkRedirect('/auth/reset-password', requestId) })
-		if (result.error) {
-			request.log.error({ code: result.error.code }, 'Password reset request failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		return { message: 'Reset email sent' }
-	})
-
-	app.post('/api/auth/password-link/validate', { preHandler: requireAuth({ allowPartial: true }), schema: { body: passwordLinkBody } }, async (request, reply) => {
+	app.post('/api/auth/password-link/validate', { preHandler: [requireAuth({ allowPartial: true }), requireSuperAdmin], schema: { body: passwordLinkBody } }, async (request, reply) => {
 		const valid = await supabase.rpc('validate_admin_password_request', {
 			p_auth_user_id: request.admin.authUserId,
 			p_request_fingerprint: requestFingerprint(request.body.request_id),
@@ -279,7 +288,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		return { valid: valid.data === true }
 	})
 
-	app.post('/api/auth/password-link/claim', { preHandler: requireAuth({ allowPartial: true }), schema: { body: passwordLinkBody } }, async (request, reply) => {
+	app.post('/api/auth/password-link/claim', { preHandler: [requireAuth({ allowPartial: true }), requireSuperAdmin], schema: { body: passwordLinkBody } }, async (request, reply) => {
 		const claimed = await supabase.rpc('claim_admin_password_request', {
 			p_auth_user_id: request.admin.authUserId,
 			p_request_fingerprint: requestFingerprint(request.body.request_id),
@@ -288,8 +297,8 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		return { kind: claimed.data }
 	})
 
-	app.post('/api/auth/password-link/complete', { preHandler: requireAuth({ allowPartial: true }), schema: { body: passwordLinkBody } }, async (request, reply) => {
-		const requestRecord = await supabase.from('admin_password_request').select('apr_request_kind').eq('apr_request_fingerprint', requestFingerprint(request.body.request_id)).eq('apr_auth_user_id', request.admin.authUserId).not('apr_claimed_at', 'is', null).maybeSingle()
+	app.post('/api/auth/password-link/complete', { preHandler: [requireAuth({ allowPartial: true }), requireSuperAdmin], schema: { body: passwordLinkBody } }, async (request, reply) => {
+		const requestRecord = await supabase.from('admin_password_request').select('apr_request_kind').eq('apr_request_fingerprint', requestFingerprint(request.body.request_id)).eq('apr_auth_user_id', request.admin.authUserId).not('apr_claimed_at', 'is', null).is('apr_superseded_at', null).gt('apr_expires_at', new Date().toISOString()).maybeSingle()
 		if (requestRecord.error || !requestRecord.data) return reply.code(400).send({ message: genericFailure })
 		if (requestRecord.data.apr_request_kind === 'invite' && request.admin.status === 'partial') {
 			if (!request.admin.usedPassword) return reply.code(400).send({ message: genericFailure })
@@ -299,38 +308,30 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		return { message: 'Password updated' }
 	})
 
-	app.post('/api/admin-accounts/:id/deactivate', { onRequest: primaryAdminOnly, schema: { params: idParams } }, async (request, reply) => {
-		const target = await supabase.from('admin').select('admin_id, admin_auth_user_id, admin_role, admin_account_status, admin_is_deactivated').eq('admin_id', request.params.id).maybeSingle()
-		if (target.error || !target.data || String(target.data.admin_id) === String(request.admin.id) || target.data.admin_role !== 'super_admin' || target.data.admin_is_deactivated) return reply.code(400).send({ message: genericFailure })
-		const active = await supabase.from('admin').select('admin_id', { count: 'exact', head: true }).eq('admin_role', 'super_admin').eq('admin_account_status', 'official').eq('admin_is_deactivated', false)
-		if (active.error || active.count <= 1) return reply.code(400).send({ message: 'The last active Super Admin cannot be deactivated.' })
-		const timestamp = new Date().toISOString()
-		const updated = await supabase.from('admin').update({ admin_is_deactivated: true, admin_deactivated_on: timestamp, admin_updated_at: timestamp }).eq('admin_id', request.params.id).select('admin_id').single()
-		if (updated.error) {
-			request.log.error({ code: updated.error.code }, 'Admin deactivation failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		const banned = await supabase.auth.admin.updateUserById(target.data.admin_auth_user_id, { ban_duration: '876000h' })
-		if (banned.error) request.log.error({ code: banned.error.code }, 'Auth ban failed')
-		await writeAudit(supabase, request, 'admin_account_deactivated', `Deactivated admin account ${request.params.id}`)
-		return { message: 'Account deactivated' }
-	})
+    for (const action of ['deactivate', 'reactivate']) {
+        app.post(`/api/admin-accounts/:id/${action}`, { onRequest: primaryAdminOnly, schema: { params: idParams } }, async (request, reply) => {
+            if (action === 'reactivate') {
+                // Validate permissions/state without granting access, then restore Auth first.
+                const row = await mutate(request, reply, 'check-reactivate')
+                if (!row) return
+                const result = await supabase.auth.admin.updateUserById(row.admin_auth_user_id, { ban_duration: 'none' })
+                if (result.error) return reply.code(503).send({ message: 'Authentication could not be restored. The account remains deactivated; please retry.' })
+            }
+            const row = await mutate(request, reply, action)
+            if (!row) return
+            let warning = null
+            if (action === 'deactivate') {
+                const result = await supabase.auth.admin.updateUserById(row.admin_auth_user_id, { ban_duration: '876000h' })
+                if (result.error) {
+                    request.log.error({ code: result.error.code, accountId: row.admin_id }, 'Account disabled but Auth ban needs retry')
+                    warning = 'Account access is disabled, but the Auth ban could not be confirmed. Check backend logs.'
+                }
+            }
+            return { message: action === 'deactivate' ? 'Account deactivated' : 'Account reactivated', warning }
+        })
+    }
 
-	app.post('/api/admin-accounts/:id/reactivate', { onRequest: primaryAdminOnly, schema: { params: idParams } }, async (request, reply) => {
-		const target = await supabase.from('admin').select('admin_id, admin_auth_user_id, admin_role, admin_is_deactivated').eq('admin_id', request.params.id).maybeSingle()
-		if (target.error || !target.data || target.data.admin_role !== 'super_admin' || !target.data.admin_is_deactivated) return reply.code(400).send({ message: genericFailure })
-		const updated = await supabase.from('admin').update({ admin_is_deactivated: false, admin_updated_at: new Date().toISOString() }).eq('admin_id', request.params.id).eq('admin_is_deactivated', true).select('admin_id').single()
-		if (updated.error) {
-			request.log.error({ code: updated.error.code }, 'Admin reactivation failed')
-			return reply.code(400).send({ message: genericFailure })
-		}
-		const unbanned = await supabase.auth.admin.updateUserById(target.data.admin_auth_user_id, { ban_duration: 'none' })
-		if (unbanned.error) request.log.error({ code: unbanned.error.code }, 'Auth unban failed')
-		await writeAudit(supabase, request, 'admin_account_reactivated', `Reactivated admin account ${request.params.id}`)
-		return { message: 'Account reactivated' }
-	})
-
-	app.post('/api/auth/login-complete', { preHandler: requireAuth({ allowPartial: true }) }, async (request, reply) => {
+	app.post('/api/auth/login-complete', { preHandler: [requireAuth({ allowPartial: true }), requireSuperAdmin] }, async (request, reply) => {
 		const timestamp = new Date().toISOString()
 		const updates = { admin_last_login: timestamp, admin_updated_at: timestamp }
 		if (request.admin.status === 'partial') {
@@ -369,9 +370,9 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 				type: 'object',
 				additionalProperties: false,
 				properties: {
-					name: { type: 'string', minLength: 1, maxLength: 100 },
+					name: { type: 'string', minLength: 1, maxLength: 100, pattern: '\\S' },
 					job_title: { type: 'string', maxLength: 100 },
-					contact_num: { type: 'string', pattern: '^[0-9]*$', maxLength: 20 },
+					contact_num: { type: 'string', pattern: '^(|[+]?[0-9][0-9 ()-]{6,19})$', maxLength: 20 },
 					profile_picture: { type: ['string', 'null'], maxLength: 1000000, pattern: profilePicturePattern },
 				},
 				minProperties: 1,
@@ -383,7 +384,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 		if (request.body.job_title !== undefined) updates.admin_job_title = request.body.job_title.trim() || null
 		if (request.body.contact_num !== undefined) updates.admin_contact_num = request.body.contact_num.trim() || null
 		if (request.body.profile_picture !== undefined) {
-			if (request.body.profile_picture === null) updates.admin_profile_picture_path = null
+			if (request.body.profile_picture === null) { updates.admin_profile_picture_path = null; updates.admin_profile_picture = null }
 			else {
 				const picturePath = `admins/${request.admin.id}/profile`
 				try {
@@ -408,3 +409,4 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
 }
 
 module.exports = registerAccountManagementRoutes
+module.exports.sendInviteEmail = sendInviteEmail
