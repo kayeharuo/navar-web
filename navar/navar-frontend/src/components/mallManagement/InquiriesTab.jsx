@@ -60,7 +60,7 @@ function ViewDetailsPanel({ inquiry, onClose }) {
     ['Inquiry', [['Reference', `INQ-${inquiry.id}`], ['Date Inquired', inquiry.date], ['Last Updated', inquiry.lastUpdated], ['Reviewed On', inquiry.reviewedAt]]],
     ['Contact Information', [['Contact Person', inquiry.contactPerson], ['Email', inquiry.email], ['Phone', inquiry.phone]]],
     ['Mall Information', [['Mall Name', inquiry.mallName], ['Full Address', inquiry.fullAddress], ['Barangay', inquiry.barangay], ['City', inquiry.city], ['Province', inquiry.province], ['ZIP Code', inquiry.zipCode], ['Number of Floors', inquiry.floors], ['Coverage Area', inquiry.mallCoverageArea]]],
-    ['Subscription Interest', [['Interested Tier', inquiry.tier], ['Annual Fee', inquiry.annualFee]]],
+    ['Subscription Interest', [['Interested Tier', inquiry.tier], ['Annual Fee', inquiry.annualFee], ['Onboarding Fee', inquiry.onboardingFee], ...(inquiry.onboardingStatus ? [['Onboarding Payment', inquiry.onboardingStatus]] : [])]],
   ]
   return (
     <div className="inq-details-overlay" onClick={onClose}>
@@ -431,6 +431,11 @@ export default function InquiriesTab() {
               <span className="inq-info-sep">·</span>
               <span className="inq-info-interested">
                 Interested: <strong>{selectedInquiry.tier} — {selectedInquiry.annualFee}</strong>
+              </span>
+              <span className="inq-info-sep">·</span>
+              <span className="inq-info-interested">
+                Onboarding Fee: <strong>{selectedInquiry.onboardingFee || 'Not quoted yet'}</strong>
+                {selectedInquiry.onboardingStatus ? ` (${selectedInquiry.onboardingStatus})` : ''}
               </span>
             </div>
 

@@ -12,14 +12,26 @@ const messageColumns = 'i_message_id,i_message_sender_type,i_message_sender_emai
 const formatDate = value => value ? new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`).toLocaleString('en-PH',{timeZone:'Asia/Manila',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'Not recorded'
 const mapMessage=m=>({id:m.i_message_id,sender:['admin','super_admin'].includes(m.i_message_sender_type)?'admin':'mall',senderName:m.i_message_sender_email,text:m.i_message_message,time:formatDate(m.i_message_sent_at),deliveryStatus:m.i_message_delivery_status})
 function status(row) { return row.mall_id != null || ['approved','converted'].includes(String(row.inquiry_status).toLowerCase()) ? 'Approved' : String(row.inquiry_status || 'new').toLowerCase().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) }
-function mapInquiry(row, tiers) {
+const peso=value=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP',maximumFractionDigits:0}).format(value)
+// Onboarding (AR development) fee for an inquiry: the mall's onboarding payment once the inquiry
+// became a mall (paid first, then the open request), otherwise the latest saved pricing quote.
+function onboardingFor(row, fees={}) {
+ const requests=(fees.requests || []).filter(r=>row.mall_id != null && r.mall_id===row.mall_id && r.status!=='cancelled')
+ const request=requests.find(r=>r.status==='paid') || requests.sort((a,b)=>b.request_id-a.request_id)[0]
+ if (request && Number(request.amount_cent)>0) return {onboardingFee:peso(Number(request.amount_cent)/100),onboardingStatus:request.status==='paid'?'Paid':'Awaiting Payment'}
+ const quote=(fees.quotes || []).filter(q=>q.status!=='superseded' && (q.inquiry_id===row.inquiry_id || (row.mall_id != null && q.mall_id===row.mall_id))).sort((a,b)=>b.revision-a.revision)[0]
+ if (quote && Number(quote.amount_cent)>0) return {onboardingFee:peso(Number(quote.amount_cent)/100),onboardingStatus:quote.status==='paid'?'Paid':quote.status==='finalized'?'Quoted':'Draft Estimate'}
+ return {onboardingFee:'Not quoted yet',onboardingStatus:''}
+}
+function mapInquiry(row, tiers, fees) {
  const barangay=(row.inquiry_mall_address || '').match(/(?:^|,)\s*Barangay\s+([^,]+)/i)?.[1]?.trim() || ''
  const originalMessage=row.inquiry_has_revision ? row.inquiry_original_description : row.inquiry_mall_description
  const tier=tiers.find(t=>t.s_tier_key===row.inquiry_interested_tier)
  return {id:row.inquiry_id,mallName:row.inquiry_mall_name,contactPerson:row.inquiry_contact_person || '',email:row.inquiry_contact_email,phone:row.inquiry_contact_num || 'Not recorded',
   location:[row.inquiry_mall_address,row.inquiry_mall_city,row.inquiry_mall_state].filter(Boolean).join(', '),
   tier:tier?.s_tier_label || row.inquiry_interested_tier || 'Not selected',
-  annualFee:tier?.s_tier_annual_fee == null ? 'Not selected' : `${new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP',maximumFractionDigits:0}).format(tier.s_tier_annual_fee)}/yr`,
+  annualFee:tier?.s_tier_annual_fee == null ? 'Not selected' : `${peso(tier.s_tier_annual_fee)}/yr`,
+  ...onboardingFor(row,fees),
   date:formatDate(row.inquiry_created_at),status:status(row),updatedAt:row.inquiry_updated_at,mallId:row.mall_id,
   reviewedAt:formatDate(row.inquiry_reviewed_at),rejectionReason:row.inquiry_rejection_reason || '',lastUpdated:formatDate(row.inquiry_updated_at),hasRevision:!!row.inquiry_has_revision,
   barangay,fullAddress:[row.inquiry_mall_address,row.inquiry_mall_city,row.inquiry_mall_state,row.inquiry_mall_zip_code].filter(Boolean).join(', '),
@@ -119,13 +131,16 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   }})
  app.get('/api/inquiries/events',(req,reply)=>events.open(req,reply))
  app.get('/api/inquiries',wrap(async()=>{
-  const [rows,tiers]=await Promise.all([all(()=>db.from('inquiry').select(columns).order('inquiry_created_at',{ascending:false}).order('inquiry_id',{ascending:false})),all(()=>db.from('subscription_tier').select('s_tier_key,s_tier_label,s_tier_annual_fee').order('s_tier_id'))])
-  return {inquiries:rows.map(row=>mapInquiry(row,tiers))}
+  const optional=query=>all(query).catch(()=>[])
+  const [rows,tiers,requests,quotes]=await Promise.all([all(()=>db.from('inquiry').select(columns).order('inquiry_created_at',{ascending:false}).order('inquiry_id',{ascending:false})),all(()=>db.from('subscription_tier').select('s_tier_key,s_tier_label,s_tier_annual_fee').order('s_tier_id')),
+   optional(()=>db.from('contract_payment_request').select('request_id,mall_id,status,amount_cent').eq('fee_type','onboarding').order('request_id')),
+   optional(()=>db.from('onboarding_quote').select('quote_id,inquiry_id,mall_id,revision,status,amount_cent').order('quote_id'))])
+  return {inquiries:rows.map(row=>mapInquiry(row,tiers,{requests,quotes}))}
  }))
  app.get('/api/inquiries/:id/messages',wrap(async req=>{
   const row=await inquiry(req.params.id)
   const rows=await all(()=>db.from('inquiry_message').select(messageColumns).eq('inquiry_id',row.inquiry_id).order('i_message_sent_at').order('i_message_id'))
-  const {tier,annualFee,...currentInquiry}=mapInquiry(row,[])
+  const {tier,annualFee,onboardingFee,onboardingStatus,...currentInquiry}=mapInquiry(row,[])
   return {currentInquiry,inboxSync:{enabled:inbox.state.enabled,lastCheckedAt:inbox.state.lastCheckedAt,warning:inbox.state.error},messages:rows.map(mapMessage)}
  }))
  app.patch('/api/inquiries/:id/status',wrap(async req=>{
