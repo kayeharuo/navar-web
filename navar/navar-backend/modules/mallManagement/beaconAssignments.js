@@ -5,12 +5,12 @@ async function loadBeaconContext(supabase, mallId, beaconIds = []) {
 	if (versionsResult.error) throw versionsResult.error
 	const versions = (versionsResult.data || []).map(row => ({ id: row.ar_development_id, name: `Version ${row.ar_development_version}` }))
 	const [nodesResult, assignmentsResult] = await Promise.all([
-		versions.length ? supabase.from('node').select('node_id, node_label, ar_development_id, floor_id').in('ar_development_id', versions.map(v => v.id)) : { data: [] },
+		versions.length ? supabase.from('node').select('node_id, node_label, ar_development_id, floor_id, node_is_active').in('ar_development_id', versions.map(v => v.id)) : { data: [] },
 		beaconIds.length ? supabase.from('beacon_node_assignment').select('beacon_id, node_id, ar_development_id').in('beacon_id', beaconIds) : { data: [] },
 	])
 	if (nodesResult.error) throw nodesResult.error
 	if (assignmentsResult.error) throw assignmentsResult.error
-	return { versions, nodes: (nodesResult.data || []).map(row => ({ nodeId: row.node_id, label: row.node_label, versionId: row.ar_development_id, floorId: row.floor_id })), assignments: assignmentsResult.data || [] }
+	return { versions, nodes: (nodesResult.data || []).map(row => ({ nodeId: row.node_id, label: row.node_label, versionId: row.ar_development_id, floorId: row.floor_id,isActive:row.node_is_active!==false })), assignments: assignmentsResult.data || [] }
 }
 
 function validateNodeConfig(config, context) {

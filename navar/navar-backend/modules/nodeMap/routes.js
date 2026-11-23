@@ -179,6 +179,7 @@ module.exports = function registerNodeMapRoutes(app) {
                         isEmergency: node.node_is_emergency,
 						unitId: node.unit_id,
 						storeId: node.store_id,
+						isActive: node.node_is_active!==false,
 						transitionGroupId: node.transition_group_id,
 					}
 				}).filter(node => node.pixelX != null && node.pixelY != null),

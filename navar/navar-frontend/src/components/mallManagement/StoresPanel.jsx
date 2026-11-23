@@ -1,3 +1,4 @@
+import ActionResultModal from '../ui/ActionResultModal'
 import { useCallback, useState, useEffect } from 'react'
 import { Plus, Search, XCircle, CheckCircle } from 'lucide-react'
 import SelectBrandModal from './SelectBrandModal'
@@ -68,6 +69,9 @@ function getFloorLabel(unitNos, mall) {
 }
 
 export default function StoresPanel({ mall, onClose, onSave }) {
+  const [result,setResult]=useState(null)
+  async function persistStores(nextStores){try{const saved=await onSave(nextStores);setResult({success:true,title:'Store changes saved',message:'The store information was saved successfully.'});return saved}catch(error){setResult({success:false,title:'Store changes could not be saved',message:error.message});return null}}
+
   const [stores, setStores] = useState(mall.stores ? [...mall.stores] : [])
   const [mallState, setMallState] = useState(mall)
   const [categoryFilter, setCategoryFilter] = useState('All')
@@ -88,22 +92,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       .catch(() => setBrands([]))
   }, [])
 
-  const handleClose = useCallback(() => {
-    // Update unit statuses based on current store assignments
-    let updatedUnits = [...(mallState.units || [])]
-    updatedUnits = updatedUnits.map(u => ({ ...u, status: 'vacant' }))
-    stores.forEach(store => {
-      if (store.active && store.unitNos && store.unitNos.length > 0) {
-        store.unitNos.forEach(unitNo => {
-          updatedUnits = updatedUnits.map(u =>
-            u.unitNo === unitNo ? { ...u, status: 'occupied' } : u
-          )
-        })
-      }
-    })
-    onSave(stores, updatedUnits)
-    onClose()
-  }, [mallState.units, onClose, onSave, stores])
+  const handleClose=useCallback(()=>onClose(),[onClose])
 
   useEffect(() => {
     function handleEsc(e) {
@@ -167,7 +156,8 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         lastUpdated: now,
       }
       const nextStores = [...stores, newStore]
-      const savedStores = await onSave(nextStores)
+      const savedStores = await persistStores(nextStores)
+    if(!savedStores)return
       setStores(savedStores || nextStores)
       const savedByUnit = new Map(
         (savedStores || nextStores).flatMap(store =>
@@ -184,7 +174,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       setShowAddStore(false)
       setSelectedBrand(null)
     } catch (error) {
-      window.alert(error.message || 'Could not save the store.')
+      setResult({success:false,title:'Store changes could not be saved',message:error.message||'Could not save the store.'})
     }
   }
 
@@ -213,6 +203,8 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         lastUpdated:   now,
       } : s
     )
+    const savedStores = await persistStores(nextStores)
+    if(!savedStores)return
     // Update unit statuses immediately so pencil button shows correct statuses
     if (mallState.units) {
       const updatedUnits = mallState.units.map(u => {
@@ -226,7 +218,6 @@ export default function StoresPanel({ mall, onClose, onSave }) {
       })
       setMallState(prev => ({ ...prev, units: updatedUnits }))
     }
-    const savedStores = await onSave(nextStores)
     setStores(savedStores || nextStores)
 
     setEditingStore(null)
@@ -238,13 +229,14 @@ export default function StoresPanel({ mall, onClose, onSave }) {
         ? { ...s, active: false, status: 'unmapped' }
         : s
     )
+    const savedStores = await persistStores(nextStores)
+    if(!savedStores)return
     setMallState(prev => ({
       ...prev,
       units: (prev.units || []).map(unit =>
         deactivating.unitNos?.includes(unit.unitNo) ? { ...unit, status: 'vacant', storeId: null } : unit
       ),
     }))
-    const savedStores = await onSave(nextStores)
     setStores(savedStores || nextStores)
     setDeactivating(null)
   }
@@ -266,13 +258,15 @@ export default function StoresPanel({ mall, onClose, onSave }) {
 
   return (
     <>
+      {result&&<ActionResultModal result={result} onClose={()=>setResult(null)}/>}
       {/* Page-level content — replaces the malls table, no overlay */}
       <div className="stores-page">
         {/* Header */}
         <div className="stores-page-header">
           <div className="stores-page-header-info">
             <h1 className="stores-page-title">{mall.name}</h1>
-            <p className="stores-page-subtitle">{activeCount} Stores | {mall.floors || 0} floors</p>
+            <p className="stores-page-subtitle">{activeCount} / {mall.storeCapacity??'—'} store and stall slots | {mall.floors || 0} floors</p>
+            {mall.storeCapacity==null&&<p className="mall-field-hint">Set the store and tenant counts in Mall Details before adding establishments.</p>}
           </div>
           <button className="stores-page-close" onClick={handleClose} title="Back to malls">
             X
@@ -297,7 +291,7 @@ export default function StoresPanel({ mall, onClose, onSave }) {
               })}
             </div>
           </div>
-          <button className="stores-add-btn" onClick={handleAddStoreClick}>
+          <button className="stores-add-btn" disabled={mall.storeCapacity==null||activeCount>=mall.storeCapacity} title={mall.storeCapacity==null?'Set the store capacity in mall details first.':`${activeCount} of ${mall.storeCapacity} store and stall slots used.`} onClick={handleAddStoreClick}>
             <Plus size={14} strokeWidth={2.5} />
             Add Store
           </button>

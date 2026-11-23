@@ -1,3 +1,4 @@
+import ActionResultModal from '../ui/ActionResultModal'
 import { useCallback, useEffect, useState } from 'react'
 // eslint-disable-next-line no-unused-vars
 import { Search, Plus, Pencil, ImageIcon } from 'lucide-react'
@@ -366,10 +367,10 @@ function AgreementCell({ status, tier }) {
   )
 }
 
-function StatusBadge({ value, variantMap }) {
+function StatusBadge({ value, variantMap, label = value }) {
   const variant = variantMap[value] || 'pending'
   return (
-    <span className={`mall-status-badge mall-status-badge--${variant}`}>{value}</span>
+    <span className={`mall-status-badge mall-status-badge--${variant}`}>{label}</span>
   )
 }
 
@@ -408,6 +409,7 @@ export default function MallsTable() {
   const [loading, setLoading] = useState(true)
 
   const [showAddModal, setShowAddModal] = useState(false)
+  const [result,setResult]=useState(null)
   const [editingMall, setEditingMall] = useState(null)
   const [viewMall, setViewMall] = useState(null)
   const loadMalls = useCallback(() => {
@@ -425,7 +427,7 @@ export default function MallsTable() {
       details: error.details,
       cause: error.cause,
     })
-    window.alert(error.message)
+    setResult({success:false,title:'Action could not be completed',message:error.message})
   }
 
   useEffect(() => {
@@ -481,11 +483,11 @@ export default function MallsTable() {
     try {
       const savedMall = await apiRequest('/api/malls', { method: 'POST', body: JSON.stringify(data) })
       setMalls(prev => {
-        const nextMalls = [...prev, savedMall]
+        const nextMalls = [savedMall, ...prev]
         mallListCache = nextMalls
         return nextMalls
       })
-      setShowAddModal(false)
+      setShowAddModal(false);setResult({success:true,title:'Mall added',message:'The mall was added successfully.'})
     } catch (error) {
       showRequestError(error)
     }
@@ -500,7 +502,7 @@ export default function MallsTable() {
         return nextMalls
       })
       setViewMall(current => current?.id === mall.id ? mall : current)
-      setEditingMall(null)
+      setEditingMall(null);setResult({success:true,title:'Mall updated',message:'The mall details were saved successfully.'})
     } catch (error) {
       showRequestError(error)
     }
@@ -510,7 +512,7 @@ export default function MallsTable() {
     try {
       const brand = await apiRequest('/api/brands', { method: 'POST', body: JSON.stringify(data) })
       setBrands(prev => [...prev, brand])
-      setShowBrandModal(false)
+      setShowBrandModal(false);setResult({success:true,title:'Brand added',message:'The brand was added successfully.'})
     } catch (error) { showRequestError(error) }
   }
 
@@ -518,7 +520,7 @@ export default function MallsTable() {
     try {
       const brand = await apiRequest(`/api/brands/${editingBrand.id}`, { method: 'PUT', body: JSON.stringify(data) })
       setBrands(prev => prev.map(item => item.id === brand.id ? brand : item))
-      setEditingBrand(null)
+      setEditingBrand(null);setResult({success:true,title:'Brand updated',message:'The brand details were saved successfully.'})
     } catch (error) { showRequestError(error) }
   }
 
@@ -547,6 +549,7 @@ export default function MallsTable() {
 
   return (
     <>
+      {result&&<ActionResultModal result={result} onClose={()=>setResult(null)}/>}
       <div className="mall-content">
         {/* Page header */}
         <div className="mall-header">
@@ -718,7 +721,7 @@ export default function MallsTable() {
                       <th>City</th>
                       <th>No. of Floors</th>
                       <th>Agreement</th>
-                      <th>Application</th>
+                      <th>Latest Application</th>
                       <th>AR Development</th>
                       <th>Date Added</th>
                       <th>Last Updated</th>
@@ -752,7 +755,7 @@ export default function MallsTable() {
                           <AgreementCell status={mall.agreementStatus} tier={mall.tier} />
                         </td>
                         <td>
-                          <StatusBadge value={mall.application} variantMap={applicationVariantMap} />
+                          <StatusBadge value={mall.application} label={mall.applicationVersion != null ? `Ver.${mall.applicationVersion} - ${mall.application}` : mall.application} variantMap={applicationVariantMap} />
                         </td>
                         <td>
                           <StatusBadge value={mall.arDevelopment} variantMap={arDevVariantMap} />

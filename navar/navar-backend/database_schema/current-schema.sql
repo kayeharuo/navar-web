@@ -356,6 +356,7 @@ CREATE TABLE public.subscription_tier (
   s_tier_free_extra_stalls_per_year integer,
   s_tier_map_update_pricing text,
   s_tier_map_update_fee_per_floor numeric(12,2) NOT NULL DEFAULT 0 CHECK (s_tier_map_update_fee_per_floor >= 0),
+  s_tier_map_update_rate numeric(5,4) CHECK (s_tier_map_update_rate > 0 AND s_tier_map_update_rate <= 1),
   included_visits_per_year integer NOT NULL DEFAULT 0 CHECK (included_visits_per_year >= 0),
   free_stalls_per_year integer NOT NULL DEFAULT 0 CHECK (free_stalls_per_year >= 0),
   CONSTRAINT subscription_tier_pkey PRIMARY KEY (s_tier_id)
@@ -451,6 +452,7 @@ CREATE TABLE public.node (
   node_pixel_y double precision,
   transition_group_id uuid,
   node_is_emergency boolean NOT NULL DEFAULT false,
+  node_is_active boolean NOT NULL DEFAULT true,
   CONSTRAINT node_pkey PRIMARY KEY (node_id),
   CONSTRAINT fk_node_floor_id FOREIGN KEY (floor_id) REFERENCES public.floor(floor_id),
   CONSTRAINT fk_node_store_id FOREIGN KEY (store_id) REFERENCES public.store(store_id),
@@ -873,6 +875,7 @@ CREATE TABLE public.tenant_account (
 );
 CREATE TABLE public.mall_onboarding (
   mall_id bigint NOT NULL,
+  onboarding_floor_count integer CHECK (onboarding_floor_count > 0),
   contract_id bigint,
   offer jsonb,
   prepayment_acceptance jsonb,

@@ -25,6 +25,12 @@ Reused plans get separate version-owned records and retain source IDs. They do n
 
 ## Integration
 
+Migration 72 replaces fixed map-update fees with 50% Basic, 40% Standard and 30% Premium of the mall's original paid onboarding amount divided by its original onboarding floor count, for each payable changed floor. `subscription_tier.s_tier_map_update_rate` is editable in System Settings; the old fixed-fee column is deprecated and zeroed. Original floor count is frozen in `mall_onboarding.onboarding_floor_count`, using the onboarding quote or original version's plans for legacy records. New quotes snapshot the amount, original denominator, tier rate, unit fee in centavos and allowance. Round the unit price to centavos, then multiply by payable floors. Previously issued quotes and onboarding/subscription snapshots stay unchanged unless explicitly corrected.
+
+The Premium included benefit still covers a single-floor update request; it does not partially discount a multi-floor request. Both structural intake and the older service approval entry point calculate prices on the server, ignoring supplied fee amounts. Missing confirmed onboarding data blocks acceptance with a clear error instead of treating a missing price as free.
+
+The explicitly requested Gaisano Fiesta manual payment correction uses `reprice_gaisano_fiesta_map_update.sql`: PHP 30,178.50 / 3 original floors × 50% × 1 payable floor = PHP 5,029.75. Quote, payment request and private manual receipt agree; Paid/fulfilled and development status remain unchanged. The before-records and new calculation are retained in the audit log. The immutable payment trigger is disabled only inside the exclusively locked correction transaction and restored before commit. No payment is collected or refunded by this data correction.
+
 Migrations 65-67 install `map_application_portal`, floor provenance and submission/payment receipts; updates the version insert guard; removes the legacy hard quota; and delegates through existing owner-confirmation and stall wrappers. They also correct the earlier structural rejection path that ended after only one dispute, preserve confirmation while a subscription awaits recovery, and align mapping starts with the approved Pending AR queue rather than unapproved service requests.
 
 Super Admin-assisted APIs: GET `/api/map-portal/:mallId`, GET `/api/map-portal/:mallId/plans/:planId`, and POST actions `submit`, `pay`, `revise`, `dispute`, `message`, `confirm`.

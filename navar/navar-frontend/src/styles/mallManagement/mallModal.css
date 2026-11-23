@@ -391,6 +391,16 @@
   transition: border-color 0.15s;
 }
 
+.mall-field-input.mall-field-textarea {
+  height: auto;
+  min-height: 112px;
+  padding: 10px;
+  line-height: 1.6;
+  resize: vertical;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
 .mall-field-input:focus {
   border-color: #2563EB;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
@@ -1444,6 +1454,8 @@ select.mall-field-input {
 
 /* ─── Notes box ───────────────────────────────────────────── */
 .mall-info-notes {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
   padding: 12px 14px;
   background: #F1F1F1;
   border-radius: 5px;

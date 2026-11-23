@@ -6,7 +6,7 @@ const { currentRateCard } = require('../systemSettings/rateCard')
 function wrap(fn) { return async (request, reply) => { try { return await fn(request,reply) } catch(error) { if(error.code==='P0001'||error.statusCode) return reply.code(error.statusCode||409).send({message:error.message}); throw error } } }
 function registerAdmin(app) {
   const db=app.supabase
-  app.get('/api/subscriptions',wrap(async()=>({ malls:await listSubscriptions(db) })))
+  app.get('/api/subscriptions',wrap(async()=>({ malls:await listSubscriptions(db),asOf:new Date().toISOString() })))
   app.get('/api/subscriptions/alerts',wrap(async()=> (await listSubscriptions(db)).filter(m=>['Suspended','Grace Period'].includes(m.status)).map(m=>({ id:m.id,type:m.status==='Suspended'?'error':'warning',title:`${m.name}: ${m.status}`,message:m.daysLeftLabel,text:`${m.name}: ${m.status}. ${m.daysLeftLabel}` }))))
   app.post('/api/subscriptions/:id/suspend',wrap(async(req)=>checked(await db.rpc('manage_subscription_suspension',{p_mall:Number(req.params.id),p_actor:req.admin.id,p_action:'suspend',p_reason:req.body?.reason,p_notes:req.body?.notes||'',p_penalty:Number(req.body?.penalty||0)}))))
   app.post('/api/subscriptions/:id/lift',wrap(async(req)=>checked(await db.rpc('manage_subscription_suspension',{p_mall:Number(req.params.id),p_actor:req.admin.id,p_action:'lift'}))))

@@ -1,3 +1,4 @@
+import ActionResultModal from '../ui/ActionResultModal'
 /* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -7,7 +8,7 @@ import BusyButton from '../ui/BusyButton'
 import { playNotificationSound } from '../../utils/notificationSound'
 import '../../styles/mallManagement/beaconTickets.css'
 
-const STATUS_FILTERS = ['All', 'Pending', 'Faulty', 'Investigating', 'Under Maintenance', 'Resolved']
+const STATUS_FILTERS = ['All', 'Faulty', 'Investigating', 'Under Maintenance', 'Resolved']
 
 const initialTickets = [
   {
@@ -211,11 +212,10 @@ const initialTickets = [
 ]
 
 const STATUS_CONFIG = {
-  pending:      { label: 'pending',           color: '#64748B', bg: '#F1F5F9', dotBg: '#F1F5F9', icon: '?' },
-  faulty:       { label: 'faulty',            color: '#EC5252', bg: '#FFF2F2', dotBg: '#FFF2F2', icon: '!' },
-  investigating:{ label: 'investigating',      color: '#FF9233', bg: '#FFF8F1', dotBg: '#FFF8F1', icon: '!' },
-  maintenance:  { label: 'under maintenance', color: '#5B5BFF', bg: '#F0F0FF', dotBg: '#F0F0FF', icon: '!' },
-  resolved:     { label: 'resolved',          color: '#016630', bg: '#E1FFEC', dotBg: '#E1FFEC', icon: '✓' },
+  faulty:       { label: 'Faulty',            color: '#EC5252', bg: '#FFF2F2', dotBg: '#FFF2F2', icon: '!' },
+  investigating:{ label: 'Investigating',      color: '#FF9233', bg: '#FFF8F1', dotBg: '#FFF8F1', icon: '!' },
+  maintenance:  { label: 'Under Maintenance', color: '#5B5BFF', bg: '#F0F0FF', dotBg: '#F0F0FF', icon: '!' },
+  resolved:     { label: 'Resolved',          color: '#016630', bg: '#E1FFEC', dotBg: '#E1FFEC', icon: '✓' },
 }
 
 const SOURCE_COLORS = {
@@ -262,7 +262,6 @@ function getTicketId(ticket) {
 }
 
 const TICKET_STATUS_ORDER = {
-  pending: 0,
   faulty: 1,
   investigating: 2,
   maintenance: 3,
@@ -310,13 +309,17 @@ function TimelineDot({ status }) {
 
 function getTimelineStatus(action) {
   if (action.toLowerCase().includes('resolved')) return 'resolved'
-  if (action.toLowerCase().includes('pending')) return 'pending'
   if (action.toLowerCase().includes('investigating') || action.toLowerCase().includes('reopen')) return 'investigating'
   return 'faulty'
 }
 
+function formatTicketAction(action = '') {
+  const status = action.toLowerCase().replace(/^marked(?: ticket)? as /, '')
+  const labels = { faulty: 'Faulty', investigating: 'Investigating', maintenance: 'Under Maintenance', 'under maintenance': 'Under Maintenance', resolved: 'Resolved' }
+  return labels[status] ? `Marked as ${labels[status]}` : action.replace(/^\w/, letter => letter.toUpperCase())
+}
+
 function TicketDetailPanel({ ticket, onClose, onAction }) {
-  const canApprove = ticket.status === 'pending'
   const canInvestigate = ticket.status === 'faulty' || ticket.status === 'resolved'
   const canMaintenance = ticket.status === 'investigating'
   const canResolve = ticket.status === 'investigating' || ticket.status === 'maintenance'
@@ -394,7 +397,7 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
                   <div className="bkt-tl-content">
                     <p className="bkt-tl-date">{entry.date}</p>
                     <div className="bkt-tl-action-row">
-                      <strong className="bkt-tl-action">{entry.action}</strong>
+                      <strong className="bkt-tl-action">{formatTicketAction(entry.action)}</strong>
                       <span
                         className="bkt-tl-source"
                         style={{ background: srcCfg.bg, color: srcCfg.color }}
@@ -414,14 +417,6 @@ function TicketDetailPanel({ ticket, onClose, onAction }) {
         </div>
 
         <div className="bkt-detail-footer">
-          {canApprove && (
-            <button
-              className="bkt-action-btn bkt-action-btn--investigate"
-              onClick={() => onAction('faulty')}
-            >
-              Mark as Faulty
-            </button>
-          )}
           {canInvestigate && (
             <button
               className="bkt-action-btn bkt-action-btn--investigate"
@@ -615,6 +610,7 @@ function ActionModal({ type, onCancel, onConfirm }) {
 let nextTicketId = initialTickets.length + 1
 
 export default function BeaconTicketsTab() {
+  const [result,setResult]=useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -626,7 +622,7 @@ export default function BeaconTicketsTab() {
   useEffect(() => {
     apiRequest('/api/beacon-tickets')
       .then(setTickets)
-      .catch(error => window.alert(error.message))
+      .catch(error => setResult({success:false,title:'Ticket action failed',message:error.message}))
       .finally(() => setLoading(false))
   }, [])
 
@@ -641,7 +637,7 @@ export default function BeaconTicketsTab() {
   const selectedTicket = tickets.find(t => t.id === selectedId) || null
 
   const filtered = tickets.filter(t => {
-    const matchFilter = statusFilter === 'All' || t.status === statusFilter.toLowerCase()
+    const matchFilter = statusFilter === 'All' || t.status === (statusFilter==='Under Maintenance'?'maintenance':statusFilter.toLowerCase())
     const matchSearch = !search ||
       t.beaconCode.toLowerCase().includes(search.toLowerCase()) ||
       t.mall.toLowerCase().includes(search.toLowerCase()) ||
@@ -650,7 +646,6 @@ export default function BeaconTicketsTab() {
   })
 
   const counts = {
-    pending: tickets.filter(t => t.status === 'pending').length,
     faulty: tickets.filter(t => t.status === 'faulty').length,
     investigating: tickets.filter(t => t.status === 'investigating').length,
     maintenance: tickets.filter(t => t.status === 'maintenance').length,
@@ -664,73 +659,24 @@ export default function BeaconTicketsTab() {
     setActionModal(isReopen ? 'investigating-reopen' : type)
   }
 
-  async function handleConfirmAction(note, effectiveType, assignedTo) {
-    if (!selectedTicket) return
-    try {
-      await apiRequest(`/api/beacon-tickets/${selectedTicket.id}/actions`, {
-        method: 'POST',
-        body: JSON.stringify({ status: effectiveType, note, assignedTo: assignedTo || null }),
-      })
-      if (effectiveType === 'investigating') playNotificationSound('notification')
-    } catch (error) {
-      window.alert(error.message)
-      return
-    }
-    const now = new Date()
-    const dateStr = now.toLocaleString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: 'numeric', minute: '2-digit', hour12: true,
-    })
-
-    const isReopen = actionModal === 'investigating-reopen'
-
-    const actionLabel = isReopen
-      ? 'Reopened — Marked as investigating'
-      : effectiveType === 'faulty'
-      ? 'Approved — Marked as faulty'
-      : effectiveType === 'investigating'
-      ? 'Marked as investigating'
-      : effectiveType === 'maintenance'
-      ? 'Marked as under maintenance'
-      : 'Marked as resolved'
-
-    const newEntry = {
-      id: Date.now(),
-      date: dateStr,
-      action: actionLabel,
-      source: 'admin',
-      by: 'NavAR Admin',
-      note: note || null,
-    }
-
-    const updatedTicket = {
-      ...selectedTicket,
-      status: effectiveType,
-      timeline: [...selectedTicket.timeline, newEntry],
-      timeAgo: 'just now',
-    }
-
-    if (effectiveType === 'investigating' && assignedTo) {
-      updatedTicket.assignedTo = assignedTo
-      updatedTicket.assignedBy = 'NavAR Admin'
-    }
-
-    setTickets(prev => sortTickets(prev.map(t =>
-      t.id === selectedTicket.id ? updatedTicket : t
-    )))
-    setActionModal(null)
+  async function handleConfirmAction(note,effectiveType,assignedTo){
+    if(!selectedTicket)return
+    try{
+      await apiRequest(`/api/beacon-tickets/${selectedTicket.id}/actions`,{method:'POST',body:JSON.stringify({status:effectiveType,note,assignedTo:assignedTo||null})})
+      setTickets(sortTickets(await apiRequest('/api/beacon-tickets')))
+      setActionModal(null)
+      setResult({success:true,title:'Ticket updated',message:'The ticket status and history have been saved.'})
+      if(effectiveType==='investigating')playNotificationSound('notification')
+    }catch(error){setResult({success:false,title:'Ticket action failed',message:error.message})}
   }
 
   return (
     <div className="bkt-wrap">
+      {result&&<ActionResultModal result={result} onClose={()=>setResult(null)}/>}
       <h2 className="bkt-heading">Beacon Tickets</h2>
 
       {/* Summary cards */}
       <div className="bkt-stat-grid">
-        <div className="bkt-stat-card">
-          <span className="bkt-stat-num">{counts.pending}</span>
-          <span className="bkt-stat-label">Pending</span>
-        </div>
         <div className="bkt-stat-card">
           <span className="bkt-stat-num bkt-stat-num--faulty">{counts.faulty}</span>
           <span className="bkt-stat-label">Faulty</span>

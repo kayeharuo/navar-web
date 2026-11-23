@@ -222,14 +222,14 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
             }
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fillStyle = cfg.color;
+            ctx.fillStyle = n.status==='inactive'?'#94A3B8':cfg.color;
             ctx.fill();
             ctx.strokeStyle = "#FFFFFF";
             ctx.lineWidth = 1.5;
             ctx.stroke();
             if (showIcons && cfg.icon && !NO_ICON.has(cfg.icon) && cfg.icon !== "✛") {
                 ctx.font = "12px serif";
-                ctx.fillStyle = cfg.color;
+                ctx.fillStyle = n.status==='inactive'?'#94A3B8':cfg.color;
                 ctx.fillText(cfg.icon, x, y - r - 8);
             }
             if (cfg.isFloorTransition && n.cross_floor_link) {

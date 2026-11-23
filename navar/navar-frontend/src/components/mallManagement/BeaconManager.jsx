@@ -1,3 +1,4 @@
+import ActionResultModal from '../ui/ActionResultModal'
 import { useState, useEffect } from 'react'
 import { Plus, Search } from 'lucide-react'
 import AddBeaconModal from './AddBeaconModal'
@@ -124,7 +125,7 @@ function BatteryForm({ initialData = null, onCancel, onSave, isReplacement = fal
       setError('Battery ID, install date, and brand are required.')
       return
     }
-    onSave({ batteryId: batteryId.trim(), installDate, brand: brand.trim() })
+    return onSave({ batteryId: batteryId.trim(), installDate, brand: brand.trim() })
   }
 
   return (
@@ -342,6 +343,7 @@ function ReactivateModal({ onCancel, onConfirm, requiresRemarks = true }) {
 
 // ─── Main Component ────────────────────────────────────────
 export default function BeaconManager({ mall, onClose, onSave }) {
+  const [result,setResult]=useState(null)
   const [beacons, setBeacons] = useState(mall.beacons ? [...mall.beacons] : [])
   useEffect(() => { setBeacons([...(mall.beacons || [])]) }, [mall.id, mall.beacons])
   const [statusFilter, setStatusFilter] = useState('All')
@@ -361,9 +363,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       const beacon = await apiRequest(`/api/malls/${mall.id}/beacons`, { method: 'POST', body: JSON.stringify(data) })
       setBeacons(prev => [...prev, { ...beacon, faultyNote: '', ticketHistory: [], dateAdded: now }])
       setShowAdd(false)
+      setResult({success:true,title:'Beacon added',message:'The beacon information was saved successfully.'})
       notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
-      window.alert(error.message)
+      setResult({success:false,title:'Beacon action failed',message:error.message})
     }
   }
 
@@ -372,9 +375,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       const beacon = await apiRequest(`/api/malls/${mall.id}/beacons/${editingBeacon.id}`, { method: 'PUT', body: JSON.stringify(data) })
       setBeacons(prev => prev.map(b => b.id === editingBeacon.id ? { ...b, ...beacon } : b))
       setEditing(null)
+      setResult({success:true,title:'Beacon updated',message:'The beacon information was saved successfully.'})
       notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
-      window.alert(error.message)
+      setResult({success:false,title:'Beacon action failed',message:error.message})
     }
   }
 
@@ -390,9 +394,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       })
       setBeacons(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b))
       setBatteryBeacon(prev => prev && prev.id === id ? { ...prev, ...updated } : prev)
+      setResult({success:true,title:'Battery updated',message:'The beacon information was saved successfully.'})
       notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
-      window.alert(error.message)
+      setResult({success:false,title:'Beacon action failed',message:error.message})
     }
   }
 
@@ -404,9 +409,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       })
       setBeacons(prev => prev.map(b => b.id === faultyTarget.id ? updated : b))
       setFaulty(null)
+      setResult({success:true,title:'Beacon marked faulty',message:'The linked nodes are unavailable until the beacon is active again.'})
       notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
-      window.alert(error.message)
+      setResult({success:false,title:'Beacon action failed',message:error.message})
     }
   }
 
@@ -418,9 +424,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       })
       setBeacons(prev => prev.map(b => b.id === reactTarget.id ? updated : b))
       setReact(null)
+      setResult({success:true,title:'Beacon reactivated',message:'The beacon is active and its current node assignments have been refreshed.'})
       notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
-      window.alert(error.message)
+      setResult({success:false,title:'Beacon action failed',message:error.message})
     }
   }
 
@@ -429,9 +436,10 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       const updated = await apiRequest(`/api/malls/${mall.id}/beacons/${deactivateTarget.id}/deactivate`, { method: 'POST' })
       setBeacons(prev => prev.map(b => b.id === deactivateTarget.id ? updated : b))
       setDeactivate(null)
+      setResult({success:true,title:'Beacon deactivated',message:'The beacon is deactivated. Its node can now be assigned to a replacement beacon.'})
       notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
-      window.alert(error.message)
+      setResult({success:false,title:'Beacon action failed',message:error.message})
     }
   }
 
@@ -457,6 +465,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
 
   return (
     <>
+      {result&&<ActionResultModal result={result} onClose={()=>setResult(null)}/>}
       <div className="stores-page beacons-page">
         {/* Header */}
         <div className="stores-page-header">

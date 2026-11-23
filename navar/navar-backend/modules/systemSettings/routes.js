@@ -31,7 +31,7 @@ function displayValues(rows) {
 	values.extraStall = field('extraStall', row => peso(row.s_tier_additional_stall_fee))
 	values.freeStalls = field('freeStalls', row => String(row.s_tier_free_extra_stalls_per_year))
 	values.freeMapUpdates = field('freeMapUpdates', row => String(row.s_tier_map_updates_per_year))
-	values.paidMapUpdate = field('paidMapUpdate', row => peso(row.s_tier_map_update_fee_per_floor))
+	values.paidMapUpdate = field('paidMapUpdate', row => `${Number(row.s_tier_map_update_rate) * 100}%`)
 	return values
 }
 
@@ -64,10 +64,10 @@ module.exports = function registerSystemSettingsRoutes(app) {
 			const extraStallFee = money(values.extraStall?.[key])
 			const freeExtraStalls = integer(values.freeStalls?.[key])
 			const freeMapUpdates = integer(values.freeMapUpdates?.[key])
-			const mapUpdateFee = money(values.paidMapUpdate?.[key])
+			const mapUpdateRate = percentage(values.paidMapUpdate?.[key])
 			const analyticsHistory = String(values.analyticsHistory?.[key] || '').trim()
 			const textValues = ['analyticsTools', 'mapQueue', 'remoteResponse', 'onsiteDispatch'].map(field => String(values[field]?.[key] || '').trim())
-			if (![annualFee, graceDays, reinstatementRate, adminAccounts, includedVisits, extraVisitFee, replacementFee, extraStallFee, freeExtraStalls, freeMapUpdates, mapUpdateFee].every(Number.isFinite) || annualFee <= 0 || graceDays < 0 || reinstatementRate < 0 || reinstatementRate > 1 || adminAccounts < 1 || includedVisits < 0) {
+			if (![annualFee, graceDays, reinstatementRate, adminAccounts, includedVisits, extraVisitFee, replacementFee, extraStallFee, freeExtraStalls, freeMapUpdates, mapUpdateRate].every(Number.isFinite) || annualFee <= 0 || graceDays < 0 || reinstatementRate < 0 || reinstatementRate > 1 || mapUpdateRate <= 0 || mapUpdateRate > 1 || adminAccounts < 1 || includedVisits < 0) {
 				return reply.code(400).send({ message: `Check the numeric values entered for the ${key} tier.` })
 			}
 			if (!analyticsHistory || textValues.some(value => !value)) return reply.code(400).send({ message: `Complete every ${key} tier feature.` })
@@ -90,8 +90,9 @@ module.exports = function registerSystemSettingsRoutes(app) {
 				included_visits_per_year: includedVisits,
 				free_stalls_per_year: freeExtraStalls,
 				s_tier_map_updates_per_year: freeMapUpdates,
-				s_tier_map_update_fee_per_floor: mapUpdateFee,
-				s_tier_map_update_pricing: `${freeMapUpdates ? `First ${freeMapUpdates} update(s) each year free (up to one floor each), then ` : ""}${peso(mapUpdateFee)} per floor`,
+				s_tier_map_update_rate: mapUpdateRate,
+				s_tier_map_update_fee_per_floor: 0,
+				s_tier_map_update_pricing: `${freeMapUpdates ? `First ${freeMapUpdates} update(s) each year free (up to one floor each), then ` : ""}${Number((mapUpdateRate*100).toFixed(2))}% of original onboarding cost per floor`,
 				s_tier_updated_at: new Date().toISOString(),
 			}
 			updates.push(update)

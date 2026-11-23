@@ -4,6 +4,33 @@
   flex-direction: column;
   gap: 20px;
 }
+.analytics-empty { margin:auto; padding:28px 12px; color:#64748b; text-align:center; font:13px Poppins,sans-serif; }
+.analytics-chart-body:has(>.analytics-empty) { display:flex; align-items:center; justify-content:center; }
+.analytics-report-meta { margin:0; color:#64748b; font:12px Poppins,sans-serif; line-height:1.7; }
+.analytics-export-btn { gap:7px; }
+.analytics-export-btn:disabled { opacity:.55; cursor:not-allowed; }
+.analytics-print-btn { background:white; color:#2563eb; border:1px solid #dbe3ef; }
+.analytics-print-range { display:none; }
+.analytics-payment-types { display:flex; flex-wrap:wrap; gap:16px; margin-top:20px; }
+.analytics-payment-types>div { display:flex; flex-direction:column; gap:6px; padding:14px 18px; border:1px solid #e8ecf2; border-radius:8px; font:13px Poppins,sans-serif; }
+@media print {
+  @page { size:A4 landscape; margin:12mm; }
+  body:has(.analytics-page) { background:white!important; }
+  body:has(.analytics-page) aside,body:has(.analytics-page) header,body:has(.analytics-page) nav,body:has(.analytics-page) .sidebar,body:has(.analytics-page) .topbar,body:has(.analytics-page) .top-bar,.analytics-header-actions,.analytics-range-tabs { display:none!important; }
+  body:has(.analytics-page) #root,body:has(.analytics-page) main,body:has(.analytics-page) .app-shell,body:has(.analytics-page) .app-content { height:auto!important; overflow:visible!important; margin:0!important; padding:0!important; width:100%!important; min-height:0!important; display:block!important; }
+  .analytics-page { width:100%!important; gap:14px; }
+  .analytics-print-range { display:block; margin:0; font:12px Poppins,sans-serif; }
+  .analytics-title::before { content:'NavAR · '; }
+  .analytics-card,.analytics-stat-card { break-inside:avoid; box-shadow:none!important; }
+  .analytics-row-2col,.analytics-row-3col { display:block; }
+  .analytics-row-2col>.analytics-card,.analytics-row-3col>.analytics-card { margin-bottom:14px; }
+  .analytics-chart-body { height:230px!important; }
+  .analytics-table-wrap { overflow:visible!important; }
+  .analytics-table { min-width:0!important; width:100%; }
+  .analytics-table th,.analytics-table td { font-size:9px; padding:6px; }
+  .analytics-stats-grid { grid-template-columns:repeat(4,1fr); }
+  * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
 
 .analytics-header {
   display: flex;

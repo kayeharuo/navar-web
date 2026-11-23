@@ -1,5 +1,5 @@
 import { C, F, M, NODE_TYPES } from "../editorConstants";
-export function FloorConnections({ node, nodes, edges, floorMeta, locked, onChange }) {
+export function FloorConnections({ node, nodes, edges, locked, onChange }) {
     const all = Object.values(nodes).flat();
     const members = all.filter(n => n.id !== node.id && node.transition_group_id && n.transition_group_id === node.transition_group_id && n.type === node.type);
     const connected = edges.filter(e => e.from === node.id || e.to === node.id);
@@ -20,8 +20,8 @@ export function FloorConnections({ node, nodes, edges, floorMeta, locked, onChan
                         <div style={{ fontSize: 9, fontFamily: M, color: "#64748B", marginTop: 2 }}>{target?.floor}</div>
                     </div>
                 </div>
-                <label style={labelStyle}>PATH TYPE<select aria-label="Connection path type" disabled={locked} style={style} value={e.path_type} onChange={event => update(e.id, { path_type: event.target.value })}>
-                    <option value="normal">Normal</option><option value="accessible">Accessible</option><option value="restricted">Restricted</option>
+                <label style={labelStyle}>PATH TYPE<select aria-label="Connection path type" disabled={locked} style={style} value={e.path_type === 'accessible' ? 'normal' : e.path_type} onChange={event => update(e.id, { path_type: event.target.value })}>
+                    <option value="normal">Normal</option><option value="restricted">Restricted</option>
                 </select></label>
                 <label style={labelStyle}>DIRECTION<select aria-label="Connection direction" disabled={locked} style={style} value={e.direction || "both"} onChange={event => update(e.id, { direction: event.target.value })}>
                     <option value="both">Both directions</option><option value="forward">{from?.floor} to {to?.floor}</option><option value="reverse">{to?.floor} to {from?.floor}</option>

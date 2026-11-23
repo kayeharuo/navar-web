@@ -31,7 +31,7 @@ const TIER_GROUPS = [
     { key: 'freeStalls', label: 'Free extra stalls per year', values: { basic: '0', standard: '0', premium: '10' } },
     { key: 'extraStall', label: 'Fee per extra stall after free allowance', values: { basic: '₱1,100', standard: '₱1,000', premium: '₱1,000' } },
     { key: 'freeMapUpdates', label: 'Free map updates per year (up to one floor each)', values: { basic: '0', standard: '0', premium: '1' } },
-    { key: 'paidMapUpdate', label: 'Paid map update — fixed price per floor', values: { basic: '₱28,000', standard: '₱25,000', premium: '₱25,000' } },
+    { key: 'paidMapUpdate', label: 'Paid map update — percentage per floor', sublabel: 'Original onboarding fee ÷ original floor count × tier percentage.', values: { basic: '50%', standard: '40%', premium: '30%' } },
   ] },
 ]
 

@@ -9,6 +9,12 @@ function fixture() {
 }
 test('middle landing supports two connections and retains direction/access',()=>{const result=buildNodeMap(fixture(),context);assert.deepEqual(result.errors,[]);assert.equal(result.payload.edges.length,2);assert.equal(result.payload.edges[1].direction,'forward');assert.equal(result.payload.edges[1].path_type,'restricted');});
 test('reject reverse duplicates',()=>{const f=fixture();f.edges.push({fromClientId:'n1',toClientId:'n2',pathType:'normal'});assert.match(buildNodeMap(f,context).errors.join(),/more than once/);});
+test('server generated elevator and ramp edges use Normal path type',()=>{
+ for(const type of ['ELEVATOR','RAMP']){
+  const f=fixture();f.edges=[];f.nodes.forEach(n=>n.type=type);f.transitionGroups[0].type=type;
+  const built=buildNodeMap(f,context);assert.deepEqual(built.errors,[]);assert.ok(built.payload.edges.every(e=>e.path_type==='normal'));
+ }
+});
 test('missing group connections are generated and singleton groups identify the node',()=>{
  const f=fixture();f.edges=[];const built=buildNodeMap(f,context);assert.deepEqual(built.errors,[]);assert.equal(built.payload.edges.length,2);
  f.nodes=f.nodes.slice(0,1);assert.match(buildNodeMap(f,context).errors.join(),/n1.*floor 1.*matching landing/);
