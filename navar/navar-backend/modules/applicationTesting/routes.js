@@ -18,9 +18,10 @@ module.exports = function registerApplicationTestingRoutes(app) {
 			const eligibility = await getVersionEligibility(app.supabase, mall.mall_id)
 			return {
 				...mall,
-				canSubmit: eligibility.allowed,
+				canSubmit: eligibility.allowed && eligibility.nextVersion===1,
+        portalUrl: eligibility.nextVersion>1?`/mall-portal/map-applications/${mall.mall_id}`:null,
 				nextVersion: eligibility.nextVersion,
-				blockedReason: eligibility.reason,
+				blockedReason: eligibility.nextVersion>1?'Use the map application page to reuse the current application details.':eligibility.reason,
 			}
 		}))
 		return {
@@ -62,12 +63,7 @@ module.exports = function registerApplicationTestingRoutes(app) {
 		const eligibility = await getVersionEligibility(app.supabase, mallId)
 		if (!eligibility.allowed) return reply.code(409).send({ message: eligibility.reason })
 		const version = eligibility.nextVersion
-  if (version > 1) {
-   const allFloors = await app.supabase.from('floor').select('floor_id').eq('mall_id', mallId)
-   if (allFloors.error) throw allFloors.error
-   if (new Set(floorIds).size !== floorIds.length || allFloors.data.length !== floorIds.length) return reply.code(400).send({ message: 'Include exactly one floor plan for every existing floor.' })
-   if (typeof body.reasonCategory !== 'string' || !body.reasonCategory.trim() || body.reasonCategory.length > 100 || typeof body.reasonNotes !== 'string' || !body.reasonNotes.trim() || body.reasonNotes.length > 5000) return reply.code(400).send({ message: 'A reason category and notes are required for version 2+.' })
-  }
+  if (version > 1) return reply.code(409).send({message:'Use the map application portal for version 2 and later.',portalUrl:`/mall-portal/map-applications/${mallId}`})
   // Validate every image before creating the request.
   if (selectedFloors.some(f => { const image = parseImageDataUrl(f.image?.dataUrl); return !image || !['image/png','image/jpeg'].includes(image.mimeType) || image.size > MAX_FLOOR_PLAN_BYTES })) return reply.code(400).send({ message: 'Every floor needs a PNG/JPEG floor plan up to 10 MB.' })
 		const application = await app.supabase.from('application').insert({

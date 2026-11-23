@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import useDashboardData from './useDashboardData'
 import Badge from '../ui/Badge'
+import LoadingSpinner from '../ui/LoadingSpinner'
 import '../../styles/dashboard/dashboard.css'
 
 const variants = {
@@ -20,14 +21,14 @@ export default function MallTable() {
           <span className="dash-card-label">Mall Information Summary</span>
         </div>
         <div className="dash-table-meta">
-          <span className="dash-table-count">{loading || error ? '-' : malls.length} malls</span>
+          <span className="dash-table-count">{loading ? '…' : error ? '-' : malls.length} malls</span>
           <Link className="dash-table-show-all" to="/mall-management">Show All</Link>
         </div>
       </div>
 
       {/* Scrollable area — fills remaining card height */}
       <div className="dash-table-scroll">
-        <table className="dash-table">
+        <table className={`dash-table${loading ? ' dash-table--loading' : ''}`}>
           <thead>
             <tr>
               <th>Mall</th>
@@ -38,7 +39,7 @@ export default function MallTable() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan={5} role="status">Loading malls...</td></tr> : error ? <tr><td colSpan={5} role="alert">{error}</td></tr> : malls.length === 0 ? <tr><td colSpan={5}>No malls found.</td></tr> : malls.map(mall => (
+            {loading ? <tr><td colSpan={5}><LoadingSpinner label="Loading Malls..." showLabel /></td></tr> : error ? <tr><td colSpan={5} role="alert">{error}</td></tr> : malls.length === 0 ? <tr><td colSpan={5}>No malls found.</td></tr> : malls.map(mall => (
               <tr key={mall.id}>
                 <td>
                   <span className={`dash-table-mall-name${

@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ApplicationsTable from '../components/applicationManagement/ApplicationsTable'
 import StallApplicationsTable from '../components/applicationManagement/StallApplicationsTable'
 import ReviewPanel from '../components/applicationManagement/ReviewPanel'
+import StallReviewPanel from '../components/applicationManagement/StallReviewPanel'
+import '../styles/applicationManagement/stallApplications.css'
+import { useRealtimeRefresh } from '../config/realtime'
 import { apiRequest } from '../config/api'
 import '../styles/applicationManagement/applicationManagementLayout.css'
 import '../styles/applicationManagement/applicationManagement.css'
 
-export default function ApplicationManagement({ onAppApproved, arProjects = [], onStallAppApproved }) {
+export default function ApplicationManagement({ onAppApproved }) {
   const [activeTab, setActiveTab] = useState('new') // 'new' or 'stall'
   const [reviewingApp, setReviewingApp] = useState(null)
   const [applications, setApplications] = useState(null) // Will be passed from ApplicationsTable
@@ -18,9 +21,29 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
   const location = useLocation()
   const navigate = useNavigate()
 
+  const loadApplication=useCallback(async(app)=>{
+    if (app.draft) return
+    const seq = ++requestSeq.current
+    setOpeningApp(true)
+    try {
+      const detail = await apiRequest(`/api/applications/${app.id}${app.historyId?`?historyId=${app.historyId}`:''}`)
+      if (seq === requestSeq.current) setReviewingApp(detail)
+    } catch (error) {
+      console.error('Application detail request failed:', error)
+    } finally {
+      if (seq === requestSeq.current) setOpeningApp(false)
+    }
+  },[])
+
+  const loadStallApplication=useCallback(async(app)=>{
+    const seq=++requestSeq.current;setOpeningApp(true)
+    try{const detail=await apiRequest(`/api/stall-applications/${app.id}`);if(seq===requestSeq.current)setReviewingApp(detail)}
+    catch(e){window.alert(e.message)}finally{if(seq===requestSeq.current)setOpeningApp(false)}
+  },[])
+
   useEffect(() => {
-    setActiveTab(location.pathname.endsWith('/stall-applications') ? 'stall' : 'new')
-  }, [location.pathname])
+    setActiveTab(location.pathname.endsWith('/stall-applications')||new URLSearchParams(location.search).get('type')==='stall'?'stall':'new')
+  }, [location.pathname,location.search])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -39,9 +62,9 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
     if (!source) return
     autoOpenedKey.current = location.search
     setActiveTab(isStallApplication ? 'stall' : 'new')
-    if (isStallApplication) setReviewingApp(source)
+    if (isStallApplication) loadStallApplication(source)
     else loadApplication(source)
-  }, [applications, location.search, stallApplications])
+  }, [applications, location.search, stallApplications, loadApplication, loadStallApplication])
 
   const openThread = new URLSearchParams(location.search).get('view') === 'thread'
 
@@ -49,7 +72,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
   // cleared whenever the panel is closed or a different row is opened by hand.
   function clearReviewParams() {
     if (new URLSearchParams(location.search).has('applicationId')) {
-      navigate(location.pathname, { replace: true })
+      navigate(activeTab==='stall'?'/application-management/stall-applications':location.pathname, { replace: true })
     }
   }
 
@@ -60,20 +83,6 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
     clearReviewParams()
   }
 
-  async function loadApplication(app) {
-    if (app.draft) return
-    const seq = ++requestSeq.current
-    setOpeningApp(true)
-    try {
-      const detail = await apiRequest(`/api/applications/${app.id}`)
-      if (seq === requestSeq.current) setReviewingApp(detail)
-    } catch (error) {
-      console.error('Application detail request failed:', error)
-    } finally {
-      if (seq === requestSeq.current) setOpeningApp(false)
-    }
-  }
-
   function handleReviewApp(app) {
     clearReviewParams()
     return loadApplication(app)
@@ -81,35 +90,8 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
 
   function handleReviewStallApp(app) {
     clearReviewParams()
-    setReviewingApp(app)
+    return loadStallApplication(app)
   }
-
-  const liveProjects = useMemo(() => {
-    const approvedLiveApps = (applications || [])
-      .filter(app => app.applicationStatus === 'Approved' && app.arDevelopment === 'Live')
-      .map(app => ({
-        id: app.id,
-        mallName: app.mallName,
-        arStatus: 'Live',
-      }))
-
-    const externalLiveProjects = (arProjects || [])
-      .filter(project => project.arStatus === 'Live')
-      .map(project => ({
-        id: project.id,
-        mallName: project.mallName,
-        arStatus: 'Live',
-      }))
-
-    const merged = [...externalLiveProjects, ...approvedLiveApps]
-    const seen = new Set()
-    return merged.filter(project => {
-      const key = `${project.mallName}:${project.id}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  }, [applications, arProjects])
 
   async function handleRequestRevision(id, notes, isStallApplication = false) {
     if (isStallApplication) return
@@ -125,24 +107,11 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
 
   async function handleApprove(id, isStallApplication = false) {
     if (isStallApplication) {
-      const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      const approvedStallApp = stallApplications?.find(a => a.id === id)
-      setStallApplications(prev => prev.map(app => {
-        if (app.id !== id) return app
-        return {
-          ...app,
-          applicationStatus: 'Approved',
-          lastUpdated: now,
-        }
-      }))
-      // Notify parent that stall app was approved so AR can be unpublished
-      if (onStallAppApproved && approvedStallApp) {
-        onStallAppApproved({
-          ...approvedStallApp,
-          applicationStatus: 'Approved',
-          lastUpdated: now,
-        })
-      }
+      const current=reviewingApp
+      const result=await apiRequest(`/api/stall-applications/${id}/approve`,{method:'POST',body:JSON.stringify({revision:current.revision})})
+      setStallApplications(await apiRequest('/api/stall-applications'))
+      await loadStallApplication({id})
+      return result
     } else {
       await apiRequest(`/api/applications/${id}/approve`, { method: 'POST' })
       const next = await apiRequest('/api/applications')
@@ -156,8 +125,7 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
   }
 
   async function handleSendNote(id, note, attachments = [], isStallApplication = false) {
-    if (isStallApplication) return
-    const sentMessage = await apiRequest(`/api/applications/${id}/thread`, {
+    const sentMessage = await apiRequest(`/api/${isStallApplication?'stall-applications':'applications'}/${id}/thread`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: note, attachments }),
@@ -166,15 +134,38 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
       ? { ...current, thread: [...(current.thread || []), sentMessage] }
       : current)
     // Refresh the table in the background; the thread must not wait for it.
-    apiRequest('/api/applications').then(setApplications).catch(() => {})
+    apiRequest(isStallApplication?'/api/stall-applications':'/api/applications').then(isStallApplication?setStallApplications:setApplications).catch(() => {})
     return sentMessage
   }
 
+  useRealtimeRefresh(p=>{if(['application','ar_development','mall_service_request','contract_payment_request'].includes(p.table))window.dispatchEvent(new Event('navar-application-review-refresh'))})
+  const historyId=reviewingApp?.historyId
+  const threadId=reviewingApp?.id
+  const isStallThread=Boolean(reviewingApp?.expansionId)
+  useEffect(()=>{
+    if(!threadId||historyId)return
+    let mounted=true
+    const refresh=async()=>{
+      try{
+        const [data,state]=await Promise.all([
+          apiRequest(`/api/${isStallThread?'stall-applications':'applications'}/${threadId}/thread`),
+          isStallThread?Promise.resolve(null):apiRequest(`/api/applications/${threadId}/state`),
+        ])
+        if(mounted)setReviewingApp(current=>{
+          if(current?.id!==threadId)return current
+          const newer=state&&(!current.updatedAt||!state.updatedAt||Date.parse(state.updatedAt)>=Date.parse(current.updatedAt))
+          return {...current,...(newer?state:{}),thread:data.messages,...(typeof data.threadReadOnly==='boolean'?{threadReadOnly:data.threadReadOnly}:{})}
+        })
+      }catch{ /* Keep current details and messages during a temporary disconnect. */ }
+    }
+    const timer=setInterval(refresh,10000)
+    window.addEventListener('focus',refresh);window.addEventListener('navar-application-review-refresh',refresh)
+    return()=>{mounted=false;clearInterval(timer);window.removeEventListener('focus',refresh);window.removeEventListener('navar-application-review-refresh',refresh)}
+  },[threadId,isStallThread,historyId])
+
   const currentReviewApp = reviewingApp && applications ? reviewingApp : null
 
-  const currentReviewStallApp = reviewingApp && stallApplications
-    ? stallApplications.find(a => a.id === reviewingApp.id) ?? null
-    : null
+  const currentReviewStallApp = activeTab==='stall'&&reviewingApp?.expansionId?reviewingApp:null
 
   return (
     <div className="app-mgmt-page">
@@ -212,7 +203,6 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
             applications={stallApplications}
             onApplicationsChange={setStallApplications}
             onReviewApp={handleReviewStallApp}
-            liveProjects={liveProjects}
           />
         )}
       </div>
@@ -228,13 +218,14 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
 
       {currentReviewApp && activeTab === 'new' && (
         <ReviewPanel
-          key={currentReviewApp.id}
+          key={`${currentReviewApp.id}:${currentReviewApp.historyId||'current'}`}
           app={currentReviewApp}
-          onVersionChange={id => loadApplication({ id })}
+          onVersionChange={(id,historyId) => loadApplication({ id,historyId })}
           onDecision={async (id, name, notes) => {
-            await apiRequest(`/api/applications/${id}/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }) })
+            const response=await apiRequest(`/api/applications/${id}/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }) })
             setApplications(await apiRequest('/api/applications'))
             setReviewingApp(await apiRequest(`/api/applications/${id}`))
+            return response
           }}
           onClose={closeReview}
           onRequestRevision={(id, notes) => handleRequestRevision(id, notes, false)}
@@ -246,16 +237,16 @@ export default function ApplicationManagement({ onAppApproved, arProjects = [], 
 
 
       {currentReviewStallApp && activeTab === 'stall' && (
-        <ReviewPanel
-          app={currentReviewStallApp}
-          onClose={closeReview}
-          onRequestRevision={(id, notes) => handleRequestRevision(id, notes, true)}
-          onApprove={(id) => handleApprove(id, true)}
-          onSendNote={(id, note, attachments) => handleSendNote(id, note, attachments, true)}
-          isStallApplication={true}
-          initialTab={openThread ? 'thread' : 'submission'}
-        />
+        <StallReviewPanel key={currentReviewStallApp.id} app={currentReviewStallApp} onClose={closeReview}
+          initialTab={openThread?'thread':'submission'}
+          onDecision={async(action,note)=>{
+            if(action==='approve')return handleApprove(currentReviewStallApp.id,true)
+            const result=await apiRequest(`/api/stall-applications/${currentReviewStallApp.id}/revision`,{method:'POST',body:JSON.stringify({revision:currentReviewStallApp.revision,note})})
+            setStallApplications(await apiRequest('/api/stall-applications'));await loadStallApplication(currentReviewStallApp);return result
+          }}
+          onSendNote={(note,files)=>handleSendNote(currentReviewStallApp.id,note,files,true)}/>
       )}
+
     </div>
   )
 }

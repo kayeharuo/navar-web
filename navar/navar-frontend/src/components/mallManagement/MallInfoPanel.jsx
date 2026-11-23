@@ -5,7 +5,6 @@ import AuthImage from '../ui/AuthImage'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }
-const DEFAULT_MALL_COVERAGE_AREA = 'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm'
 
 function formatTime(time) {
   if (!time) return ''
@@ -67,7 +66,6 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
     navigate(`/mall-management/stores/${mall.id}`)
   }
   const opHours = formatOperatingHours(mall.operatingHours)
-  const coverageArea = mall.mallCoverageArea || DEFAULT_MALL_COVERAGE_AREA
   const cityProvince = [mall.city, mall.province].filter(Boolean).join(', ')
   const logoUrl = mall.logoUrl
 
@@ -94,12 +92,13 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
 
           <SectionHeader title="MALL INFORMATION" />
           <InfoRow label="Address" value={mall.address} />
+          <InfoRow label="Barangay" value={mall.barangay || '—'} />
           <InfoRow label="City, Province" value={cityProvince || '—'} />
           <InfoRow label="Zip Code" value={mall.zipCode} />
           <InfoRow label="Latitude" value={mall.latitude ?? '—'} />
           <InfoRow label="Longitude" value={mall.longitude ?? '—'} />
           <InfoRow label="Floors" value={mall.floors} />
-          <InfoRow label="Coverage Area (GFA)" value={coverageArea} />
+          <InfoRow label="Total Floor Area" value={mall.floorDetails?.length ? `${mall.floorDetails.reduce((total, floor) => total + Number(floor.floorAreaSqm || 0), 0).toLocaleString()} sqm` : '—'} />
           <InfoRow label="Stores" value={mall.storesCount} />
           <InfoRow label="Units" value={mall.unitsCount ?? mall.units?.length ?? 0} />
           <InfoRow label="Operating Hours" value={opHours} />
@@ -125,7 +124,8 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
             </div>
           </div>
 
-          <SectionHeader title="AGREEMENT" />
+          <SectionHeader title="SUBSCRIPTION" />
+          <InfoRow label="Initially preferred tier" value={mall.initialPreferredTier || 'Not selected'} />
           <InfoRow label="Status" value={mall.agreementStatus} />
           <InfoRow label="Tier" value={mall.tier} />
           <InfoRow label="Start Date" value={mall.agreementStartDate} />

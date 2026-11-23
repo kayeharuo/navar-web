@@ -1,8 +1,9 @@
-export default function TestingModal({ mallName, errors, onCancel, onProceed }) {
+import LoadingSpinner from '../ui/LoadingSpinner'
+export default function TestingModal({ busy = false, mallName, errors, onCancel, onProceed }) {
   const hasErrors = errors && errors.length > 0
 
   return (
-    <div className="ar-modal-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+    <div className="ar-modal-overlay" onClick={e => !busy && e.target === e.currentTarget && onCancel()}>
       <div className="ar-modal-box">
         <h3 className="ar-modal-title">Submit {mallName} for Testing?</h3>
         <p className="ar-modal-subtitle">
@@ -35,13 +36,13 @@ export default function TestingModal({ mallName, errors, onCancel, onProceed }) 
         )}
 
         <div className="ar-modal-actions">
-          <button className="ar-modal-btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className="ar-modal-btn-cancel" disabled={busy} onClick={onCancel}>Cancel</button>
           <button
             className="ar-modal-btn-proceed"
             onClick={onProceed}
-            disabled={hasErrors}
+            disabled={hasErrors||busy}
           >
-            Proceed to Navigation Testing
+            {busy?<LoadingSpinner label="Submitting for testing..." showLabel/>:'Proceed to Navigation Testing'}
           </button>
         </div>
       </div>

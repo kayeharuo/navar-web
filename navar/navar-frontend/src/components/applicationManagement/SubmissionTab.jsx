@@ -38,7 +38,7 @@ function FloorPlanCard({ floorPlan }) {
   async function openFloorPlan() {
     setLoading(true)
     try {
-      const result = await apiRequest(`/api/application-floor-plans/${floorPlan.app_floor_plan_id}/url`)
+      const result = await apiRequest(floorPlan.previewEndpoint||`/api/application-floor-plans/${floorPlan.app_floor_plan_id}/url`)
       setPreviewUrl(result.url)
     } catch (error) {
       console.error('Floor-plan preview failed:', error)
@@ -49,7 +49,7 @@ function FloorPlanCard({ floorPlan }) {
 
   async function downloadFloorPlan() {
     try {
-      const result = await apiRequest(`/api/application-floor-plans/${floorPlan.app_floor_plan_id}/url`)
+      const result = await apiRequest(floorPlan.previewEndpoint||`/api/application-floor-plans/${floorPlan.app_floor_plan_id}/url`)
       const link = document.createElement('a')
       link.href = result.url
       link.download = result.fileName || floorPlan.filename || 'floor-plan'
@@ -68,7 +68,7 @@ function FloorPlanCard({ floorPlan }) {
           <div className="review-floor-card-icon"><FileIcon /></div>
           <div className="review-floor-card-info">
             <div className="review-floor-card-name">{floorPlan.floor}</div>
-            <div className="review-floor-card-file">{floorPlan.filename} · {floorPlan.size}</div>
+            <div className="review-floor-card-file">{floorPlan.filename} / {floorPlan.size}{floorPlan.reuseLabel?` / ${floorPlan.reuseLabel}`:''}</div>
           </div>
         </button>
         <button className="review-download-btn" onClick={downloadFloorPlan}>Download</button>

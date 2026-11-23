@@ -1,3 +1,4 @@
+import useDashboardData from '../components/dashboard/useDashboardData'
 import AlertBanner from '../components/dashboard/AlertBanner'
 import AgreementSummary from '../components/dashboard/AgreementSummary'
 import ApplicationsPanel from '../components/dashboard/ApplicationsPanel'
@@ -7,23 +8,12 @@ import ARUsageStats from '../components/dashboard/ARUsageStats'
 import RecentActivity from '../components/dashboard/RecentActivity'
 import '../styles/dashboard/dashboardLayout.css'
 
-const alerts = [
-  {
-    type: 'error',
-    title: 'Parkmall is suspended.',
-    message: 'AR navigation is offline. Awaiting reinstatement contact.',
-  },
-  {
-    type: 'warning',
-    title: 'Ayala Center Cebu — grace period.',
-    message: '27 days overdue. AR still active. Contact mall to arrange payment.',
-  },
-]
-
 export default function Dashboard() {
+  const {data:alerts,error} = useDashboardData('/api/subscriptions/alerts')
   return (
     <div className="dash-page">
       <AlertBanner alerts={alerts} />
+      {error && <p className="mall-field-error">{error}</p>}
 
       <div className="dash-top-grid">
         <AgreementSummary />

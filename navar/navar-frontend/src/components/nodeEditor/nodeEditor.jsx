@@ -1,11 +1,24 @@
+import { prepareDraft } from "./prepareDraft";
+import { apiRequest } from "../../config/api";
+import { EditorBeacons } from './components/EditorBeacons';
+import { MapSnapshots } from './components/MapSnapshots';
+import { LoaderCircle } from 'lucide-react';
+import { planNodeDeletion, findBeaconAssignmentChanges, getBeaconAssignmentIssues } from './beaconChanges';
+import { notifyMallBeaconsUpdated } from '../../utils/mallDataEvents';
+import { snapshotContent } from './snapshotContent';
+import { autoConnect } from "./autoConnections";
+import { TransitionGroupPicker } from "./components/TransitionGroupPicker";
+import { FloorConnections } from "./components/FloorConnections";
+import { EmergencyToggle } from "./components/EmergencyToggle";
 import "./nodeEditor.css";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { preserveCurrentSnapshot } from './snapshotPreservation';
 import { NodeCanvas } from "./components/NodeCanvas";
 import { PlaceModal } from "./components/PlaceModal";
 import { CalibrationModal } from "./components/CalibrationModal";
 import { DataTable } from "./components/DataTable";
 import { useHistory } from "./hooks/useHistory";
-import { C, F, M, NODE_TYPES, NODE_GROUPS, PATH_TYPE, FLOORS, STORE_UNITS, STALL_STORES, formatStore, uid, } from "./editorConstants";
+import { C, F, M, NODE_TYPES, NODE_GROUPS, PATH_TYPE, FLOORS, STORE_UNITS, stallStoresForFloor, formatStore, uid, } from "./editorConstants";
 import { loadNodeMap, buildSaveBody, saveNodeMap, edgeMeters, withFreshDistances } from "./mapApi";
 import { useFloorImage } from "./hooks/useFloorImage";
 // The map is editable only while the AR development is in Node Mapping. The status
@@ -19,33 +32,9 @@ const STATUS_CONFIG = {
 const STATUS_ORDER = ["node_mapping", "navigation_testing", "ready_for_activation", "live"];
 const LOCKED_STATUS = { label: "Locked", short: "Locked", color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1", icon: "🔒", editable: false };
 const statusConfigFor = (status) => STATUS_CONFIG[status] || { ...LOCKED_STATUS, label: String(status || "locked").replace(/_/g, " "), short: String(status || "locked").replace(/_/g, " ") };
-// Deleting a node also removes its edges and any cross-floor link that pointed at it.
-function removeNodeFromSnapshot(snap, floor, id) {
-    const nodes = {};
-    for (const f of Object.keys(snap.nodes)) {
-        nodes[f] = snap.nodes[f]
-            .filter(n => !(f === floor && n.id === id))
-            .map(n => (n.cross_floor_link === id ? { ...n, cross_floor_link: null } : n));
-    }
-    return { nodes, edges: { ...snap.edges, [floor]: (snap.edges[floor] || []).filter(e => e.from !== id && e.to !== id) }, calibration: snap.calibration };
-}
-function validateTransitions(nodes) {
-    const issues = [];
-    const allNodes = Object.values(nodes).flat();
-    FLOORS.forEach(f => {
-        (nodes[f] || []).forEach(n => {
-            if (!NODE_TYPES[n.type]?.isFloorTransition)
-                return;
-            if (!n.cross_floor_link) {
-                issues.push({ floor: f, nodeId: n.id, label: n.label || n.type, type: n.type });
-                return;
-            }
-            const target = allNodes.find(t => t.id === n.cross_floor_link);
-            if (!target)
-                issues.push({ floor: f, nodeId: n.id, label: n.label || n.type, type: n.type });
-        });
-    });
-    return issues;
+function validateTransitions(nodes, edges, groups) {
+    const connections = edges.__crossFloor || [];
+    return Object.entries(nodes).flatMap(([floor, list]) => list.filter(n => NODE_TYPES[n.type]?.isFloorTransition && (!groups.some(g => g.id === n.transition_group_id && g.type === n.type) || !connections.some(e => e.from === n.id || e.to === n.id))).map(n => ({ floor, nodeId: n.id, label: n.label, type: n.type, reason: !groups.some(g => g.id === n.transition_group_id && g.type === n.type) ? "Missing transition group: select or create one in Node Properties." : "No matching landing: add this group on the neighboring floor (or next served elevator floor)." })));
 }
 // ── Shared atoms ──────────────────────────────────────────────────────────────
 const SecHead = ({ children, color }) => (<div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, marginTop: 12 }}>
@@ -54,6 +43,16 @@ const SecHead = ({ children, color }) => (<div style={{ display: "flex", alignIt
       {children}
     </span>
   </div>);
+const CoordinateInput = ({ value, onChange, ...props }) => {
+    const [draft, setDraft] = useState(null);
+    const shown = draft && draft.value === value ? draft.text : Number(value.toFixed(2));
+    return <input {...props} value={shown} onChange={e => {
+        const text = e.target.value;
+        const number = e.target.valueAsNumber;
+        setDraft({ value: Number.isFinite(number) ? number : value, text });
+        if (text !== "" && Number.isFinite(number)) onChange(number);
+    }} onBlur={() => setDraft(null)} onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }} />;
+};
 const PathBadge = ({ type, sm }) => {
     const pt = PATH_TYPE[type] || PATH_TYPE.normal;
     return (<span style={{
@@ -98,12 +97,12 @@ const TransitionWarningModal = ({ issues, onClose }) => (<div style={{ position:
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", fontFamily: F }}>{iss.label}</div>
               <div style={{ fontSize: 10, color: "#64748B", fontFamily: M }}>{iss.floor} · {iss.nodeId} · {NODE_TYPES[iss.type]?.label}</div>
-              <div style={{ fontSize: 10, color: C.red, fontFamily: M, marginTop: 1 }}>Missing cross-floor link — select this node and set the link in the right panel</div>
+              <div style={{ fontSize: 10, color: C.red, fontFamily: M, marginTop: 1 }}>{iss.reason}</div>
             </div>
           </div>))}
       </div>
       <div style={{ fontSize: 11, color: "#64748B", fontFamily: M, marginBottom: 16, lineHeight: 1.6 }}>
-        A staircase, escalator, elevator, or ramp always connects to its counterpart on the adjacent floor. Fix all items above before saving.
+        Assign each landing to a group and place its matching landing on another floor. Connections are created automatically.
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, background: C.red, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
@@ -187,16 +186,36 @@ const SaveProblemsModal = ({ problems, onClose }) => {
 };
 // ── Main ──────────────────────────────────────────────────────────────────────
 function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
-    const { snapshot, push, undo, redo, canUndo, canRedo } = useHistory(initial.snapshot);
+    const { snapshot, push: historyPush, replace: historyReplace, undo, redo, canUndo, canRedo } = useHistory(autoConnect(initial.snapshot, initial.floorMeta));
+    const push = useCallback(next => historyPush(autoConnect({ ...next, groups: next.groups ?? snapshot.groups ?? [], beacons: next.beacons ?? snapshot.beacons ?? [] }, initial.floorMeta)), [historyPush, snapshot.groups, snapshot.beacons, initial.floorMeta]);
+    const replace = next => historyReplace(autoConnect({ ...next, groups: next.groups ?? snapshot.groups ?? [], beacons: next.beacons ?? snapshot.beacons ?? [] }, initial.floorMeta));
     const { floorMeta } = initial;
     // The status and revision come from the server. The revision is how the backend
     // detects that someone else saved the map first.
     const projectStatus = initial.meta.status;
     const revision = useRef(initial.meta.revision);
+    const beaconRevision = useRef(initial.meta.beaconRevision);
+    const beaconDbIds = useRef(new Map());
+    const appliedBeacons = useRef(initial.snapshot.beacons || []);
+    const appliedContent = useRef(snapshotContent(buildSaveBody(initial.snapshot, floorMeta, { baseRevision: initial.meta.revision, finalize: true, dbIds: new Map() })));
+    const [matchingSnapshot, setMatchingSnapshot] = useState(null);
+    const [beaconPanel, setBeaconPanel] = useState(false);
+    const [savedSnapshot, setSavedSnapshot] = useState(null);
+    const [beaconRemovalWarning, setBeaconRemovalWarning] = useState(null);
+    const [nodeDeleteWarning, setNodeDeleteWarning] = useState(null);
+    const [needsSnapshot, setNeedsSnapshot] = useState(false);
     const dbIds = useRef(new Map());
     const [savedAt, setSavedAt] = useState(null);
     const [unsaved, setUnsaved] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [savePhase, setSavePhase] = useState('checking');
+    const [snapshotPanel, setSnapshotPanel] = useState(false);
+    const [namedSnapshots, setNamedSnapshots] = useState([]);
+    const [snapshotName, setSnapshotName] = useState("");
+    const [snapshotBusy, setSnapshotBusy] = useState(false);
+    const [snapshotError, setSnapshotError] = useState("");
+    const [restoreTarget, setRestoreTarget] = useState(null);
+    const [restoreCheck, setRestoreCheck] = useState({ status: 'idle', match: null });
     const [confirmAction, setConfirmAction] = useState(null);
     const [transitionIssues, setTransitionIssues] = useState(null);
     const [saveProblems, setSaveProblems] = useState(null);
@@ -210,52 +229,78 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
     const [showData, setShowData] = useState(false);
     const [toast, setToast] = useState(null);
     // ── Node mode state ──
-    const [selectedId, setSelId] = useState(null);
+    const [selectedId, setSelectedId] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const setSelId = useCallback((id) => { setSelectedId(id); setSelectedIds(id ? [id] : []); }, []);
+    const [clipboard, setClipboard] = useState(null);
+    const pasteCount = useRef(0);
     const [selectedEdgeId, setSelEdgeId] = useState(null);
+    const [calibrationSelected, setCalibrationSelected] = useState(false);
+    const [calibrationEdits, setCalibrationEdits] = useState(null);
+    const [calibrationEditsDirty, setCalibrationEditsDirty] = useState(false);
+    const [calibrationError, setCalibrationError] = useState("");
     const [connectFrom, setConnFrom] = useState(null);
     const [pathType, setPathType] = useState("normal");
     const [placeModal, setPlaceModal] = useState(null);
     const dragInProgress = useRef(false);
     const [dragNodes, setDragNodes] = useState(null);
+    const [dragCalibration, setDragCalibration] = useState(null);
     // ── Node properties local edit state ──
     const [nodeEdits, setNodeEdits] = useState(null);
     const [nodeEditsDirty, setNodeEditsDirty] = useState(false);
     const [labelError, setLabelError] = useState(false);
     const { nodes, edges, calibration } = snapshot;
+    const floorCalib = calibration[floor];
+    const activeFloorCalib = dragCalibration || floorCalib;
     const floorNodes = nodes[floor] || [];
-    const floorEdges = edges[floor] || [];
+    const floorEdges = withFreshDistances(edges[floor] || [], (dragNodes ?? nodes)[floor] || [], activeFloorCalib?.pxPerMeter);
     const selNode = floorNodes.find(n => n.id === selectedId) || null;
     const selEdge = floorEdges.find(e => e.id === selectedEdgeId) || null;
     const totalNodes = Object.values(nodes).flat().length;
     const totalEdges = Object.values(edges).flat().length;
     const accEdges = Object.values(edges).flat().filter(e => e.path_type === "accessible").length;
-    const floorCalib = calibration[floor];
     const liveNodes = dragNodes ?? nodes;
     const liveFloorNodes = liveNodes[floor] || [];
     // Canvas nodes: preview staged properties without overriding live drag coordinates.
     const canvasFloorNodes = (nodeEdits && selectedId)
         ? liveFloorNodes.map(n => n.id === selectedId ? { ...nodeEdits, x: n.x, y: n.y } : n)
         : liveFloorNodes;
-    const showToast = (msg, color = C.green) => {
+    const showToast = useCallback((msg, color = C.green) => {
         setToast({ msg, color });
         setTimeout(() => setToast(null), 2800);
-    };
+    }, []);
+    useEffect(() => {
+        if (!calibrationSelected || !floorCalib) {
+            setCalibrationEdits(null);
+            setCalibrationEditsDirty(false);
+            setCalibrationError("");
+            return;
+        }
+        setCalibrationEdits({ refLine: floorCalib.refLine || "", meters: String(floorCalib.meters ?? ""), pathLossExponent: String(floorCalib.pathLossExponent ?? "") });
+        setCalibrationEditsDirty(false);
+        setCalibrationError("");
+    }, [calibrationSelected, floor, floorCalib]);
     const firstSnapshot = useRef(true);
+    const replacingAfterSave = useRef(false);
     useEffect(() => {
         if (firstSnapshot.current) {
             firstSnapshot.current = false;
+            return;
+        }
+        if (replacingAfterSave.current) {
+            replacingAfterSave.current = false;
             return;
         }
         setUnsaved(true);
     }, [snapshot]);
     // Warn before leaving with changes that were never saved.
     useEffect(() => {
-        if (!unsaved)
+        if (!unsaved && !nodeEditsDirty && !calibrationEditsDirty)
             return;
         const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
         window.addEventListener("beforeunload", warn);
         return () => window.removeEventListener("beforeunload", warn);
-    }, [unsaved]);
+    }, [unsaved, nodeEditsDirty, calibrationEditsDirty]);
     const floorImage = useFloorImage(floorMeta[floor]?.imageUrl);
     useEffect(() => { setDragNodes(null); }, [snapshot]);
     // Sync nodeEdits when selection changes
@@ -272,19 +317,67 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId]);
     // ── Persistence: everything goes through the backend, which re-validates and re-computes ──
-    const persist = useCallback(async (finalize) => {
+    const persist = useCallback(async (finalize, confirmAssignmentRemoval = false, chosenMatch = null) => {
         if (isLocked || saving)
             return false;
+        setSavePhase(chosenMatch ? 'applying' : 'checking');
         setSaving(true);
         try {
-            const body = buildSaveBody({ nodes: liveNodes, edges, calibration }, floorMeta, { baseRevision: revision.current, finalize, dbIds: dbIds.current });
+            const draft = prepareDraft({ nodes: liveNodes, edges, calibration, groups: snapshot.groups, beacons: snapshot.beacons }, floorMeta, { floor, selectedId, nodeEdits, nodeEditsDirty, calibrationEdits, calibrationEditsDirty });
+            const body = buildSaveBody(draft, floorMeta, { baseRevision: revision.current, finalize, dbIds: dbIds.current });
+            const content = snapshotContent(body);
+            if (!chosenMatch || chosenMatch.content !== content) {
+                const { match, revision: latestRevision, beaconRevision: latestBeaconRevision } = await apiRequest(`/api/ar-developments/${projectId}/node-map/snapshots/match`, { method: 'POST', body: JSON.stringify(body) });
+                if (latestRevision !== revision.current || latestBeaconRevision !== beaconRevision.current) {
+                    const error = new Error('The saved map or beacon data changed elsewhere. Preserve your work as a snapshot, then reload the editor.');
+                    error.status = 409; throw error;
+                }
+                if (match) {
+                    setSavedSnapshot({ ...match, content });
+                    setMatchingSnapshot({ ...match, content, confirmAssignmentRemoval });
+                    return false;
+                }
+                if (content === appliedContent.current) {
+                    setUnsaved(false);
+                    setNodeEditsDirty(false);
+                    setCalibrationEditsDirty(false);
+                    showToast('No changes to save. This map and beacon setup is already applied.', C.blue);
+                    return true;
+                }
+                setNeedsSnapshot(true); setSnapshotPanel(true); setSnapshotError('This layout differs from every saved snapshot. Save a new snapshot before applying.'); return false;
+            }
+            body.snapshotId = chosenMatch.id;
+            body.baseBeaconRevision = beaconRevision.current;
+            body.confirmAssignmentRemoval = confirmAssignmentRemoval;
+            body.beacons = body.beacons.map(b => ({ ...b, dbId: beaconDbIds.current.get(b.clientId) ?? b.dbId }));
             const result = await saveNodeMap(projectId, body);
             revision.current = result.revision;
-            for (const [clientId, id] of Object.entries(result.nodeIds || {}))
+            beaconRevision.current = result.beaconRevision;
+            for (const [clientId, id] of Object.entries(result.beaconIds || {})) beaconDbIds.current.set(clientId, id);
+            const savedBeacons = draft.beacons.map(b => ({ ...b, dbId: beaconDbIds.current.get(b.clientId) ?? b.dbId }));
+            appliedBeacons.current = savedBeacons;
+            appliedContent.current = content;
+            const savedNodeIds = result.nodeIds || {};
+            for (const [clientId, id] of Object.entries(savedNodeIds))
                 dbIds.current.set(clientId, id);
+            const savedNodes = Object.fromEntries(Object.entries(draft.nodes).map(([floorLabel, floorNodes]) => [
+                floorLabel,
+                floorNodes.map(node => ({ ...node, dbId: savedNodeIds[node.id] ?? node.dbId ?? dbIds.current.get(node.id) })),
+            ]));
+            const savedEdgeIds = result.edgeIds || {};
+            const savedEdges = Object.fromEntries(Object.entries(draft.edges).map(([floorLabel, floorEdges]) => [
+                floorLabel,
+                floorEdges.map(edge => ({ ...edge, dbId: savedEdgeIds[[edge.from, edge.to].sort().join("::")] ?? edge.dbId })),
+            ]));
+            replacingAfterSave.current = true;
+            replace({ nodes: savedNodes, edges: savedEdges, calibration: draft.calibration, groups: draft.groups, beacons: savedBeacons });
+            setNodeEdits(current => current ? { ...current, dbId: savedNodeIds[current.id] ?? current.dbId ?? dbIds.current.get(current.id) } : current);
+            setNodeEditsDirty(false);
+            setCalibrationEditsDirty(false);
             const now = new Date();
             setSavedAt(now);
             setUnsaved(false);
+            notifyMallBeaconsUpdated(initial.meta.mallId);
             setSaveProblems(result.warnings?.length ? { title: "Saved, with warnings", items: result.warnings.map(w => w.message), tone: "warn" } : null);
             showToast(finalize ? "Map saved and validated." : `Draft saved — ${now.toLocaleTimeString()}`, C.green);
             return true;
@@ -301,19 +394,103 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             setSaving(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLocked, saving, liveNodes, edges, calibration, floorMeta, projectId]);
-    const handleSaveDraft = useCallback(() => { persist(false); }, [persist]);
+    }, [isLocked, saving, liveNodes, edges, calibration, snapshot.groups, snapshot.beacons, savedSnapshot, floor, selectedId, nodeEdits, nodeEditsDirty, calibrationEdits, calibrationEditsDirty, floorMeta, projectId, initial.meta.mallId, replace]);
+    const handleSaveDraft = useCallback(() => { setSnapshotPanel(true); setNeedsSnapshot(false); }, []);
+    const snapshotUrl = `/api/ar-developments/${projectId}/node-map/snapshots`;
+    const openSnapshots = () => { setRestoreTarget(null); setSnapshotError(''); setSnapshotPanel(true); setNeedsSnapshot(false); };
+    useEffect(() => {
+        if (!snapshotPanel) return;
+        let active = true;
+        setSnapshotBusy(true);
+        apiRequest(snapshotUrl).then(items => { if (active) setNamedSnapshots(items); })
+            .catch(error => { if (active) setSnapshotError(error.message); })
+            .finally(() => { if (active) setSnapshotBusy(false); });
+        return () => { active = false; };
+    }, [snapshotPanel, snapshotUrl]);
+    const restoreComparison = useMemo(() => {
+        if (!restoreTarget) return null;
+        try {
+            const draft = prepareDraft({ nodes: liveNodes, edges, calibration, groups: snapshot.groups, beacons: snapshot.beacons }, floorMeta, { floor, selectedId, nodeEdits, nodeEditsDirty, calibrationEdits, calibrationEditsDirty });
+            return { draft };
+        } catch (error) { return { error: error.message }; }
+    }, [restoreTarget, liveNodes, edges, calibration, snapshot.groups, snapshot.beacons, floorMeta, floor, selectedId, nodeEdits, nodeEditsDirty, calibrationEdits, calibrationEditsDirty]);
+    useEffect(() => {
+        if (!restoreComparison) { setRestoreCheck({ status: 'idle', match: null }); return; }
+        if (restoreComparison.error) { setRestoreCheck({ status: 'error', match: null, error: restoreComparison.error }); return; }
+        let active = true;
+        setRestoreCheck({ status: 'checking', match: null });
+        const body = buildSaveBody(restoreComparison.draft, floorMeta, { baseRevision: revision.current, finalize: true, dbIds: dbIds.current });
+        apiRequest(`${snapshotUrl}/match`, { method: 'POST', body: JSON.stringify(body) })
+            .then(({ match }) => { if (active) setRestoreCheck({ status: match ? 'matched' : 'different', match }); })
+            .catch(error => { if (active) setRestoreCheck({ status: 'error', match: null, error: error.message }); });
+        return () => { active = false; };
+    }, [restoreComparison, snapshotUrl, floorMeta]);
+    const saveSnapshot = async () => {
+        if (isLocked || snapshotBusy || saving) return false;
+        setSnapshotBusy(true); setSnapshotError("");
+        try {
+            const draft = prepareDraft({ nodes: liveNodes, edges, calibration, groups: snapshot.groups, beacons: snapshot.beacons }, floorMeta, { floor, selectedId, nodeEdits, nodeEditsDirty, calibrationEdits, calibrationEditsDirty });
+            const { missing: orphans } = getBeaconAssignmentIssues(draft.beacons, draft.nodes, dbIds.current);
+            if (orphans.length) { setSnapshotPanel(false); setBeaconRemovalWarning({ orphans, changed: [] }); return false; }
+            const saveBody = buildSaveBody(draft, floorMeta, { baseRevision: revision.current, finalize: true, dbIds: dbIds.current });
+            const payload = { ...draft, saveBody, floorIds: Object.fromEntries(Object.entries(floorMeta).map(([label, meta]) => [label, meta.floorId])) };
+            const saved = await preserveCurrentSnapshot({
+                name: snapshotName, body: saveBody, payload,
+                findMatch: body => apiRequest(`${snapshotUrl}/match`, { method: 'POST', body: JSON.stringify(body) }),
+                create: value => apiRequest(snapshotUrl, { method: 'POST', body: JSON.stringify(value) }),
+            });
+            setSavedSnapshot({ id: saved.snapshot_id, name: saved.name, content: snapshotContent(saveBody) });
+            if (!saved.existing) setNamedSnapshots(current => [saved, ...current]);
+            setSnapshotName(""); setNeedsSnapshot(false);
+            showToast(saved.existing ? `Already saved as "${saved.name}". No duplicate created.` : 'Snapshot saved. Use Save & Validate to apply.'); return true;
+        } catch (error) { setSnapshotError(error.message); return false; }
+        finally { setSnapshotBusy(false); }
+    };
+    const restoreSnapshot = async (preserve) => {
+        if (isLocked || saving || snapshotBusy) return;
+        if (preserve && !await saveSnapshot()) return;
+        setSnapshotBusy(true); setSnapshotError("");
+        try {
+            const saved = await apiRequest(`${snapshotUrl}/${restoreTarget.snapshot_id}`);
+            const draft = structuredClone(saved.payload);
+            if (!Array.isArray(draft.beacons) || !draft.saveBody) throw new Error('This older snapshot has no beacon data. It cannot be applied safely; create a new snapshot.');
+            const floorIds = Object.fromEntries(Object.entries(floorMeta).map(([label, meta]) => [label, meta.floorId]));
+            if (Object.keys(floorIds).length !== Object.keys(draft.floorIds).length || Object.entries(floorIds).some(([label, id]) => draft.floorIds[label] !== id)) throw new Error("The floors have changed since this snapshot. This layout cannot be restored.");
+            const current = await loadNodeMap(projectId);
+            const currentIds = new Set(Object.values(current.snapshot.nodes).flat().map(n => n.dbId));
+            for (const list of Object.values(draft.nodes)) for (const node of list) {
+                const id = saved.identities?.node_ids?.[node.id] ?? dbIds.current.get(node.id) ?? node.dbId;
+                node.dbId = currentIds.has(id) ? id : undefined;
+            }
+            dbIds.current.clear();
+            for (const b of draft.beacons) b.dbId = saved.identities?.beacon_ids?.[b.clientId] ?? beaconDbIds.current.get(b.clientId) ?? b.dbId;
+            // A historic layout must not delete hardware added since it was saved.
+            for (const b of current.snapshot.beacons) if (!draft.beacons.some(old => old.dbId === b.dbId)) draft.beacons.push({ ...b, nodeId: null });
+            setSavedSnapshot({ id: saved.snapshot_id, name: saved.name, content: snapshotContent(draft.saveBody) });
+            push(draft); setSelId(null); setSelEdgeId(null); setNodeEdits(null); setNodeEditsDirty(false);
+            setCalibrationSelected(false); setCalibrationEditsDirty(false); setCalibPts([]); setConnFrom(null);
+            setUnsaved(true); setRestoreTarget(null); setSnapshotPanel(false);
+            showToast(`Restored ${saved.name}. Use Save & Validate to apply.`, C.blue);
+        } catch (error) { setSnapshotError(error.message); }
+        finally { setSnapshotBusy(false); }
+    };
     // "Save & Validate": stricter than a draft save (every stairs / escalator / elevator /
     // ramp must be linked). It does NOT change the AR development status; moving to
     // Navigation Testing is done from the AR Development page.
-    const handleSave = async () => {
+    const handleSave = async (confirmed = false) => {
         setConfirmAction(null);
-        const issues = validateTransitions(liveNodes);
+        let draft;
+        try { draft = prepareDraft({ nodes: liveNodes, edges, calibration, groups: snapshot.groups, beacons: snapshot.beacons }, floorMeta, { floor, selectedId, nodeEdits, nodeEditsDirty, calibrationEdits, calibrationEditsDirty }); }
+        catch (error) { setSaveProblems({ title: "Not saved", items: [error.message], tone: "error" }); return; }
+        const issues = validateTransitions(draft.nodes, draft.edges, draft.groups || []);
         if (issues.length > 0) {
             setTransitionIssues(issues);
             return;
         }
-        await persist(true);
+        const { missing: orphans, unassigned } = getBeaconAssignmentIssues(draft.beacons, draft.nodes, dbIds.current);
+        const changed = findBeaconAssignmentChanges(appliedBeacons.current, draft.beacons, draft.nodes, dbIds.current, beaconDbIds.current);
+        if (orphans.length || ((changed.length || unassigned.length) && confirmed !== true)) { setBeaconRemovalWarning({ orphans, changed, unassigned }); return; }
+        await persist(true, confirmed === true);
     };
     // ── Push helpers ──
     const pushNodes = (n) => push({ nodes: n, edges, calibration });
@@ -329,7 +506,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             setSelEdgeId(null);
             showToast("Undo", C.violet);
         }
-    }, [undo, isLocked]);
+    }, [undo, isLocked, setSelId, showToast]);
     const handleRedo = useCallback(() => {
         if (isLocked)
             return;
@@ -339,44 +516,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             setSelEdgeId(null);
             showToast("Redo", C.blue);
         }
-    }, [redo, isLocked]);
-    useEffect(() => {
-        const onKey = (e) => {
-            const tag = e.target?.tagName;
-            const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-            const ctrl = e.ctrlKey || e.metaKey;
-            if (ctrl) {
-                if (e.key === "z" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleUndo();
-                }
-                if (e.key === "y" || (e.key === "z" && e.shiftKey)) {
-                    e.preventDefault();
-                    handleRedo();
-                }
-                if (e.key === "s" && !isLocked) {
-                    e.preventDefault();
-                    handleSaveDraft();
-                }
-            }
-            if (!inInput && (e.key === "Delete" || e.key === "Backspace") && !isLocked) {
-                if (selectedId) {
-                    e.preventDefault();
-                    push(removeNodeFromSnapshot({ nodes, edges, calibration }, floor, selectedId));
-                    setSelId(null);
-                    showToast("Node deleted.", C.red);
-                }
-                else if (selectedEdgeId) {
-                    e.preventDefault();
-                    pushEdges({ ...edges, [floor]: edges[floor].filter(e2 => e2.id !== selectedEdgeId) });
-                    setSelEdgeId(null);
-                    showToast("Edge deleted.", C.red);
-                }
-            }
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [handleUndo, handleRedo, handleSaveDraft, isLocked, selectedId, selectedEdgeId, nodes, edges, calibration, floor, push, pushEdges]);
+    }, [redo, isLocked, setSelId, showToast]);
     // ── Canvas handler ──
     const handleCanvasClick = (x, y) => {
         if (edMode === "calibrate") {
@@ -396,20 +536,30 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         }
         setSelId(null);
         setSelEdgeId(null);
+        setCalibrationSelected(false);
     };
     // ── Node handlers ──
     const handlePlaceConfirm = (data) => {
         if (!placeModal || isLocked)
             return;
-        const n = { id: uid("n"), x: placeModal.x, y: placeModal.y, floor, ...data };
-        pushNodes({ ...nodes, [floor]: [...(nodes[floor] || []), n] });
+        const { newGroup, ...properties } = data;
+        const n = { id: uid("n"), x: placeModal.x, y: placeModal.y, floor, ...properties };
+        push({ nodes: { ...nodes, [floor]: [...(nodes[floor] || []), n] }, edges, calibration, groups: newGroup ? [...(snapshot.groups || []), newGroup] : snapshot.groups });
         setSelId(n.id);
         setSelEdgeId(null);
         setEdMode("select");
         setPlaceModal(null);
         showToast(`${NODE_TYPES[data.type]?.label} placed.`);
     };
-    const handleNodeClick = (node) => {
+    const handleNodeClick = (node, additive = false) => {
+        setCalibrationSelected(false);
+        if (edMode === "select" && additive) {
+            const next = selectedIds.includes(node.id) ? selectedIds.filter(id => id !== node.id) : [...selectedIds, node.id];
+            setSelectedIds(next);
+            setSelectedId(next.includes(node.id) ? node.id : next.at(-1) || null);
+            setSelEdgeId(null);
+            return;
+        }
         if (isLocked) {
             setSelId(node.id);
             setSelEdgeId(null);
@@ -430,7 +580,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                 let autoPt = pathType;
                 if (NODE_TYPES[fromNode?.type || ""]?.isPwdType || NODE_TYPES[node.type]?.isPwdType)
                     autoPt = "accessible";
-                if (NODE_TYPES[fromNode?.type || ""]?.isEmergencyType || NODE_TYPES[node.type]?.isEmergencyType)
+                if (fromNode?.isEmergency || node.isEmergency || NODE_TYPES[fromNode?.type || ""]?.isEmergencyType || NODE_TYPES[node.type]?.isEmergencyType)
                     autoPt = "restricted";
                 const dist = fromNode ? edgeMeters(fromNode, node, floorCalib?.pxPerMeter) : null;
                 const newEdge = { id: uid("e"), from: connectFrom, to: node.id, floor, path_type: autoPt, distance_value: dist };
@@ -448,37 +598,156 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         }
     };
     const handleEdgeClick = (edgeId) => { if (edMode === "select") {
+        setCalibrationSelected(false);
         setSelEdgeId(edgeId);
         setSelId(null);
     } };
+    const translatedNodes = (id, x, y, base = nodes) => {
+        const source = (base[floor] || []).find(n => n.id === id);
+        if (!source) return base;
+        const ids = selectedIds.includes(id) ? selectedIds : [id];
+        const moving = (base[floor] || []).filter(n => ids.includes(n.id));
+        const width = floorImage.image?.naturalWidth ?? Infinity;
+        const height = floorImage.image?.naturalHeight ?? Infinity;
+        const dx = Math.max(-Math.min(...moving.map(n => n.x)), Math.min(x - source.x, width - Math.max(...moving.map(n => n.x))));
+        const dy = Math.max(-Math.min(...moving.map(n => n.y)), Math.min(y - source.y, height - Math.max(...moving.map(n => n.y))));
+        return { ...base, [floor]: base[floor].map(n => ids.includes(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n) };
+    };
     const handleNodeDrag = (id, x, y) => {
-        if (isLocked)
-            return;
+        if (isLocked) return;
+        if (!selectedIds.includes(id)) setSelId(id);
         dragInProgress.current = true;
-        setDragNodes(prev => { const base = prev ?? nodes; return { ...base, [floor]: (base[floor] || []).map(n => n.id === id ? { ...n, x, y } : n) }; });
+        setDragNodes(translatedNodes(id, x, y));
+    };
+    const moveNode = (id, x, y) => {
+        if (isLocked) return;
+        const next = translatedNodes(id, x, y);
+        push({ nodes: next, edges: { ...edges, [floor]: withFreshDistances(edges[floor] || [], next[floor], floorCalib?.pxPerMeter) }, calibration });
     };
     const handleNodeDragEnd = (id, x, y) => {
-        if (!dragInProgress.current)
-            return;
+        if (!dragInProgress.current) return;
         dragInProgress.current = false;
         moveNode(id, x, y);
         setDragNodes(null);
     };
-    // Moves one node and refreshes the length of every edge that touches it, so the
-    // distance shown always matches where the nodes really are.
-    const moveNode = (id, x, y) => {
-        const moved = (nodes[floor] || []).map(n => n.id === id ? { ...n, x, y } : n);
-        push({
-            nodes: { ...nodes, [floor]: moved },
-            edges: { ...edges, [floor]: withFreshDistances(edges[floor] || [], moved, floorCalib?.pxPerMeter, id) },
-            calibration,
-        });
+    const handleNodeNudge = (id, x, y) => moveNode(id, x, y);
+    const calibrationWithRefs = (refStart, refEnd) => {
+        if (!floorCalib) return null;
+        const next = { ...floorCalib, refStart, refEnd };
+        next.pxPerMeter = Math.hypot(next.refEnd.x - next.refStart.x, next.refEnd.y - next.refStart.y) / next.meters;
+        return next;
     };
-    const handleNodeNudge = (id, x, y) => {
-        if (isLocked)
+    const handleCalibrationDrag = (refStart, refEnd) => {
+        if (isLocked) return;
+        setCalibrationSelected(true);
+        setDragCalibration(calibrationWithRefs(refStart, refEnd));
+    };
+    const handleCalibrationDragEnd = (refStart, refEnd) => {
+        if (isLocked) return;
+        const next = calibrationWithRefs(refStart, refEnd);
+        if (!next) return;
+        pushAll(nodes, { ...edges, [floor]: withFreshDistances(edges[floor] || [], nodes[floor] || [], next.pxPerMeter) }, { ...calibration, [floor]: next });
+        setDragCalibration(null);
+        showToast(`Calibration point moved. Scale is now ${next.pxPerMeter.toFixed(2)} px/m.`);
+    };
+    const handleCalibrationSelect = () => {
+        setCalibrationSelected(true);
+        setSelId(null);
+        setSelEdgeId(null);
+    };
+    const setCalibrationEditField = (field, value) => {
+        if (isLocked) return;
+        setCalibrationEdits(current => current ? { ...current, [field]: value } : current);
+        setCalibrationEditsDirty(true);
+        setCalibrationError("");
+    };
+    const saveCalibrationEdits = () => {
+        if (!floorCalib || !calibrationEdits || isLocked) return;
+        const meters = Number(calibrationEdits.meters);
+        const pathLossExponent = Number(calibrationEdits.pathLossExponent);
+        if (!Number.isFinite(meters) || meters <= 0) {
+            setCalibrationError("Real distance must be greater than zero.");
             return;
-        moveNode(id, x, y);
+        }
+        if (!Number.isFinite(pathLossExponent) || pathLossExponent < 1 || pathLossExponent > 6) {
+            setCalibrationError("Path loss exponent must be between 1.0 and 6.0.");
+            return;
+        }
+        const pixelLength = Math.hypot(floorCalib.refEnd.x - floorCalib.refStart.x, floorCalib.refEnd.y - floorCalib.refStart.y);
+        const next = { ...floorCalib, refLine: calibrationEdits.refLine.trim(), meters, pathLossExponent, pxPerMeter: pixelLength / meters };
+        pushAll(nodes, { ...edges, [floor]: withFreshDistances(edges[floor] || [], nodes[floor] || [], next.pxPerMeter) }, { ...calibration, [floor]: next });
+        setCalibrationEditsDirty(false);
+        setCalibrationError("");
+        showToast(`Calibration properties saved. Scale is now ${next.pxPerMeter.toFixed(2)} px/m.`);
     };
+    const copyNodes = () => {
+        const copied = canvasFloorNodes.filter(n => selectedIds.includes(n.id)).map(n => ({ ...n }));
+        if (!copied.length) return;
+        setClipboard(copied);
+        pasteCount.current = 0;
+        showToast(`${copied.length} node(s) copied.`);
+    };
+    const pasteNodes = (point) => {
+        if (isLocked || !clipboard?.length || floorImage.status !== "ready") return;
+        const offset = ++pasteCount.current * 20;
+        const minX = Math.min(...clipboard.map(n => n.x)), minY = Math.min(...clipboard.map(n => n.y));
+        const maxX = Math.max(...clipboard.map(n => n.x)), maxY = Math.max(...clipboard.map(n => n.y));
+        const dx = Math.max(-minX, Math.min(point ? point.x - minX : offset, floorImage.image.naturalWidth - maxX));
+        const dy = Math.max(-minY, Math.min(point ? point.y - minY : offset, floorImage.image.naturalHeight - maxY));
+        const copies = clipboard.map(n => ({ ...n, id: uid("n"), dbId: null, floor, x: n.x + dx, y: n.y + dy, cross_floor_link: null }));
+        pushNodes({ ...nodes, [floor]: [...floorNodes, ...copies] });
+        setSelectedIds(copies.map(n => n.id));
+        setSelectedId(copies[0].id);
+        setSelEdgeId(null);
+        setEdMode("select");
+        showToast(`${copies.length} node(s) pasted.`);
+    };
+    const deleteNode = useCallback(() => {
+        if (!selectedId || isLocked || saving) return;
+        const ids = selectedIds.length ? selectedIds : [selectedId];
+        const plan = planNodeDeletion(snapshot, floor, ids, dbIds.current);
+        if (plan.affected.length) { setNodeDeleteWarning({ floor, ids, affected: plan.affected }); return; }
+        push(plan.snapshot); setSelId(null); setSelEdgeId(null);
+        showToast('Node deleted. No beacon assignments were affected.', C.red);
+    }, [selectedId, selectedIds, isLocked, saving, snapshot, floor, push, showToast, setSelId]);
+    useEffect(() => {
+        const onKey = (e) => {
+            const tag = e.target?.tagName;
+            const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+            const ctrl = e.ctrlKey || e.metaKey;
+            if (inInput || e.target?.isContentEditable || placeModal || calibModal || confirmAction || showData || saveProblems || transitionIssues || beaconPanel || snapshotPanel || beaconRemovalWarning || nodeDeleteWarning || matchingSnapshot || saving) return;
+            if (ctrl && e.key.toLowerCase() === "c") { if (selectedIds.length) { e.preventDefault(); copyNodes(); } return; }
+            if (ctrl && e.key.toLowerCase() === "v") { if (!isLocked && clipboard) { e.preventDefault(); pasteNodes(); } return; }
+            if (ctrl) {
+                if (e.key === "z" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleUndo();
+                }
+                if (e.key === "y" || (e.key === "z" && e.shiftKey)) {
+                    e.preventDefault();
+                    handleRedo();
+                }
+                if (e.key === "s" && !isLocked) {
+                    e.preventDefault();
+                    handleSaveDraft();
+                }
+            }
+            if (!inInput && (e.key === "Delete" || e.key === "Backspace") && !isLocked) {
+                if (selectedId) {
+                    e.preventDefault();
+                    deleteNode();
+                }
+                else if (selectedEdgeId) {
+                    e.preventDefault();
+                    pushEdges({ ...edges, [floor]: edges[floor].filter(e2 => e2.id !== selectedEdgeId) });
+                    setSelEdgeId(null);
+                    showToast("Edge deleted.", C.red);
+                }
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [handleUndo, handleRedo, handleSaveDraft, isLocked, selectedId, selectedEdgeId, nodes, edges, calibration, floor, push, pushEdges, selectedIds, clipboard, copyNodes, pasteNodes, placeModal, calibModal, confirmAction, showData, saveProblems, transitionIssues, beaconPanel, snapshotPanel, beaconRemovalWarning, nodeDeleteWarning, matchingSnapshot, deleteNode, saving, showToast]);
     const handleCalibConfirm = (data) => {
         // Keep the two clicked points: they are what makes the scale reproducible and auditable.
         const next = { ...data, refStart: calibPts[0], refEnd: calibPts[1] };
@@ -505,7 +774,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         if ("label" in fields)
             setLabelError(false);
     };
-    const handleSaveNodeEdits = () => {
+    const handleSaveNodeEdits = (confirmed = false) => {
         if (!nodeEdits || !selectedId || isLocked)
             return;
         if (!nodeEdits.label.trim()) {
@@ -513,18 +782,24 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             showToast("Label is required for all nodes.", C.red);
             return;
         }
+        if (NODE_TYPES[nodeEdits.type]?.isFloorTransition) {
+            const group = (snapshot.groups || []).find(g => g.id === nodeEdits.transition_group_id && g.type === nodeEdits.type);
+            if (!group || nodes[floor].some(n => n.id !== selectedId && n.transition_group_id === group.id)) { showToast(`${nodeEdits.label} (${floor}, ${selectedId}): choose an available ${NODE_TYPES[nodeEdits.type]?.label} group.`, C.red); return; }
+        }
+        const previous = nodes[floor].find(n => n.id === selectedId);
+        if (!confirmed && (previous.type !== nodeEdits.type || previous.transition_group_id !== nodeEdits.transition_group_id) && (edges.__crossFloor || []).some(e => e.from === selectedId || e.to === selectedId)) { setConfirmAction("change-group"); return; }
+        setConfirmAction(null);
         // Property edits never carry coordinates: keep the node where it currently is.
-        pushNodes({ ...nodes, [floor]: nodes[floor].map(n => n.id === selectedId ? { ...nodeEdits, x: n.x, y: n.y } : n) });
+        const typeChanged = nodes[floor].find(n => n.id === selectedId)?.type !== nodeEdits.type;
+        const updatedNodes = Object.fromEntries(Object.entries(nodes).map(([key, floorNodes]) => [key, floorNodes.map(n => {
+            if (n.id === selectedId) return { ...nodeEdits, x: n.x, y: n.y };
+            return typeChanged && n.cross_floor_link === selectedId ? { ...n, cross_floor_link: null } : n;
+        })]));
+        const groupChanged = nodes[floor].find(n => n.id === selectedId)?.transition_group_id !== nodeEdits.transition_group_id;
+        push({ nodes: updatedNodes, edges: { ...edges, __crossFloor: (edges.__crossFloor || []).filter(e => !(typeChanged || groupChanged) || (e.from !== selectedId && e.to !== selectedId)) }, calibration });
         setNodeEditsDirty(false);
         setLabelError(false);
         showToast("Node properties saved.", C.green);
-    };
-    const deleteNode = () => {
-        if (!selectedId || isLocked)
-            return;
-        push(removeNodeFromSnapshot({ nodes, edges, calibration }, floor, selectedId));
-        setSelId(null);
-        showToast("Node deleted.", C.red);
     };
     const deleteEdge = () => {
         if (!selectedEdgeId || isLocked)
@@ -546,6 +821,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         setConnFrom(null);
         setSelId(null);
         setSelEdgeId(null);
+        setCalibrationSelected(false);
         if (m !== "calibrate")
             setCalibPts([]);
     };
@@ -609,15 +885,11 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         <span style={{ fontSize: 11, color: "#94A3B8", fontFamily: M }}>{totalNodes}n · {totalEdges}e</span>
 
         {/* Action buttons */}
+        <IconBtn onClick={openSnapshots} title="Manage snapshots (Ctrl+S)" disabled={saving || snapshotBusy}>Snapshots</IconBtn>
+        <IconBtn onClick={() => setBeaconPanel(true)} disabled={saving || snapshotBusy}>Beacons ({snapshot.beacons?.length || 0})</IconBtn>
         <div style={{ display: "flex", alignItems: "center", gap: 6, borderLeft: `1px solid ${C.border}`, paddingLeft: 10 }}>
-          {!isLocked && (<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-              <button onClick={handleSaveDraft} title="Save Draft (Ctrl+S)" style={{ display: "flex", alignItems: "center", gap: 5, background: unsaved ? "#F0FDF4" : "#F8FAFC", color: unsaved ? "#166534" : "#94A3B8", border: `1px solid ${unsaved ? "#BBF7D0" : C.border}`, borderRadius: 7, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F, transition: "all 0.2s" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                {saving ? "Saving…" : "Save Draft"}
-              </button>
-              {savedAt && <span style={{ fontSize: 9, color: "#94A3B8", fontFamily: M }}>{savedAt.toLocaleTimeString()}</span>}
-            </div>)}
-          {!isLocked && (<button onClick={() => setConfirmAction("save")} style={{ display: "flex", alignItems: "center", gap: 5, background: C.blue, color: "#fff", border: `1px solid ${C.blue}`, borderRadius: 7, padding: "5px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
+          {savedAt && <span style={{ fontSize: 9, color: C.muted, fontFamily: M }}>Applied {savedAt.toLocaleTimeString()}</span>}
+          {!isLocked && (<button onClick={() => handleSave()} style={{ display: "flex", alignItems: "center", gap: 5, background: C.blue, color: "#fff", border: `1px solid ${C.blue}`, borderRadius: 7, padding: "5px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               Save &amp; Validate
             </button>)}
@@ -664,6 +936,13 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         })}
           </div>
 
+          {floorCalib && !isLocked && (<div style={{ padding: "0 14px 10px" }}>
+              <button onClick={handleCalibrationSelect} style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.goldM}`, background: calibrationSelected ? C.gold : C.goldL, color: calibrationSelected ? "#fff" : "#92400E", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F }}>
+                Select Scale Calibration
+              </button>
+              <div style={{ marginTop: 5, fontSize: 9, color: "#92400E", lineHeight: 1.5, fontFamily: M }}>In Select &amp; Move, drag either amber endpoint to reposition the reference line.</div>
+            </div>)}
+
           {edMode === "calibrate" && (<div style={{ margin: "0 14px 10px", padding: "10px 12px", background: C.goldL, border: `1px solid ${C.goldM}`, borderRadius: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#92400E", fontFamily: F, marginBottom: 5 }}>How to calibrate</div>
               <div style={{ fontSize: 10, color: "#92400E", fontFamily: F, lineHeight: 1.7 }}>
@@ -692,7 +971,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                 {Object.entries(NODE_TYPES).filter(([, v]) => v.group === g).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: v.color, flexShrink: 0 }}/>
                     <span style={{ fontSize: 10, color: "#334155", fontFamily: F }}>{v.label}</span>
-                    {v.isPwdType && <span style={{ fontSize: 8, color: "#0F766E", fontFamily: M, fontWeight: 700 }}>ACC</span>}
+
                     {v.isFloorTransition && <span style={{ fontSize: 8, color: C.violet, fontFamily: M, fontWeight: 700 }}>⇅</span>}
                   </div>))}
               </div>))}
@@ -730,7 +1009,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
 
           {/* Canvas */}
           <div style={{ flex: 1, padding: 12, minHeight: 0 }}>
-            <NodeCanvas key={floor} nodes={canvasFloorNodes} edges={floorEdges} mode={isLocked && edMode !== "calibrate" ? "select" : edMode} editable={!isLocked} selectedId={selectedId} selectedEdgeId={selectedEdgeId} connectFrom={connectFrom} calibPts={calibPts} savedRef={floorCalib} image={floorImage.image} imageStatus={floorImage.status} pxPerMeter={floorCalib?.pxPerMeter} onCanvasClick={handleCanvasClick} onNodeClick={handleNodeClick} onNodeDrag={handleNodeDrag} onNodeDragEnd={handleNodeDragEnd} onNodeNudge={handleNodeNudge} onEdgeClick={handleEdgeClick}/>
+            <NodeCanvas key={floor} nodes={canvasFloorNodes} edges={floorEdges} selectedIds={selectedIds} onCopy={copyNodes} onPaste={pasteNodes} canPaste={!!clipboard?.length} mode={isLocked && edMode !== "calibrate" ? "select" : edMode} editable={!isLocked} selectedId={selectedId} selectedEdgeId={selectedEdgeId} connectFrom={connectFrom} calibPts={calibPts} savedRef={activeFloorCalib} calibrationSelected={calibrationSelected} image={floorImage.image} imageStatus={floorImage.status} pxPerMeter={activeFloorCalib?.pxPerMeter} onCanvasClick={handleCanvasClick} onNodeClick={handleNodeClick} onNodeDrag={handleNodeDrag} onNodeDragEnd={handleNodeDragEnd} onNodeNudge={handleNodeNudge} onEdgeClick={handleEdgeClick} onCalibrationSelect={handleCalibrationSelect} onCalibrationDrag={handleCalibrationDrag} onCalibrationDragEnd={handleCalibrationDragEnd}/>
           </div>
 
           {/* Status bar */}
@@ -749,17 +1028,29 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         <div style={{ width: 248, background: C.white, borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, overflowY: "auto" }}>
           <div style={{ padding: "12px 14px", flex: 1 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: M, marginBottom: 8 }}>
-              {selEdge ? "Edge Properties" : "Node Properties"}
+              {calibrationSelected ? "Calibration Properties" : selEdge ? "Edge Properties" : selectedIds.length > 1 ? `Node Properties (${selectedIds.length} selected)` : "Node Properties"}
             </div>
+
+            {calibrationSelected && floorCalib && calibrationEdits && (<div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}><div style={{ width: 22, height: 3, background: C.gold, borderRadius: 2 }}/><strong style={{ fontSize: 11, color: "#92400E", fontFamily: M }}>SCALE CALIBRATION</strong>{!isLocked && calibrationEditsDirty && <span style={{ marginLeft: "auto", fontSize: 9, color: C.orange, fontFamily: M, fontWeight: 700 }}>● unsaved</span>}</div>
+                <SecHead color={C.gold}>Reference Line Name</SecHead><input value={calibrationEdits.refLine} onChange={e => setCalibrationEditField("refLine", e.target.value)} disabled={isLocked} style={{ width: "100%", background: isLocked ? "#F8FAFC" : C.bg, border: `1px solid ${calibrationEditsDirty ? C.orange + "88" : C.border}`, borderRadius: 6, padding: "6px 9px", fontSize: 12, color: C.txt, fontFamily: F, outline: "none", boxSizing: "border-box", marginBottom: 8, cursor: isLocked ? "not-allowed" : "text" }}/>
+                <SecHead color={C.gold}>Real Distance</SecHead><input type="number" min="0.1" step="0.1" value={calibrationEdits.meters} onChange={e => setCalibrationEditField("meters", e.target.value)} disabled={isLocked} style={{ width: "100%", background: isLocked ? "#F8FAFC" : C.bg, border: `1px solid ${calibrationEditsDirty ? C.orange + "88" : C.border}`, borderRadius: 6, padding: "6px 9px", fontSize: 12, color: C.txt, fontFamily: M, outline: "none", boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}/><div style={{ fontSize: 9, color: "#64748B", fontFamily: M, marginTop: 3, marginBottom: 8 }}>Meters</div>
+                <SecHead color={C.gold}>Path Loss Exponent</SecHead><input type="number" min="1" max="6" step="0.1" value={calibrationEdits.pathLossExponent} onChange={e => setCalibrationEditField("pathLossExponent", e.target.value)} disabled={isLocked} style={{ width: "100%", background: isLocked ? "#F8FAFC" : C.bg, border: `1px solid ${calibrationEditsDirty ? C.orange + "88" : C.border}`, borderRadius: 6, padding: "6px 9px", fontSize: 12, color: C.txt, fontFamily: M, outline: "none", boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}/><div style={{ fontSize: 9, color: "#64748B", fontFamily: M, lineHeight: 1.5, marginTop: 3, marginBottom: 8 }}>Allowed range: 1.0–6.0</div>
+                <SecHead color="#94A3B8">Calculated Scale</SecHead><div style={{ padding: "9px 11px", border: `1px solid ${C.border}`, borderRadius: 7, background: C.bg, fontSize: 10, lineHeight: 1.6, fontFamily: M, color: "#64748B", marginBottom: 8 }}><div>{Math.hypot(floorCalib.refEnd.x - floorCalib.refStart.x, floorCalib.refEnd.y - floorCalib.refStart.y).toFixed(1)} px reference line</div><strong style={{ color: C.teal, fontSize: 11 }}>{(Number(calibrationEdits.meters) > 0 ? Math.hypot(floorCalib.refEnd.x - floorCalib.refStart.x, floorCalib.refEnd.y - floorCalib.refStart.y) / Number(calibrationEdits.meters) : 0).toFixed(2)} px/m</strong></div>
+                {calibrationError && <div style={{ fontSize: 10, color: C.red, fontFamily: M, marginBottom: 8, lineHeight: 1.5 }}>{calibrationError}</div>}{!isLocked && <button onClick={saveCalibrationEdits} disabled={!calibrationEditsDirty} style={{ width: "100%", padding: "8px 0", borderRadius: 7, border: `1.5px solid ${calibrationEditsDirty ? C.blue : C.border}`, background: calibrationEditsDirty ? C.blue : "#F8FAFC", color: calibrationEditsDirty ? "#fff" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: calibrationEditsDirty ? "pointer" : "default", fontFamily: F, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>{calibrationEditsDirty ? "Save Changes" : "Saved"}</button>}
+              </div>)}
 
             {selEdge && !selNode && (<EdgePanel edge={selEdge} nodes={liveFloorNodes} onChangeType={changeEdgeType} onDelete={deleteEdge} locked={isLocked}/>)}
 
             {selNode && !selEdge && (() => {
-            const cfg = NODE_TYPES[selNode.type] || NODE_TYPES.WALKWAY;
-            const lsn = nodeEdits ?? (liveFloorNodes.find(n => n.id === selectedId) || selNode);
+            const liveNode = liveFloorNodes.find(n => n.id === selectedId) || selNode;
+            const lsn = { ...(nodeEdits ?? liveNode), x: liveNode.x, y: liveNode.y };
+            const cfg = NODE_TYPES[lsn.type] || NODE_TYPES.WALKWAY;
             // Only current-floor store units
             const floorStores = STORE_UNITS.filter(s => s.floor === floor);
-            const linked = STORE_UNITS.find(s => s.unit === lsn.related_store_id);
+            const linked = floorStores.find(s => s.unit === lsn.related_store_id);
+            const nodeDatabaseId = lsn.dbId;
+            const directlyAssignedBeacons = (snapshot.beacons || []).filter(b => b.nodeId != null && (b.nodeId === lsn.id || (nodeDatabaseId != null && b.nodeId === `db${nodeDatabaseId}`)));
             return (<>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.color, flexShrink: 0 }}/>
@@ -768,6 +1059,26 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                     {!isLocked && nodeEditsDirty && (<span style={{ fontSize: 9, color: C.orange, fontFamily: M, marginLeft: "auto", fontWeight: 700 }}>● unsaved</span>)}
                   </div>
 
+                  <SecHead color={C.blue}>Beacon assignment</SecHead>
+                  <div style={{ padding: '9px 10px', marginBottom: 12, borderRadius: 7, border: `1px solid ${C.border}`, background: C.dim, fontFamily: F }}>
+                    <div style={{ fontSize: 10, color: C.sub, marginBottom: 5 }}>Node #{nodeDatabaseId ?? lsn.id}</div>
+                    {directlyAssignedBeacons.length ? directlyAssignedBeacons.map(b => <div key={b.clientId} style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>{b.beaconCode} · {b.label}</div>) : <div style={{ fontSize: 11, color: C.sub }}>No beacon is directly assigned to this node.</div>}
+                    <div style={{ fontSize: 10, color: C.muted, lineHeight: 1.6, marginTop: 5 }}>Path connections do not assign or move beacons.</div>
+                    <button onClick={() => setBeaconPanel(true)} style={{ marginTop: 7, padding: 0, background: 'none', border: 'none', color: C.blue, fontFamily: F, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>Manage map beacons</button>
+                  </div>
+                  <SecHead color={cfg.color}>Node Type</SecHead>
+                  <select aria-label="Node type" value={lsn.type} disabled={isLocked} onChange={e => {
+                      const type = e.target.value;
+                      setNodeEditFields({ type, related_store_id: type === "STORE_ENTRANCE" ? lsn.related_store_id : null,
+                          stall_name: type === "STALL" ? lsn.stall_name : undefined,
+                          transition_group_id: type === lsn.type ? lsn.transition_group_id : null,
+                           });
+                  }} style={{ width: "100%", padding: "6px 9px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.txt, fontFamily: F, fontSize: 12, marginBottom: 8 }}>
+                    {NODE_GROUPS.map(group => <optgroup key={group} label={group}>
+                      {Object.entries(NODE_TYPES).filter(([, config]) => config.group === group).map(([type, config]) => <option key={type} value={type}>{config.label}</option>)}
+                    </optgroup>)}
+                  </select>
+                  <EmergencyToggle checked={Boolean(lsn.isEmergency)} onChange={value => setNodeEditField("isEmergency", value)} disabled={isLocked} />
                   <SecHead color={cfg.color}>
                     Label <span style={{ fontSize: 8, color: C.red, fontWeight: 700 }}>REQUIRED</span>
                   </SecHead>
@@ -791,7 +1102,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                       <select value={lsn.related_store_id || ""} onChange={e => {
                         if (!isLocked) {
                             const storeId = e.target.value || null;
-                            const store = storeId ? STORE_UNITS.find(s => s.unit === storeId) : null;
+                            const store = storeId ? floorStores.find(s => s.unit === storeId) : null;
                             setNodeEditFields({ related_store_id: storeId, ...(store ? { label: store.brand } : {}) });
                         }
                     }} disabled={isLocked} style={{ width: "100%", background: isLocked ? "#F8FAFC" : C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 9px", fontSize: 11, color: C.txt, fontFamily: M, outline: "none", marginBottom: 8, cursor: isLocked ? "not-allowed" : "pointer" }}>
@@ -815,65 +1126,31 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                         setNodeEditFields({ stall_name: stallName, ...(stallName ? { label: stallName } : {}) });
                     }} disabled={isLocked} style={{ width: "100%", background: isLocked ? "#F8FAFC" : C.bg, border: `1px solid ${C.goldM}`, borderRadius: 6, padding: "6px 9px", fontSize: 11, color: lsn.stall_name ? C.txt : "#94A3B8", fontFamily: F, outline: "none", marginBottom: 4, cursor: isLocked ? "not-allowed" : "pointer" }}>
                         <option value="">— Select stall store —</option>
-                        {STALL_STORES.map(s => (<option key={s} value={s}>{s}</option>))}
+                        {stallStoresForFloor(floor).map(s => (<option key={s} value={s}>{s}</option>))}
                       </select>
                       <div style={{ fontSize: 10, color: "#64748B", fontFamily: M, marginBottom: 8, lineHeight: 1.5 }}>
                         Not linked to a store unit — stalls are temporary / no unit number.
                       </div>
                     </>)}
 
-                  {/* Accessible toggle */}
-                  <button onClick={() => !isLocked && setNodeEditField("isPwd", !lsn.isPwd)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 7, padding: "6px 10px", borderRadius: 6, border: `1px solid ${lsn.isPwd ? C.teal : C.border}`, background: lsn.isPwd ? C.tealL : "#F8FAFC", cursor: isLocked ? "not-allowed" : "pointer", marginBottom: 8, opacity: isLocked ? 0.7 : 1 }}>
-                    <div style={{ width: 13, height: 13, borderRadius: 3, border: `2px solid ${lsn.isPwd ? C.teal : C.border}`, background: lsn.isPwd ? C.teal : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {lsn.isPwd && <span style={{ fontSize: 8, color: "#fff", fontWeight: 800 }}>✓</span>}
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: lsn.isPwd ? C.teal : "#475569", fontFamily: F }}>Accessible</span>
-                  </button>
-
-                  {/* Cross-floor link */}
-                  {cfg.isFloorTransition && (() => {
-                    const otherTransNodes = Object.entries(liveNodes)
-                        .filter(([f]) => f !== floor)
-                        .flatMap(([f, ns]) => ns.filter(n => NODE_TYPES[n.type]?.isFloorTransition).map(n => ({ ...n, floor: f })));
-                    const linkedNode = otherTransNodes.find(n => n.id === lsn.cross_floor_link);
-                    const isLinked = !!lsn.cross_floor_link && !!linkedNode;
-                    return (<>
-                        <SecHead color={C.violet}>Cross-Floor Link ⇅ <span style={{ fontSize: 8, color: C.red, fontWeight: 700 }}>REQUIRED</span></SecHead>
-                        <div style={{ fontSize: 10, color: "#64748B", fontFamily: M, marginBottom: 6, lineHeight: 1.5 }}>
-                          This {cfg.label} must connect to its counterpart on another floor. Required before final save.
-                        </div>
-                        {isLinked ? (<div style={{ background: C.violetL, border: `1px solid ${C.violetM}`, borderRadius: 7, padding: "7px 10px", marginBottom: 7, display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 13 }}>{NODE_TYPES[linkedNode.type]?.icon || "⇅"}</span>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: C.violet, fontFamily: F }}>{linkedNode.label || linkedNode.type}</div>
-                              <div style={{ fontSize: 9, color: "#6D28D9", fontFamily: M }}>{linkedNode.floor} · {linkedNode.id}</div>
-                            </div>
-                            {!isLocked && (<button onClick={() => setNodeEditField("cross_floor_link", null)} style={{ fontSize: 9, color: C.red, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontFamily: M, fontWeight: 700, flexShrink: 0 }}>✕</button>)}
-                          </div>) : (<div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "6px 10px", marginBottom: 6, fontSize: 10, color: C.red, fontFamily: M, fontWeight: 600 }}>
-                            ⚠ Not linked — will block final save
-                          </div>)}
-                        {!isLocked && (<select value={lsn.cross_floor_link || ""} onChange={e => setNodeEditField("cross_floor_link", e.target.value || null)} style={{ width: "100%", background: C.bg, border: `1px solid ${isLinked ? C.border : "#FECACA"}`, borderRadius: 6, padding: "6px 9px", fontSize: 11, color: C.txt, fontFamily: F, outline: "none", marginBottom: 8, cursor: "pointer" }}>
-                            <option value="">— Select counterpart node —</option>
-                            {FLOORS.filter(f => f !== floor).map(f => {
-                                const fNodes = (liveNodes[f] || []).filter(n => NODE_TYPES[n.type]?.isFloorTransition);
-                                if (fNodes.length === 0)
-                                    return <optgroup key={f} label={`${f} (no transition nodes)`}><option disabled>No transition nodes on {f}</option></optgroup>;
-                                return (<optgroup key={f} label={f}>
-                                  {fNodes.map(n => (<option key={n.id} value={n.id}>{NODE_TYPES[n.type]?.icon} {n.label || n.type} ({n.id})</option>))}
-                                </optgroup>);
-                            })}
-                          </select>)}
-                        {isLocked && !isLinked && <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: M, marginBottom: 8 }}>No cross-floor link set.</div>}
-                      </>);
-                })()}
+                  {cfg.isFloorTransition && <>
+                    <SecHead color={C.violet}>Transition group</SecHead>
+                    <TransitionGroupPicker key={`${lsn.id}-${lsn.type}`} type={lsn.type} value={lsn.transition_group_id} groups={snapshot.groups || []} nodes={nodes} floor={floor} nodeId={lsn.id} disabled={isLocked}
+                      onChange={id => setNodeEditField("transition_group_id", id)}
+                      onCreate={group => { push({ nodes, edges, calibration, groups: [...(snapshot.groups || []), group] }); setNodeEditField("transition_group_id", group.id); }}
+                      onRename={(id, name) => { push({ nodes, edges, calibration, groups: (snapshot.groups || []).map(g => g.id === id ? { ...g, name } : g) }); showToast("Group renamed on every floor. Save a snapshot to preserve it."); }} />
+                    {nodeEditsDirty && <div style={{ fontSize: 10, fontFamily: M, color: C.orange, marginBottom: 8 }}>Save Changes before editing connections.</div>}
+                    <SecHead color={C.violet}>Connected floors</SecHead>
+                    <FloorConnections node={lsn} nodes={{ ...liveNodes, [floor]: liveNodes[floor].map(n => n.id === lsn.id ? lsn : n) }} edges={autoConnect({ nodes: { ...liveNodes, [floor]: liveNodes[floor].map(n => n.id === lsn.id ? lsn : n) }, edges, groups: snapshot.groups || [] }, floorMeta).edges.__crossFloor} floorMeta={floorMeta} locked={isLocked || nodeEditsDirty} onChange={connections => pushEdges({ ...edges, __crossFloor: connections })} />
+                  </>}
 
                   <SecHead color="#94A3B8">Position</SecHead>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 8 }}>
                     {["X", "Y"].map(k => (<div key={k}>
                         <div style={{ fontSize: 9, color: "#64748B", fontFamily: M, marginBottom: 3 }}>{k}</div>
-                        <div style={{ background: "#F1F5F9", border: `1px solid ${C.border}`, borderRadius: 5, padding: "4px 8px", fontSize: 11, fontFamily: M, color: "#334155", fontWeight: 600 }}>
-                          {Math.round(k === "X" ? lsn.x : lsn.y)}
-                        </div>
+                        <CoordinateInput key={`${selectedId}-${k}`} aria-label={`${k} coordinate`} type="number" min="0" max={k === "X" ? floorImage.image?.naturalWidth : floorImage.image?.naturalHeight} step="any" disabled={isLocked} value={lsn[k.toLowerCase()]} onChange={number => {
+                            moveNode(selectedId, k === "X" ? number : lsn.x, k === "Y" ? number : lsn.y);
+                        }} style={{ width: "100%", boxSizing: "border-box", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 5, padding: "4px 8px", fontSize: 11, fontFamily: M, color: "#334155", fontWeight: 600 }} />
                       </div>))}
                   </div>
 
@@ -891,7 +1168,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                 })}
 
                   {!isLocked && (<div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-                      <button onClick={handleSaveNodeEdits} disabled={!nodeEditsDirty} style={{
+                      <button onClick={() => handleSaveNodeEdits()} disabled={!nodeEditsDirty} style={{
                         width: "100%", padding: "8px 0", borderRadius: 7,
                         border: `1.5px solid ${nodeEditsDirty ? C.blue : C.border}`,
                         background: nodeEditsDirty ? C.blue : "#F8FAFC",
@@ -913,8 +1190,8 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
                 </>);
         })()}
 
-            {!selNode && !selEdge && (<div style={{ fontSize: 11, color: "#94A3B8", fontFamily: F, lineHeight: 1.6 }}>
-                Select a node or edge to view its properties.
+            {!calibrationSelected && !selNode && !selEdge && (<div style={{ fontSize: 11, color: "#94A3B8", fontFamily: F, lineHeight: 1.6 }}>
+                Select a node, edge, or scale calibration to view its properties.
                 {isLocked && <div style={{ marginTop: 8, color: statusCfg.color, fontWeight: 600, fontSize: 11 }}>🔒 Map is in read-only mode.</div>}
               </div>)}
           </div>
@@ -956,12 +1233,12 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
       </div>
 
       {/* ── MODALS ── */}
-      {placeModal && !isLocked && (<PlaceModal x={placeModal.x} y={placeModal.y} floor={floor} onConfirm={handlePlaceConfirm} onCancel={() => setPlaceModal(null)}/>)}
+      {placeModal && !isLocked && (<PlaceModal groups={snapshot.groups || []} nodes={nodes} x={placeModal.x} y={placeModal.y} floor={floor} onConfirm={handlePlaceConfirm} onCancel={() => setPlaceModal(null)}/>)}
       {calibModal && (<CalibrationModal floor={floor} calibPts={calibPts} initial={floorCalib} suggested={floorMeta[floor]?.submittedReference} onConfirm={handleCalibConfirm} onCancel={() => { setCalibModal(false); setCalibPts([]); }}/>)}
-      {showData && (<DataTable nodes={nodes} edges={edges} calibration={calibration} onClose={() => setShowData(false)}/>)}
+      {showData && (<DataTable groups={snapshot.groups || []} nodes={nodes} edges={edges} calibration={calibration} beacons={snapshot.beacons || []} beaconMajor={initial.meta.beaconMajor} onClose={() => setShowData(false)}/>)}
 
       {/* ── CONFIRM DIALOGS ── */}
-      {confirmAction === "save" && (<ConfirmModal title="Save & Validate" body="This checks that every stairs, escalator, elevator and ramp is linked to its counterpart on another floor, then saves the map. The map stays editable until it is submitted for navigation testing from the AR Development page." confirmLabel="Save & Validate" confirmColor={C.blue} onConfirm={handleSave} onCancel={() => setConfirmAction(null)}/>)}
+      {confirmAction === "change-group" && <ConfirmModal title="Change landing group?" body="Changing this landing's group or type replaces its floor connections with matching landings in the new group. Renaming a group preserves its connections." confirmLabel="Change group" confirmColor={C.red} onConfirm={() => handleSaveNodeEdits(true)} onCancel={() => setConfirmAction(null)} />}
 
       {/* ── SAVE RESULT: errors from the backend, or warnings about a saved map ── */}
       {saveProblems && (<SaveProblemsModal problems={saveProblems} onClose={() => setSaveProblems(null)}/>)}
@@ -969,6 +1246,40 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
       {/* ── TRANSITION VALIDATION WARNING ── */}
       {transitionIssues && transitionIssues.length > 0 && (<TransitionWarningModal issues={transitionIssues} onClose={() => setTransitionIssues(null)}/>)}
 
+      {snapshotPanel && <MapSnapshots items={namedSnapshots} name={snapshotName} onNameChange={setSnapshotName}
+        selected={savedSnapshot} needsSnapshot={needsSnapshot} busy={snapshotBusy || saving} error={snapshotError}
+        locked={isLocked} restoreTarget={restoreTarget} restoreCheck={restoreCheck} onSelectRestore={setRestoreTarget} onSave={saveSnapshot}
+        onRestore={restoreSnapshot} onClose={() => { setSnapshotPanel(false); setRestoreTarget(null); setSnapshotError(''); }} />}
+      {beaconPanel && <EditorBeacons beacons={snapshot.beacons || []} nodes={liveNodes} floorMeta={floorMeta} projectId={projectId} mallName={mallName} major={initial.meta.beaconMajor} locked={isLocked || saving} onChange={beacons => push({ ...snapshot, beacons })} onClose={() => setBeaconPanel(false)} />}
+      {matchingSnapshot && <ConfirmModal title="Matches a saved snapshot" body={<>
+        <p>Your current map and beacon setup matches <strong>{matchingSnapshot.name}</strong>.</p>
+        <p style={{ marginTop: 10 }}>You can Save &amp; Validate using this saved copy. A new snapshot is not needed.</p>
+      </>} confirmLabel="Save & Validate" confirmColor={C.blue} onCancel={() => setMatchingSnapshot(null)} onConfirm={() => {
+        const match = matchingSnapshot; setMatchingSnapshot(null);
+        void persist(true, match.confirmAssignmentRemoval, match);
+      }} />}
+      {nodeDeleteWarning && <ConfirmModal title="Delete nodes and unassign beacons?" body={<>
+        <p>The following beacon links will be cleared in this editor:</p>
+        <ul style={{ margin: '12px 0', paddingLeft: 18 }}>{nodeDeleteWarning.affected.map(b => <li key={b.clientId}><strong>{b.label}</strong> ({b.beaconCode}) — {b.removedNode?.label || b.nodeId} → Unassigned</li>)}</ul>
+        <p>Save a new snapshot, then Save &amp; Validate to apply the deletion and unassignment together.</p>
+      </>} confirmLabel="Delete & unassign" confirmColor={C.red} onCancel={() => setNodeDeleteWarning(null)} onConfirm={() => {
+        const plan = planNodeDeletion(snapshot, nodeDeleteWarning.floor, nodeDeleteWarning.ids, dbIds.current);
+        push(plan.snapshot); setNodeDeleteWarning(null); setSelId(null); setSelEdgeId(null);
+        showToast(`${plan.removed.length} node(s) deleted; ${plan.affected.length} beacon(s) unassigned in this layout.`, C.orange);
+      }} />}
+      {beaconRemovalWarning && <ConfirmModal title="Review beacon assignments" body={<>
+        {beaconRemovalWarning.orphans.length > 0 && <p>These beacons point to deleted nodes: {beaconRemovalWarning.orphans.map(b => b.label).join(', ')}. Confirm to clear their assignments in the editor, then save a new snapshot before applying.</p>}
+        {beaconRemovalWarning.changed.length > 0 && <p>Saved assignments will be removed or reassigned for: {beaconRemovalWarning.changed.map(b => b.label).join(', ')}. Applying also updates shared beacon details in Mall Management.</p>}
+        {beaconRemovalWarning.unassigned?.length > 0 && <div style={{ marginTop: 12 }}><p><strong>{beaconRemovalWarning.unassigned.length} beacon(s) have no assigned node:</strong></p><ul style={{ margin: '8px 0', paddingLeft: 18 }}>{beaconRemovalWarning.unassigned.map(b => <li key={b.clientId}>{b.label} ({b.beaconCode})</li>)}</ul><p>They will remain unassigned for this AR version. Assign them in Map beacons, or confirm to continue.</p></div>}
+      </>} confirmLabel={beaconRemovalWarning.orphans.length ? 'Clear missing assignments' : beaconRemovalWarning.unassigned?.length ? 'Continue with unassigned beacons' : 'Confirm and continue'} confirmColor={C.orange} onCancel={() => setBeaconRemovalWarning(null)} onConfirm={() => {
+        const warning = beaconRemovalWarning; setBeaconRemovalWarning(null);
+        if (warning.orphans.length) {
+            const ids = new Set(warning.orphans.map(b => b.clientId));
+            push({ ...snapshot, beacons: snapshot.beacons.map(b => ids.has(b.clientId) ? { ...b, nodeId: null } : b) });
+            setNeedsSnapshot(true); setSnapshotPanel(true); setSnapshotError('Missing assignments cleared. Save a new snapshot before applying.');
+        } else handleSave(true);
+      }} />}
+      {saving && <div role="status" aria-live="polite" className="ne-apply-overlay"><div className="ne-apply-card"><span><LoaderCircle size={23} className="ne-spin" /></span><strong>{savePhase === 'checking' ? 'Checking saved snapshots' : 'Applying snapshot'}</strong><p>{savePhase === 'checking' ? 'Comparing your map and beacon setup with saved copies.' : 'Saving your map and beacon setup together.'}</p></div></div>}
       {toast && <Toast msg={toast.msg} color={toast.color}/>}
     </div>);
 }

@@ -16,11 +16,12 @@ const PLAIN = new Set(["WALKWAY", "JUNCTION"]);
 const FIELDS = ["INPUT", "TEXTAREA", "SELECT"];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedEdgeId, connectFrom, calibPts, savedRef, image, imageStatus, pxPerMeter, onCanvasClick, onNodeClick, onNodeDrag, onNodeDragEnd, onNodeNudge, onEdgeClick, }) {
+export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedIds = [], onCopy, onPaste, canPaste, selectedEdgeId, connectFrom, calibPts, savedRef, calibrationSelected, image, imageStatus, pxPerMeter, onCanvasClick, onNodeClick, onNodeDrag, onNodeDragEnd, onNodeNudge, onEdgeClick, onCalibrationSelect, onCalibrationDrag, onCalibrationDragEnd, }) {
     const wrapRef = useRef(null);
     const canvasRef = useRef(null);
     const gesture = useRef(null);
     const fitted = useRef(false);
+    const [menu, setMenu] = useState(null);
     const [spaceHeld, setSpaceHeld] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [size, setSize] = useState({ w: 0, h: 0 });
@@ -77,7 +78,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
     // Space + drag pans. Arrow keys nudge the selected node by 1 screen pixel (Shift = 10).
     useEffect(() => {
         const down = (e) => {
-            if (FIELDS.includes(e.target?.tagName))
+            if (FIELDS.includes(e.target?.tagName) || e.target?.isContentEditable)
                 return;
             if (e.code === "Space") {
                 setSpaceHeld(true);
@@ -157,27 +158,32 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
             }
         }
         // Scale reference: the saved one (faint) or the one being drawn (amber)
-        const drawRef = (p, q, alpha) => {
+        const drawRef = (p, q, alpha, selected = false) => {
             const [px, py] = toScreen(p.x, p.y), [qx, qy] = toScreen(q.x, q.y);
             ctx.globalAlpha = alpha;
             ctx.beginPath();
             ctx.moveTo(px, py);
             ctx.lineTo(qx, qy);
             ctx.strokeStyle = "#F59E0B";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = selected ? 3 : 2;
             ctx.setLineDash([5, 4]);
             ctx.stroke();
             ctx.setLineDash([]);
             for (const [x, y] of [[px, py], [qx, qy]]) {
                 ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.arc(x, y, selected ? 7 : 4, 0, Math.PI * 2);
                 ctx.fillStyle = "#F59E0B";
                 ctx.fill();
+                if (selected) {
+                    ctx.strokeStyle = "#2563EB";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
             }
             ctx.globalAlpha = 1;
         };
         if (savedRef && calibPts.length === 0)
-            drawRef(savedRef.refStart, savedRef.refEnd, 0.5);
+            drawRef(savedRef.refStart, savedRef.refEnd, mode === "select" && editable ? 0.9 : 0.5, calibrationSelected);
         if (calibPts.length === 1) {
             const [x, y] = toScreen(calibPts[0].x, calibPts[0].y);
             ctx.beginPath();
@@ -200,7 +206,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
         // Nodes: constant on-screen size, whatever the zoom
         for (const n of nodes) {
             const cfg = NODE_TYPES[n.type] || NODE_TYPES.WALKWAY;
-            const sel = n.id === selectedId, from = n.id === connectFrom;
+            const sel = selectedIds.includes(n.id), from = n.id === connectFrom;
             const [x, y] = toScreen(n.x, n.y);
             if (x < -30 || y < -30 || x > size.w + 30 || y > size.h + 30)
                 continue;
@@ -213,15 +219,6 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
                 ctx.strokeStyle = from ? "#F59E0B" : "#2563EB";
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
-            }
-            if (cfg.isPwdType || n.isPwd) {
-                ctx.beginPath();
-                ctx.arc(x, y, r + 3, 0, Math.PI * 2);
-                ctx.strokeStyle = "#0D9488";
-                ctx.lineWidth = 1;
-                ctx.setLineDash([2, 2]);
-                ctx.stroke();
-                ctx.setLineDash([]);
             }
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -251,7 +248,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
             }
         }
         // Crosshair for precise clicking
-        if (cursor && (mode === "place" || mode === "calibrate")) {
+        if (cursor && (mode === "place" || mode === "calibrate" || (dragging && ["node", "calibration"].includes(gesture.current?.kind)))) {
             ctx.strokeStyle = "rgba(37,99,235,0.55)";
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -262,8 +259,9 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
             ctx.stroke();
         }
         // Live coordinate read-out: image pixels, plus meters once the floor has a scale
-        if (cursor) {
-            const [wx, wy] = toWorld(cursor.sx, cursor.sy);
+        if (cursor || selectedId) {
+            const active = nodes.find(n => n.id === selectedId);
+            const [wx, wy] = active ? [active.x, active.y] : toWorld(cursor.sx, cursor.sy);
             const txt = `${wx.toFixed(1)}, ${wy.toFixed(1)} px` + (pxPerMeter ? `  =  ${(wx / pxPerMeter).toFixed(2)}, ${(wy / pxPerMeter).toFixed(2)} m` : "");
             ctx.font = `600 11px ${M}`;
             ctx.textAlign = "left";
@@ -329,13 +327,34 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
         }
         return null;
     };
+    const hitCalibration = (sx, sy) => {
+        if (!savedRef?.refStart || !savedRef?.refEnd)
+            return null;
+        const points = [savedRef.refStart, savedRef.refEnd];
+        for (let index = 0; index < points.length; index++) {
+            const [x, y] = toScreen(points[index].x, points[index].y);
+            if (Math.hypot(sx - x, sy - y) <= 14)
+                return index;
+        }
+        const [ax, ay] = toScreen(points[0].x, points[0].y);
+        const [bx, by] = toScreen(points[1].x, points[1].y);
+        const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+        if (len2) {
+            const t = clamp(((sx - ax) * dx + (sy - ay) * dy) / len2, 0, 1);
+            if (Math.hypot(sx - (ax + t * dx), sy - (ay + t * dy)) <= 10)
+                return "line";
+        }
+        return null;
+    };
     const onPointerDown = (e) => {
         if (!ready || (e.button !== 0 && e.button !== 1))
             return;
+        setMenu(null);
         e.currentTarget.setPointerCapture(e.pointerId);
         const [sx, sy] = localPoint(e);
         const node = e.button === 0 ? hitNode(sx, sy) : null;
-        gesture.current = { sx, sy, moved: false, node, forcePan: e.button === 1 || spaceHeld, startView: view };
+        const calibrationHit = e.button === 0 && !node && mode === "select" ? hitCalibration(sx, sy) : null;
+        gesture.current = { sx, sy, moved: false, node, calibrationHit, calibrationStart: savedRef ? { refStart: { ...savedRef.refStart }, refEnd: { ...savedRef.refEnd } } : null, startWorld: toWorld(sx, sy), forcePan: e.button === 1 || spaceHeld, startView: view, additive: e.shiftKey };
     };
     const onPointerMove = (e) => {
         const [sx, sy] = localPoint(e);
@@ -345,7 +364,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
             return;
         if (!g.moved && Math.hypot(sx - g.sx, sy - g.sy) > CLICK_SLOP) {
             g.moved = true;
-            g.kind = g.node && editable && mode === "select" && !g.forcePan ? "node" : "pan";
+            g.kind = g.node && editable && mode === "select" && !g.forcePan ? "node" : g.calibrationHit != null && editable && !g.forcePan ? "calibration" : "pan";
             setDragging(true);
         }
         if (!g.moved)
@@ -356,22 +375,44 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
         }
         const [wx, wy] = toWorld(sx, sy);
         g.last = [clamp(wx, 0, W), clamp(wy, 0, H)];
-        onNodeDrag(g.node.id, g.last[0], g.last[1]);
+        if (g.kind === "calibration") {
+            let refStart = { ...g.calibrationStart.refStart }, refEnd = { ...g.calibrationStart.refEnd };
+            if (g.calibrationHit === 0) refStart = { x: g.last[0], y: g.last[1] };
+            else if (g.calibrationHit === 1) refEnd = { x: g.last[0], y: g.last[1] };
+            else {
+                const requestedDx = g.last[0] - g.startWorld[0], requestedDy = g.last[1] - g.startWorld[1];
+                const dx = clamp(requestedDx, -Math.min(refStart.x, refEnd.x), W - Math.max(refStart.x, refEnd.x));
+                const dy = clamp(requestedDy, -Math.min(refStart.y, refEnd.y), H - Math.max(refStart.y, refEnd.y));
+                refStart = { x: refStart.x + dx, y: refStart.y + dy };
+                refEnd = { x: refEnd.x + dx, y: refEnd.y + dy };
+            }
+            g.lastCalibration = [refStart, refEnd];
+            onCalibrationDrag(refStart, refEnd);
+        } else
+            onNodeDrag(g.node.id, g.last[0], g.last[1]);
     };
     const endGesture = (e, cancelled) => {
         const g = gesture.current;
         gesture.current = null;
         setDragging(false);
-        if (!g || cancelled)
+        if (!g) return;
+        if (cancelled) {
+            if (g.kind === "node" && g.last) onNodeDragEnd(g.node.id, ...g.last);
+            if (g.kind === "calibration" && g.lastCalibration) onCalibrationDragEnd(...g.lastCalibration);
             return;
+        }
         if (g.moved) {
             if (g.kind === "node" && g.last)
                 onNodeDragEnd(g.node.id, g.last[0], g.last[1]);
+            if (g.kind === "calibration" && g.lastCalibration)
+                onCalibrationDragEnd(...g.lastCalibration);
             return;
         }
         const [sx, sy] = localPoint(e);
         if (g.node)
-            return onNodeClick(g.node);
+            return onNodeClick(g.node, g.additive);
+        if (g.calibrationHit != null)
+            return onCalibrationSelect();
         if (mode === "select") {
             const edgeId = hitEdge(sx, sy);
             if (edgeId)
@@ -397,8 +438,20 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedE
             : "No floor plan was submitted for this floor.";
     const overlay = { position: "absolute", background: "rgba(255,255,255,0.92)", fontFamily: M };
     return (<div ref={wrapRef} style={{ position: "relative", width: "100%", height: "100%", minHeight: 0, borderRadius: 8, border: `1px solid ${C.border}`, overflow: "hidden", background: "#E9EDF3" }}>
-      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", cursor: cursorStyle, touchAction: "none", userSelect: "none" }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={(e) => endGesture(e, false)} onPointerCancel={(e) => endGesture(e, true)} onPointerLeave={() => { if (!gesture.current)
+      <canvas onContextMenu={e => {
+          e.preventDefault();
+          if (!ready || !editable || mode !== "select") return;
+          const [sx, sy] = localPoint(e);
+          const node = hitNode(sx, sy);
+          if (node && !selectedIds.includes(node.id)) onNodeClick(node);
+          const [x, y] = toWorld(sx, sy);
+          setMenu({ sx: Math.max(0, Math.min(sx, size.w - 140)), sy: Math.max(0, Math.min(sy, size.h - 80)), x: clamp(x, 0, W), y: clamp(y, 0, H) });
+      }} ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", cursor: cursorStyle, touchAction: "none", userSelect: "none" }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={(e) => endGesture(e, false)} onPointerCancel={(e) => endGesture(e, true)} onPointerLeave={() => { if (!gesture.current)
         setCursor(null); }}/>
+      {menu && <div role="menu" style={{ position: "absolute", left: menu.sx, top: menu.sy, zIndex: 10, background: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: 5, width: 130, boxShadow: "0 4px 16px #0002" }}>
+        <button role="menuitem" disabled={!selectedIds.length} style={{ ...btn, width: "100%", fontSize: 12 }} onClick={() => { onCopy(); setMenu(null); }}>Copy nodes</button>
+        <button role="menuitem" disabled={!canPaste} style={{ ...btn, width: "100%", fontSize: 12 }} onClick={() => { onPaste(menu); setMenu(null); }}>Paste nodes</button>
+      </div>}
       {!ready && (<div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", fontFamily: F, fontSize: 13, color: imageStatus === "error" ? C.red : "#475569", fontWeight: 600 }}>{message}</div>)}
       {ready && (<>
           <div style={{ ...overlay, top: 8, left: 8, border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 10px", fontSize: 10, color: "#475569", fontWeight: 600, pointerEvents: "none", maxWidth: "70%" }}>{hint}</div>

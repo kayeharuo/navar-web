@@ -17,6 +17,7 @@ export default function ApplicationsPanel() {
     return result
   }, {})
   const rows = [...pipeline, ...Object.keys(counts).filter(label => !pipeline.some(row => row.label === label)).map(label => ({ label, barColor: '#94A3B8', dotColor: '#94A3B8' }))].map(row => ({ ...row, count: counts[row.label] || 0 }))
+  const displayCount = status => loading ? '…' : counts[status] || 0
   const max = Math.max(1, ...rows.map(row => row.count))
   return (
     <div className="dash-card">
@@ -28,10 +29,10 @@ export default function ApplicationsPanel() {
         <Link className="dash-view-all" to="/application-management">View All &rarr;</Link>
       </div>
 
-      {loading ? <p role="status">Loading applications...</p> : error ? <p role="alert">{error}</p> : <>
+      {error ? <p role="alert">{error}</p> : <>
       <div className="dash-stat-grid">
-        <StatCard value={counts.Submitted || 0} label="Submitted For Review"                       color="#3B82F6" />
-        <StatCard value={counts['For Revision'] || 0} label="Requested Revision — Waiting for response"  color="#F97316" />
+        <StatCard value={displayCount('Submitted')} label="Submitted For Review"                       color="#3B82F6" />
+        <StatCard value={displayCount('For Revision')} label="Requested Revision — Waiting for response"  color="#F97316" />
       </div>
 
       <div>
@@ -41,7 +42,7 @@ export default function ApplicationsPanel() {
             <div key={label} className="dash-pipeline-row">
               <span className="dash-pipeline-dot" style={{ backgroundColor: dotColor }} />
               <span className="dash-pipeline-label">{label}</span>
-              <span className="dash-pipeline-count">{String(count).padStart(2, '0')}</span>
+              <span className="dash-pipeline-count">{loading ? '…' : String(count).padStart(2, '0')}</span>
               <div className="dash-pipeline-track">
                 <div
                   className="dash-pipeline-fill"

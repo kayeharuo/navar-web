@@ -117,14 +117,16 @@ test('tryPublish requires recorded approval and is idempotent for Live', async (
 	}
 })
 
+const activeContract = () => ({contract_id:1,mall_id:1,contract_is_current:true,contract_start:new Date(Date.now()-86400000).toISOString(),contract_end:new Date(Date.now()+365*86400000).toISOString(),contract_grace_period_days:15})
+
 test('approved Ready v2 calls publish through its subscription gate', async () => {
-	const db = database({ ar_development: [{ ar_development_id: 3, application_id: 4, ar_development_version: 2, ar_development_status: 'ready', ar_development_mall_approved_at: '2026-01-01' }], application: [{ application_id: 4, mall_id: 1 }] })
+	const db = database({ contract:[activeContract()], ar_development: [{ ar_development_id: 3, application_id: 4, ar_development_version: 2, ar_development_status: 'ready', ar_development_mall_approved_at: '2026-01-01' }], application: [{ application_id: 4, mall_id: 1 }] })
 	assert.equal((await createARService(db).tryPublish(3, 7)).published, true)
 	assert.equal(db.calls[0].args.p_action, 'publish')
 })
 
 test('previously published but now Unpublished does not qualify for a new version', async () => {
-	const db = database({ application: [{ application_id: 4, application_version: 1, mall_id: 1 }], ar_development: [{ application_id: 4, ar_development_status: 'unpublished', ar_development_activated_at: '2020-01-01' }] })
+	const db = database({ contract:[activeContract()], application: [{ application_id: 4, application_version: 1, mall_id: 1 }], ar_development: [{ application_id: 4, ar_development_status: 'unpublished', ar_development_activated_at: '2020-01-01' }] })
 	const result = await getVersionEligibility(db, 1)
 	assert.equal(result.allowed, false)
 	assert.match(result.reason, /must be Live/)
@@ -139,12 +141,13 @@ test('unpaid v1 and invalid v2 subscription leave approved Ready waiting', async
 	}
 })
 
-test('new attempt reuses the provisional version after rejection, but observes cooldown', async () => {
-	const rows = { application: [{ application_id: 8, mall_id: 1, application_version: 2, application_attempt: 2, application_status: 'rejected_final' }, { application_id: 4, mall_id: 1, application_version: 1, application_status: 'approved' }], ar_development: [{ application_id: 4, ar_development_version: 1, ar_development_status: 'live', ar_development_activated_at: '2020-01-01' }] }
+test('new attempt reuses its provisional version without a publication cooldown or free-allowance cap', async () => {
+	const rows = { contract:[activeContract()], application: [{ application_id: 8, mall_id: 1, application_version: 2, application_attempt: 2, application_status: 'rejected_final' }, { application_id: 4, mall_id: 1, application_version: 1, application_status: 'approved' }], ar_development: [{ application_id: 4, ar_development_version: 1, ar_development_status: 'live', ar_development_activated_at: '2020-01-01' }] }
 	const eligible = await getVersionEligibility(database(rows), 1)
 	assert.equal(eligible.allowed, true)
 	assert.equal(eligible.nextVersion, 2)
 	assert.equal(eligible.attempt, 3)
 	rows.ar_development[0].ar_development_activated_at = new Date().toISOString()
-	assert.equal((await getVersionEligibility(database(rows), 1)).allowed, false)
+ rows.contract[0].contract_map_updates_per_year=0
+	assert.equal((await getVersionEligibility(database(rows), 1)).allowed, true)
 })

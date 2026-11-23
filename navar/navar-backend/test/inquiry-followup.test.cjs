@@ -119,7 +119,7 @@ test('correction requests email a hashed single-use link once and keep notes out
  const Fastify=require('fastify'),{registerFollowup}=require('../modules/inquiries/followup')
  const app=Fastify();let sent=0,saved,link,kind
  const seen=new Set()
- const db={async rpc(name,args){saved=args;const replayed=seen.has(args.p_request);seen.add(args.p_request);return {data:{message_id:20,replayed}}}}
+ const db={from(table){assert.equal(table,'audit_log');return {insert:async()=>({error:null})}},async rpc(name,args){saved=args;const replayed=seen.has(args.p_request);seen.add(args.p_request);return {data:{message_id:20,replayed}}}}
  app.addHook('preHandler',async req=>{req.admin={id:7,name:'Reviewer'}})
  registerFollowup(app,{db,env:{INQUIRY_PUBLIC_ORIGIN:'https://api.example.com'},wrap:fn=>fn,
   inquiry:async()=>({inquiry_id:1,inquiry_contact_email:'owner@example.com'}),getTransport:()=>({}),events:{publish(){}},

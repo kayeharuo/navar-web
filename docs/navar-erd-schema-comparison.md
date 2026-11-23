@@ -1,3 +1,5 @@
+> Historical schema comparison: on 25 October 2026 the live table was renamed to `beacon_node_assignment`. The original spelling below records the earlier snapshot.
+
 # NavAR ERD comparison
 
 Compared on October 22, 2026 against the live NavAR Supabase project `kblobarjzrloqjikpbun`. Source: `ERD FOR NAVAR (4).json`. Database inspection was read-only. Names were compared without case sensitivity and with surrounding whitespace removed.

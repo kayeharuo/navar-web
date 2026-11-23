@@ -17,7 +17,7 @@ const TABS = ['Malls', 'Brands', 'Inquiries', 'Beacon Tickets']
 const TAB_PATHS = { Malls: '', Brands: 'brands', Inquiries: 'inquiries', 'Beacon Tickets': 'beacon-tickets' }
 const PATH_TABS = Object.fromEntries(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]))
 
-const STATUS_NAMES = ['All', 'Active', 'Grace Period', 'Suspended', 'Pending']
+const STATUS_NAMES = ['All', 'Onboarding', 'Active', 'Grace Period', 'Suspended']
 
 const initialMalls = [] /*
   {
@@ -256,7 +256,7 @@ const initialMalls = [] /*
     city: 'Cebu City',
     address: 'General Maxilom Ave, Cebu City',
     floors: 4,
-    agreementStatus: 'Pending',
+    agreementStatus: 'Onboarding',
     tier: 'Standard',
     application: '-',
     arDevelopment: '-',
@@ -284,7 +284,7 @@ const initialMalls = [] /*
     city: 'Iloilo City',
     address: 'Quezon St., Iloilo City',
     floors: 3,
-    agreementStatus: 'Pending',
+    agreementStatus: 'Onboarding',
     tier: 'Basic',
     application: '-',
     arDevelopment: '-',
@@ -340,7 +340,7 @@ const agreementVariantMap = {
   Active:         'active',
   Suspended:      'suspended',
   'Grace Period': 'grace',
-  Pending:        'pending',
+  Onboarding:     'pending',
 }
 
 const applicationVariantMap = {
@@ -352,7 +352,7 @@ const applicationVariantMap = {
 const arDevVariantMap = {
   Live:        'live',
   Unpublished: 'unpublished',
-  Pending:     'pending',
+  Onboarding:  'pending',
 }
 
 function AgreementCell({ status, tier }) {

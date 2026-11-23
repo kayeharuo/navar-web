@@ -76,11 +76,17 @@ function FlowDiagram({ label, steps }) {
   )
 }
 
-export default function FlowDiagrams() {
+export default function FlowDiagrams({ stall = false }) {
   return (
     <div className="app-mgmt-flows">
-      <FlowDiagram label="APPLICATION FLOW" steps={APP_FLOW_STEPS} />
-      <FlowDiagram label="AR DEVELOPMENT FLOW" steps={AR_FLOW_STEPS} />
+      {!stall&&<FlowDiagram label="VERSION 2+ REQUEST REVIEW" steps={[
+        {label:'Pending',sub:'New version request',variant:'orange'},{arrow:'right'},
+        {label:'Accept / Reject',sub:'Reason required to reject',variant:'purple'},{arrow:'right'},
+        {label:'Submitted',sub:'If accepted',variant:'blue'},
+      ]}/>}
+
+      <FlowDiagram label="APPLICATION FLOW" steps={stall ? APP_FLOW_STEPS.map(step => step.label === 'Approved' ? { ...step, sub: 'Returns to mapping' } : step) : APP_FLOW_STEPS} />
+      <FlowDiagram label="AR DEVELOPMENT FLOW" steps={stall ? AR_FLOW_STEPS.slice(2).map(step => step.label === 'Ready' ? { ...step, sub: 'Mall confirmation' } : step) : AR_FLOW_STEPS} />
     </div>
   )
 }

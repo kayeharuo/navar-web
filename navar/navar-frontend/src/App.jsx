@@ -1,3 +1,7 @@
+import MapApplicationPortal from './pages/MapApplicationPortal'
+import StallApplicationPortal from './pages/StallApplicationPortal'
+import { presentationText } from './utils/presentationText'
+import SubscriptionTestFlow from './pages/SubscriptionTestFlow'
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, X } from 'lucide-react'
@@ -22,7 +26,7 @@ import SubscriptionManagement from './pages/SubscriptionManagement'
 import ApplicationManagementTesting from './pages/ApplicationManagementTesting'
 import NotificationsPanel from './components/panels/NotificationsPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
-import { NAV_ITEMS, getActiveNavItem } from './config/navigation'
+import { NAV_ITEMS, getActiveNavItem, getPageTitle } from './config/navigation'
 import { apiRequest } from './config/api'
 import { supabase } from './config/supabase'
 import './App.css'
@@ -93,6 +97,10 @@ export default function App() {
   const [incomingToast, setIncomingToast] = useState(null)
   const [arIncomingProjects, setArIncomingProjects] = useState([])
 
+  useEffect(()=>{
+    document.title=accessDenied?'Access Denied | NavAR':!authLoading&&(!session||!admin)&&!isAuthRoute?'Sign In | NavAR':getPageTitle(location.pathname)
+  },[location.pathname,authLoading,session,admin,isAuthRoute,accessDenied])
+
   useEffect(() => {
     const unlock = () => unlockNotificationSound()
     window.addEventListener('pointerdown', unlock, { once: true })
@@ -151,8 +159,10 @@ export default function App() {
         ])
         const normalize = notification => ({
           ...notification,
+          title:presentationText(notification.title),
+          message:presentationText(notification.message),
           mallName: notification.sourceLabel || 'NavAR',
-          text: notification.message,
+          text: presentationText(notification.message),
           time: new Date(notification.createdAt).toLocaleString(),
         })
         if (mounted) {
@@ -186,8 +196,8 @@ export default function App() {
         const notification = {
           id: row.admin_notif_id,
           type: row.admin_notif_type,
-          title: row.admin_notif_title,
-          message: row.admin_notif_message,
+          title: presentationText(row.admin_notif_title),
+          message: presentationText(row.admin_notif_message),
           actionUrl: row.admin_notif_action_url,
           actionLabel: row.admin_notif_action_label,
           sourceType: row.admin_notif_source_type,
@@ -197,7 +207,7 @@ export default function App() {
           read: row.admin_notif_is_read,
           createdAt: row.admin_notif_created_at,
           mallName: row.admin_notif_source_label || 'NavAR',
-          text: row.admin_notif_message,
+          text: presentationText(row.admin_notif_message),
           time: new Date(row.admin_notif_created_at).toLocaleString(),
         }
         if (payload.eventType === 'INSERT') {
@@ -274,6 +284,19 @@ export default function App() {
 
   if (!session || !admin) {
     return <LoginPage message={location.state?.message} />
+  }
+
+  if (location.pathname.startsWith('/mall-portal/map-applications/')) {
+    return <Routes><Route path="/mall-portal/map-applications/:mallId" element={<MapApplicationPortal />} /></Routes>
+  }
+
+  // The assisted Mall Admin flow has its own page, outside the Super Admin shell.
+  if (location.pathname.startsWith('/mall-portal/stall-applications/')) {
+    return <Routes><Route path="/mall-portal/stall-applications/:mallId" element={<StallApplicationPortal />} /></Routes>
+  }
+  if (location.pathname.startsWith('/application-management/stalls/')) {
+    const mallId = location.pathname.split('/').filter(Boolean).pop()
+    return <Navigate to={`/mall-portal/stall-applications/${mallId}`} replace />
   }
 
   if (location.pathname.startsWith('/ar-development/editor/')) {
@@ -404,6 +427,7 @@ export default function App() {
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/system-settings/:tab" element={<SystemSettings />} />
+            <Route path="/subscription-management/test/:mallId" element={<SubscriptionTestFlow />} />
             <Route path="/subscription-management" element={<SubscriptionManagement />} />
             {NAV_ITEMS.filter(item => !['/', '/mall-management', '/mall-management/stores/:mallId', '/application-management', '/ar-development', '/account-management', '/email-logs', '/audit-logs', '/system-settings', '/subscription-management'].includes(item.path)).map(item => (
               <Route

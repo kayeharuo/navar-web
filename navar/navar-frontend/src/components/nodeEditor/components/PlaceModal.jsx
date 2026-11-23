@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { C, F, M, NODE_TYPES, NODE_GROUPS, STORE_UNITS, STALL_STORES, formatStore } from "../editorConstants";
+import { TransitionGroupPicker } from "./TransitionGroupPicker";
+import { EmergencyToggle } from "./EmergencyToggle";
+import { useState, useEffect } from "react";
+import { C, F, M, NODE_TYPES, NODE_GROUPS, STORE_UNITS, stallStoresForFloor, formatStore } from "../editorConstants";
 const Btn = ({ children, v = "default", onClick, disabled, sm }) => {
     const styles = {
         default: { background: C.white, color: "#334155", border: `1px solid ${C.border}` },
@@ -17,34 +19,45 @@ const Btn = ({ children, v = "default", onClick, disabled, sm }) => {
       {children}
     </button>);
 };
-export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
+export function PlaceModal({ x, y, floor, groups = [], nodes = {}, onConfirm, onCancel }) {
+    useEffect(() => {
+        const close = (event) => {
+            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onCancel(); }
+        };
+        window.addEventListener("keydown", close, true);
+        return () => window.removeEventListener("keydown", close, true);
+    }, [onCancel]);
+    const [isEmergency, setIsEmergency] = useState(false);
     const [type, setType] = useState("WALKWAY");
     const [label, setLabel] = useState("");
     const [storeUnit, setStoreUnit] = useState("");
     const [stallName, setStallName] = useState("");
+    const [groupId, setGroupId] = useState("");
+    const [createdGroups, setCreatedGroups] = useState([]);
     const cfg = NODE_TYPES[type];
     // Only stores on the current floor
     const floorStores = STORE_UNITS.filter(s => s.floor === floor);
-    const selectedUnit = storeUnit ? STORE_UNITS.find(s => s.unit === storeUnit) : null;
+    const selectedUnit = storeUnit ? floorStores.find(s => s.unit === storeUnit) : null;
     const handleStoreChange = (unit) => {
         setStoreUnit(unit);
         if (unit) {
-            const found = STORE_UNITS.find(s => s.unit === unit);
-            if (found && !label)
+            const found = floorStores.find(s => s.unit === unit);
+            if (found)
                 setLabel(found.brand);
         }
     };
     const handleTypeChange = (k) => {
         setType(k);
+        setGroupId("");
         setLabel("");
         setStoreUnit("");
         setStallName("");
     };
     // The effective label the node will get
     const effectiveLabel = label.trim() ||
-        (type === "STORE_ENTRANCE" && storeUnit ? STORE_UNITS.find(s => s.unit === storeUnit)?.brand || "" : "") ||
+        (type === "STORE_ENTRANCE" && storeUnit ? floorStores.find(s => s.unit === storeUnit)?.brand || "" : "") ||
         (type === "STALL" ? stallName : "");
-    const canPlace = !!effectiveLabel &&
+    const canPlace = (!cfg.isFloorTransition || !!groupId) && !!effectiveLabel &&
         (type !== "STORE_ENTRANCE" || !!storeUnit) &&
         (type !== "STALL" || !!stallName);
     const handleConfirm = () => {
@@ -52,10 +65,12 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
             return;
         onConfirm({
             type,
+            transition_group_id: cfg.isFloorTransition ? groupId : null,
+            newGroup: createdGroups.find(g => g.id === groupId),
             label: effectiveLabel,
             related_store_id: type === "STORE_ENTRANCE" ? storeUnit || null : null,
             stall_name: type === "STALL" ? stallName || undefined : undefined,
-            isPwd: cfg.isPwdType,
+            isEmergency,
             status: "active",
         });
     };
@@ -72,6 +87,7 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
         {/* Header */}
         <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, fontFamily: F, marginBottom: 2 }}>
           Place Node
+          <button type="button" aria-label="Close placement modal" onClick={onCancel} style={{ float: "right", display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, padding: 0, background: "transparent", border: "none", borderRadius: 6, color: "#64748B", fontSize: 24, lineHeight: 1, cursor: "pointer" }}>&times;</button>
         </div>
         <div style={{ fontSize: 11, color: "#64748B", fontFamily: M, marginBottom: 18 }}>
           {floor} · x={x.toFixed(1)} px, y={y.toFixed(1)} px
@@ -102,11 +118,11 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
             </div>
           </div>))}
 
-        {/* Accessible Banner */}
-        {cfg.isPwdType && (<div style={{ background: C.tealL, border: `1px solid ${C.tealM}`, borderRadius: 7, padding: "8px 13px", fontSize: 12, color: C.teal, fontFamily: F, marginBottom: 12 }}>
-            ♿ Accessible type — connected edges will default to <b>accessible</b>.
-          </div>)}
-
+        {cfg.isFloorTransition && <>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", fontFamily: M, marginBottom: 8 }}>TRANSITION GROUP <span style={{ color: C.red }}>*</span></div>
+          <TransitionGroupPicker key={type} type={type} value={groupId} groups={[...groups, ...createdGroups]} nodes={nodes} floor={floor} onChange={setGroupId} onCreate={group => { setCreatedGroups(current => [...current, group]); setGroupId(group.id); }} />
+        </>}
+        <EmergencyToggle checked={isEmergency} onChange={setIsEmergency} />
         {/* Emergency Banner */}
         {cfg.isEmergencyType && (<div style={{ background: C.redL, border: `1px solid ${C.redM}`, borderRadius: 7, padding: "8px 13px", fontSize: 12, color: C.red, fontFamily: F, marginBottom: 12 }}>
             🚨 Emergency type — connected edges will default to <b>restricted</b>.
@@ -172,7 +188,7 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
                 fontFamily: F, outline: "none", cursor: "pointer",
             }}>
               <option value="">— Select stall store —</option>
-              {STALL_STORES.map(s => (<option key={s} value={s}>{s}</option>))}
+              {stallStoresForFloor(floor).map(s => (<option key={s} value={s}>{s}</option>))}
             </select>
             {stallName && (<div style={{ marginTop: 8, background: C.goldL, border: `1px solid ${C.goldM}`, borderRadius: 8, padding: "10px 12px", display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ fontSize: 20 }}>🛒</span>
@@ -188,7 +204,7 @@ export function PlaceModal({ x, y, floor, onConfirm, onCancel }) {
           <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: M, marginBottom: 6 }}>
             Label <span style={{ color: C.red }}>*</span>
           </label>
-          <input value={label} onChange={e => setLabel(e.target.value)} placeholder={type === "STORE_ENTRANCE" ? (storeUnit ? STORE_UNITS.find(s => s.unit === storeUnit)?.brand || "Store label" : "Auto-filled from store, or type custom")
+          <input value={label} onChange={e => setLabel(e.target.value)} placeholder={type === "STORE_ENTRANCE" ? (storeUnit ? floorStores.find(s => s.unit === storeUnit)?.brand || "Store label" : "Auto-filled from store, or type custom")
             : type === "STALL" ? (stallName || "Enter stall name or pick above")
                 : cfg.label} style={{
             width: "100%", background: C.bg,

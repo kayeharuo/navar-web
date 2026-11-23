@@ -1,5 +1,6 @@
 const {randomBytes,createHash}=require('node:crypto')
 const {uuid,text,fail}=require('./validation')
+const {recordAudit}=require('../auditLog/routes')
 const check=r=>{if(r.error)throw r.error;return r.data}
 const hashToken=token=>createHash('sha256').update(token).digest('hex')
 function correctionFields(input) {
@@ -55,7 +56,7 @@ function registerFollowup(app,{db,env,wrap,inquiry,deliver,getTransport,events})
   return call(req,'read',{messageId:id})
  }))
  app.post('/api/inquiries/:id/notes',{bodyLimit:20000},wrap(async req=>{
-  const result=await call(req,'note',{text:text(req.body?.text,4000)},uuid(req.body?.requestId));events.publish(Number(req.params.id));return result
+  const note=text(req.body?.text,4000),result=await call(req,'note',{text:note},uuid(req.body?.requestId)),row=await inquiry(req.params.id);await recordAudit(db,req,{module:'inquiry_management',action:'inquiry_note_added',mallId:row.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:'Added an internal inquiry note.',metadata:{noteId:result.id}});events.publish(Number(req.params.id));return result
  }))
  app.post('/api/inquiries/:id/followup',{bodyLimit:20000},wrap(async req=>{
   const row=await inquiry(req.params.id),action=req.body?.action,request=uuid(req.body?.requestId)
@@ -67,6 +68,7 @@ function registerFollowup(app,{db,env,wrap,inquiry,deliver,getTransport,events})
   const data={updatedAt:req.body.updatedAt,acknowledgeUncertain:req.body.acknowledgeUncertain===true,
    ...(action==='corrections'?{reason:text(req.body.reason,3000),tokenHash:hashToken(token)}:{})}
   const result=await call(req,action,data,request)
+  await recordAudit(db,req,{module:'inquiry_management',action:action==='reissue'?'inquiry_setup_link_reissued':'inquiry_correction_requested',mallId:row.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:action==='reissue'?'Reissued the owner setup link.':data.reason,metadata:{messageId:result.message_id}})
   if(result.replayed)return {ok:true,warning:'This request is already saved. Check its delivery history before issuing another link.'}
   try {
    let link
@@ -81,7 +83,7 @@ function registerFollowup(app,{db,env,wrap,inquiry,deliver,getTransport,events})
    }
    const warning=await deliver(req,row,result,transport,link,action==='corrections'?'corrections':undefined)
    events.publish(row.inquiry_id)
-   return {ok:true,warning}
+   return {ok:true,warning,messageId:result.message_id}
   } catch(error) {
    await db.from('inquiry_message').update({i_message_delivery_status:'unconfirmed'}).eq('i_message_id',result.message_id).eq('i_message_delivery_status','pending')
    events.publish(row.inquiry_id)

@@ -1,28 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, X } from 'lucide-react'
-import { apiRequest } from '../../config/api'
 
-export default function ChatInboxPanel({ onClose, onOpenThread }) {
+export default function ChatInboxPanel({ onClose, onOpenThread, threads, loading, error, onRetry }) {
   const [activeFilter, setActiveFilter] = useState('All')
-  const [threads, setThreads] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const panelRef = useRef(null)
-
-  useEffect(() => {
-    let mounted = true
-    apiRequest('/api/conversations')
-      .then(result => {
-        if (mounted) setThreads(result)
-      })
-      .catch(requestError => {
-        if (mounted) setError(requestError.message)
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
-    return () => { mounted = false }
-  }, [])
 
   useEffect(() => {
     function handleEsc(event) {
@@ -73,7 +54,7 @@ export default function ChatInboxPanel({ onClose, onOpenThread }) {
 
       <div className="chat-inbox-list">
         {loading && <p className="chat-inbox-empty">Loading conversations...</p>}
-        {!loading && error && <p className="chat-inbox-empty">{error}</p>}
+        {!loading && error && <p className="chat-inbox-empty">{error} <button onClick={onRetry}>Retry</button></p>}
         {!loading && !error && filteredThreads.map(thread => (
           <button
             key={thread.id}

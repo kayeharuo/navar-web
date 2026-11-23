@@ -97,7 +97,7 @@ Get the bound publishing callback with `const { tryPublish } = require('./module
 
 ## Unity impact
 
-Resolve the mall's Live ar_development first through its application.mall_id. Use that exact ar_development_id for ALL node, edge, beacon_node_assigment and floor_calibration queries. node now requires ar_development_id for every insert. No table/column was renamed, including beacon_node_assigment. floor remains mall-level and fixed. Existing nodes are backfilled; new versions start with no copied nodes. Composite keys prohibit cross-version edges, beacon assignments and cross-floor node links.
+Resolve the mall's Live ar_development first through its application.mall_id. Use that exact ar_development_id for ALL node, edge, beacon_node_assignment and floor_calibration queries. node now requires ar_development_id for every insert. The assignment table was renamed to beacon_node_assignment on 25 October 2026; Unity clients must use this corrected name. floor remains mall-level and fixed. Existing nodes are backfilled; new versions start with no copied nodes. Composite keys prohibit cross-version edges, beacon assignments and cross-floor node links.
 
 RLS stays deny-by-default. Migration 23 adds no anonymous or authenticated grants/policies to expose maps. The Unity team must verify its existing authenticated Live-map SELECT policies permit the matching rows in each table. If those policies do not exist, direct Unity reads remain denied; no service-role key belongs in Unity.
 

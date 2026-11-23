@@ -17,19 +17,12 @@ async function getVersionEligibility(supabase, mallId) {
  const retry = ['rejected', 'rejected_final'].includes(latest.application_status) && !latest.application_accepted_at
  const base = { latestVersion: latest.application_version, nextVersion: retry ? latest.application_version : latest.application_version + 1, attempt: retry ? latest.application_attempt + 1 : 1 }
  const blocked = reason => ({ ...base, allowed: false, reason })
- if (!await gates.isSubscriptionValid(mallId)) return blocked('An active subscription is required. Grace and suspended subscriptions cannot request a new version.')
+ if (!await gates.isSubscriptionValid(mallId, { allowGrace: false })) return blocked('An active subscription is required. Grace and suspended subscriptions cannot request a new version.')
  if (!latestAR || latestAR.ar_development_status !== 'live') return blocked('The latest AR must be Live before requesting a new version.')
- const eligibleAt = new Date(new Date(latestAR.ar_development_activated_at).getTime() + 45 * 86400000)
- if (!latestAR.ar_development_activated_at || Date.now() < eligibleAt.getTime()) return { ...blocked('You can request a new version on ' + (Number.isNaN(eligibleAt.getTime()) ? 'a date established after publishing' : eligibleAt.toLocaleDateString('en-GB', { timeZone: 'Asia/Manila' })) + '.'), eligibleAt: Number.isNaN(eligibleAt.getTime()) ? null : eligibleAt.toISOString() }
- const allowance = await gates.getMapUpdateAllowance(mallId)
- if (allowance !== null) {
-  const contract = await supabase.from('contract').select('contract_start,contract_end').eq('mall_id', mallId).eq('contract_is_current', true).single()
-  if (contract.error) throw contract.error
-  if (!contract.data.contract_start || !contract.data.contract_end) return blocked('The current contract term must be set before checking map updates.')
-  const used = rows.filter(a => a.application_version > 1 && a.application_accepted_at && new Date(a.application_accepted_at) >= new Date(contract.data.contract_start) && new Date(a.application_accepted_at) < new Date(contract.data.contract_end)).length
-  if (used >= allowance) return blocked('No map updates left in the current contract term.')
- }
  if (rows.some(a => ['pending','disputed','submitted','for_revision','draft'].includes(a.application_status) || (a.application_status === 'approved' && !(developments.data || []).some(d => d.application_id === a.application_id && ['live','unpublished'].includes(d.ar_development_status))))) return blocked('Another request or version is already in progress.')
+ const stalls = await supabase.from('stall_expansion').select('status').eq('mall_id',mallId)
+ if (stalls.error) throw stalls.error
+ if ((stalls.data || []).some(item=>!['completed','cancelled'].includes(item.status))) return blocked('Complete the ongoing stall application first.')
  return { ...base, allowed: true, reason: '' }
 }
 

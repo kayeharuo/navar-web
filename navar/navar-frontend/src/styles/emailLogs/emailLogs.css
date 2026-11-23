@@ -421,6 +421,8 @@
 }
 
 .email-modal-resend-btn:hover { opacity: 0.88; }
+.email-retry-note { color: #979797; font-size: 12px; }
+.email-detail-modal button:disabled { opacity: 0.65; cursor: wait; }
 
 /* ─── Responsive ─── */
 @media (max-width: 900px) {

@@ -27,6 +27,34 @@
   max-width: 496px;
 }
 
+.sub-result-overlay {
+  z-index: 510;
+}
+
+.sub-result-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sub-result-message > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sub-result-message--success > svg { color: #16A34A; }
+.sub-result-message--failed > svg { color: #D51D1D; }
+
+.sub-lift-modal .sub-modal-subtext,
+.sub-lift-modal .sub-modal-summary-labels span,
+.sub-lift-modal .sub-modal-summary-values span {
+  font-family: Poppins, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
+  line-height: 1.5;
+}
+
 .sub-modal-top {
   display: flex;
   align-items: flex-start;
@@ -268,6 +296,14 @@
 .sub-modal-btn-confirm:hover { opacity: 0.88; }
 .sub-modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.sub-modal-btn-confirm,
+.sub-modal-btn-lift {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .sub-modal-btn-lift {
   padding: 8px 22px;
   border-radius: 5px;
@@ -285,9 +321,9 @@
 
 .sub-lift-text {
   font-family: 'Poppins', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-  color: #4C4C4C;
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
   line-height: 1.6;
   margin: 0 0 14px;
 }

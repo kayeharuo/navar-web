@@ -29,3 +29,17 @@ export function getActiveNavItem(pathname) {
     .filter(item => item.path === '/' ? pathname === '/' : pathname === item.path || pathname.startsWith(`${item.path}/`))
     .sort((a, b) => b.path.length - a.path.length)[0] || NAV_ITEMS[0]
 }
+
+export function getPageTitle(pathname) {
+  let screen
+  if (pathname.startsWith('/mall-portal/map-applications/')) screen='Map Application'
+  else if (pathname.startsWith('/mall-portal/stall-applications/')) screen='Stall Application'
+  else if (pathname.startsWith('/ar-development/editor/')) screen='Node Editor'
+  else if (pathname.startsWith('/subscription-management/test/')) screen='Subscription Setup'
+  else if (pathname.startsWith('/application-management/testing')) screen='Application Intake'
+  else if (pathname.startsWith('/auth/reset-password')) screen='Reset Password'
+  else if (pathname.startsWith('/auth/set-password')) screen='Set Password'
+  else if (pathname.startsWith('/auth/')) screen='Account Setup'
+  else screen=getActiveNavItem(pathname).label
+  return `${screen} | NavAR`
+}

@@ -14,7 +14,7 @@ test('account lifecycle validates authority, roles, state, email cooldown and au
  admin_is_primary boolean DEFAULT false,admin_full_name text,admin_email text,admin_contact_num text,admin_job_title text,
  store_id bigint,admin_created_at timestamptz,admin_auth_user_id uuid,admin_updated_at timestamptz,admin_deactivated_on timestamptz,mall_id bigint);
  CREATE TABLE audit_log(audit_log_module text,audit_log_action text,audit_log_details text,audit_log_performed_at timestamptz,audit_log_performed_by bigint,mall_id bigint NOT NULL);
- CREATE TABLE mall(mall_id bigint PRIMARY KEY); INSERT INTO mall VALUES(13);
+ CREATE TABLE mall(mall_id bigint PRIMARY KEY,mall_beacon_major integer); INSERT INTO mall(mall_id) VALUES(13);
  INSERT INTO admin(admin_id,admin_role,admin_account_status,admin_is_primary,admin_full_name,mall_id) VALUES
  (1,'super_admin','official',true,'Primary',null),(2,'super_admin','official',false,'Reviewer',null),
  (3,'mall_admin','official',true,'Owner',13),(4,'mall_admin','partial',false,'Pending',13),(5,'store_admin','official',false,'Store',13),
@@ -143,7 +143,10 @@ for (const primary of [false,true]) test(`mall admin creation and resend use the
  let message,linkOptions
  mailer.createTransport=()=>({sendMail:async mail=>{calls.push('send');message=mail;return {accepted:[mail.to]}},close(){}})
  const db={
-  from(){return {select(){return {eq(){return {maybeSingle:async()=>({data:null})}}}}}},
+  from(table){
+   if(table==='email_log')return {insert(row){assert.ok(!row.email_log_body.includes('token=test'));return {select(){return {single:async()=>({data:{email_log_id:1}})}}}},update(){return {eq:async()=>({error:null})}}}
+   return {select(){return {eq(){return {maybeSingle:async()=>({data:null})}}}}}
+  },
   rpc:async(name,args)=>{
    calls.push(name)
    if(name==='manage_super_admin_account') return {data:{admin_role:'mall_admin',admin_is_primary:primary,admin_auth_user_id:'mall-auth',admin_email:'mall@example.test'}}

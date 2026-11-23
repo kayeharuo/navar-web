@@ -1337,6 +1337,7 @@
 .app-btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.45); border-top-color: #fff; border-radius: 50%; animation: app-btn-spin 0.7s linear infinite; }
 @keyframes app-btn-spin { to { transform: rotate(360deg); } }
 .workflow-info, .workflow-reason { padding: 12px; background: #f1f5f9; border-radius: 6px; font: 12px Poppins, sans-serif; }
+.workflow-reason + .review-badges-row { margin-top: 16px; }
 .workflow-reject { display: grid; gap: 8px; width: 100%; }
 .workflow-reject textarea { width: 100%; min-height: 90px; font-family: Poppins, sans-serif; }
 
@@ -1350,3 +1351,34 @@
  .workflow-mobile-cards button { padding: 8px 12px; }
  .review-panel-footer { flex-wrap: wrap; }
 }
+
+.app-mgmt-filters { max-width:100%; overflow-x:auto; min-height:38px; }
+.app-mgmt-table .app-mgmt-version-col { min-width: 170px; white-space: nowrap; }
+
+.review-version-group { display:flex; gap:6px; flex-wrap:wrap; padding:4px 0; }
+.review-history-explanation { margin-top:12px; background:#fff5f5; border:1px solid #fecaca; color:#991b1b; }
+.review-footer-btn:disabled { background:#e5e7eb; color:#9ca3af; cursor:not-allowed; opacity:1; }
+
+/* Keep fixed review chrome compact; submission context scrolls with its content. */
+.review-panel--compact .review-panel-header { padding:14px 20px 0; }
+.review-panel--compact .review-panel-title { font-size:23px; line-height:1.3; margin-bottom:3px; }
+.review-panel--compact .review-panel-meta { font-size:11px; margin:0 0 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.review-panel--compact .review-panel-close { top:13px; right:12px; }
+.review-panel--compact .review-badges-row { padding-bottom:9px; margin-top:6px; gap:8px; flex-wrap:wrap; }
+.review-panel--compact .review-tabs { padding:0 20px; }
+.review-panel--compact .review-tab-btn { font-size:14px; padding:8px 0; }
+.review-version-nav { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; padding:4px 0 7px; gap:8px; margin:0; }
+.review-version-nav .review-version-group { flex:0 0 auto; flex-wrap:nowrap; padding:0; }
+.review-version-nav button { white-space:nowrap; font-size:11px; padding:5px 8px; }
+.review-version-nav button[aria-busy="true"] { display:inline-flex; align-items:center; gap:7px; color:#155dfb; background:#eef4ff; opacity:1; }
+.review-version-nav .table-loading { display:inline-flex; }
+.review-version-nav .table-loading-spinner { width:12px; height:12px; }
+.review-submission-context { flex-shrink:0; margin:0 0 18px; border:1px solid #e8ecf2; border-radius:6px; padding:10px 12px; }
+.review-submission-context>summary { cursor:pointer; color:#64748b; font:600 12px Poppins,sans-serif; }
+.review-submission-context .workflow-info,.review-submission-context .workflow-reason { margin:8px 0 0!important; padding:9px 10px; }
+.review-submission-context .review-stepper { margin-top:10px; }
+.review-panel-body--thread { min-height:0; overflow:hidden; }
+.review-panel-body--thread .review-thread-wrap { min-height:0; }
+.review-panel-body--thread .review-thread-messages { min-height:0; overflow-y:auto; }
+.review-panel-body--thread .review-note-area { flex-shrink:0; }
+.review-thread-lock-notice { flex-shrink:0; margin:0 0 10px; padding:8px 10px; background:#f7f8fa; border-radius:5px; color:#64748b; font:12px Poppins,sans-serif; }

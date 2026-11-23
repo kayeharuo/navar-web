@@ -3,21 +3,11 @@ import { X, Pencil, Upload, ImageIcon, AlertTriangle } from 'lucide-react'
 import FloorInfoModal from './FloorInfoModal'
 import OperatingHoursBuilder from './OperatingHoursBuilder'
 import BusyButton from '../ui/BusyButton'
+import AuthImage from '../ui/AuthImage'
 import MallLocationPicker from './MallLocationPicker'
 
 const MAX_LOGO_MB = 5
-const MALL_COVERAGE_OPTIONS = [
-  'Less than or equal to 15,000 sqm',
-  'Greater than 15,000 sqm, but lesser than or equal to 50,000 sqm',
-  'Greater than 50,000 sqm, but less than or equal to 150,000 sqm',
-  'Greater than 150,000 sqm',
-]
 
-function getLogoUrl(logo) {
-  return logo?.startsWith('/')
-    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
-    : logo
-}
 
 export default function AddMallModal({ onClose, onSave, initialData = null, stackedOnInfoPanel = false, saveError = null }) {
   const isEdit = !!initialData
@@ -28,17 +18,17 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     province: initialData?.province || '',
     zipCode: initialData?.zipCode || '',
     address: initialData?.address || '',
-    mallCoverageArea: initialData?.mallCoverageArea || '',
+    barangay: initialData?.barangay || '',
     description: initialData?.description || '',
     majorBeacons: initialData?.majorBeacons != null ? String(initialData.majorBeacons) : '1',
     floors: initialData?.floors != null ? String(initialData.floors) : '',
     latitude: initialData?.latitude ?? null,
     longitude: initialData?.longitude ?? null,
-    agreementType: initialData?.tier || initialData?.agreementType || '',
+    agreementType: initialData?.initialPreferredTier || '',
   })
 
   const [logo, setLogo] = useState(null)
-  const [logoPreview, setLogoPreview] = useState(getLogoUrl(initialData?.logoUrl) || null)
+  const [logoPreview, setLogoPreview] = useState(initialData?.logoUrl || null)
   const [logoError, setLogoError] = useState('')
 
   const [floorDetails, setFloorDetails] = useState(initialData?.floorDetails || [])
@@ -60,7 +50,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     if (count > 0) {
       setFloorDetails(prev => {
         const next = Array.from({ length: count }, (_, i) =>
-          prev[i] ?? { floorNo: '', label: '' }
+          prev[i] ?? { floorNo: '', label: '', floorAreaSqm: '' }
         )
         return next
       })
@@ -114,6 +104,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     setForm(current => ({
       ...current,
       address: location.address,
+      barangay: location.barangay || current.barangay,
       city: location.city || current.city,
       province: location.province || current.province,
       zipCode: location.zipCode || current.zipCode,
@@ -124,6 +115,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       ...current,
       location: undefined,
       address: location.address ? undefined : current.address,
+      barangay: location.barangay ? undefined : current.barangay,
       city: location.city ? undefined : current.city,
       province: location.province ? undefined : current.province,
       zipCode: location.zipCode ? undefined : current.zipCode,
@@ -140,6 +132,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     if (!form.province.trim()) errs.province = 'State/Province is required.'
     if (!form.zipCode.trim()) errs.zipCode = 'Zip code is required.'
     if (!form.address.trim()) errs.address = 'Address is required.'
+    if (!form.barangay.trim()) errs.barangay = 'Barangay is required.'
     if (form.latitude == null || form.longitude == null) errs.location = 'Confirm the mall location on the map.'
     if (!form.majorBeacons || Number(form.majorBeacons) < 1) errs.majorBeacons = 'Beacon major must be at least 1.'
     if (!form.floors || parseInt(form.floors) < 1)
@@ -149,7 +142,6 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     if (new Set(operatingHours.flatMap(schedule => schedule.days)).size !== 7)
       errs.operatingHours = 'Set operating hours or mark Closed for all seven days.'
     if (!isEdit && !logo && !logoPreview) errs.logo = 'Logo is required.'
-    if (!form.agreementType) errs.agreementType = 'Agreement type is required.'
     return errs
   }
 
@@ -186,9 +178,9 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       province: form.province.trim(),
       zipCode: form.zipCode.trim(),
       address: form.address.trim(),
+      barangay: form.barangay.trim(),
       latitude: form.latitude,
       longitude: form.longitude,
-      mallCoverageArea: form.mallCoverageArea || null,
       description: form.description.trim(),
       majorBeacons: Number(form.majorBeacons),
       floors: parseInt(form.floors),
@@ -253,6 +245,12 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               {errors.address && <p className="mall-field-error">{errors.address}</p>}
             </div>
 
+            <div ref={element => { fieldRefs.current.barangay = element }} className={`mall-field-group${shakingFields.includes('barangay') ? ' mall-field-group--shake' : ''}`}>
+              <label className="mall-field-label">BARANGAY <span className="mall-field-required">*</span></label>
+              <input className={`mall-field-input${errors.barangay ? ' mall-field-input--error' : ''}`} value={form.barangay} onChange={e => setField('barangay', e.target.value)} placeholder="e.g. Barangay Luz" />
+              {errors.barangay && <p className="mall-field-error">{errors.barangay}</p>}
+            </div>
+
             {/* City */}
             <div ref={element => { fieldRefs.current.city = element }} className={`mall-field-group${shakingFields.includes('city') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">CITY <span className="mall-field-required">*</span></label>
@@ -279,16 +277,6 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
             <div ref={element => { fieldRefs.current.majorBeacons = element }} className={`mall-field-group${shakingFields.includes('majorBeacons') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">LONGITUDE</label>
               <input className="mall-field-input" value={form.longitude ?? ''} readOnly placeholder="Select a location on the map" />
-            </div>
-
-            <div className="mall-field-group mall-field-group--full">
-              <label className="mall-field-label">MALL COVERAGE AREA (GFA)</label>
-              <select className="mall-field-input" value={form.mallCoverageArea} onChange={e => setField('mallCoverageArea', e.target.value)}>
-                <option value="">Select coverage area (optional)</option>
-                {MALL_COVERAGE_OPTIONS.map(option => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
             </div>
 
             {/* No. of Floors */}
@@ -334,10 +322,10 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
             {/* Agreement Type */}
             <div ref={element => { fieldRefs.current.agreementType = element }} className={`mall-field-group${shakingFields.includes('agreementType') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">
-                AGREEMENT TYPE <span className="mall-field-required">*</span>
+                INITIALLY PREFERRED TIER (OPTIONAL)
               </label>
               <select className={`mall-field-input${errors.agreementType ? ' mall-field-input--error' : ''}`} value={form.agreementType} onChange={e => setField('agreementType', e.target.value)}>
-                <option value="">Select agreement type</option>
+                <option value="">Skip for now</option>
                 <option value="Basic">Basic</option>
                 <option value="Standard">Standard</option>
                 <option value="Premium">Premium</option>
@@ -365,7 +353,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
                   Browse Image
                 </button>
                 {logoPreview ? (
-                  <img src={logoPreview} className="mall-logo-preview" alt="Logo preview" />
+                  logoPreview.includes("/api/") ? <AuthImage src={logoPreview} className="mall-logo-preview" alt="Logo preview" /> : <img src={logoPreview} className="mall-logo-preview" alt="Logo preview" />
                 ) : (
                   <span className="mall-logo-placeholder">
                     <ImageIcon size={14} className="mall-logo-placeholder-icon" />

@@ -135,13 +135,17 @@ export const STORES = STORE_UNITS;
  *   storeUnits : [{ unit, brand, name, floor, unitId }]
  *   stallStores: ["Potato Corner", ...]
  */
-export function setEditorCatalog({ floors, storeUnits, stallStores }) {
+const STALL_FLOOR_BY_NAME=new Map();
+export const stallStoresForFloor = floor => STALL_STORES.filter(name=>!STALL_FLOOR_BY_NAME.get(name)||STALL_FLOOR_BY_NAME.get(name)===floor);
+export function setEditorCatalog({ floors, storeUnits, stallStores, stallFloorByName=[] }) {
     FLOORS.length = 0;
     FLOORS.push(...floors);
     STORE_UNITS.length = 0;
     STORE_UNITS.push(...storeUnits);
     STALL_STORES.length = 0;
     STALL_STORES.push(...stallStores);
+    STALL_FLOOR_BY_NAME.clear();
+    for(const [name,floor] of stallFloorByName) STALL_FLOOR_BY_NAME.set(name,floor);
 }
 let _id = 200;
 export const uid = (p = "n") => `${p}${++_id}`;

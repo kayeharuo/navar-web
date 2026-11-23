@@ -1,7 +1,8 @@
+import LoadingSpinner from '../ui/LoadingSpinner'
 import { useState, useEffect } from 'react'
 
 function formatPeso(amount) {
-  return `₱${amount.toLocaleString('en-US')}.00`
+  return new Intl.NumberFormat('en-PH', {style:'currency',currency:'PHP',minimumFractionDigits:2}).format(Number(amount || 0))
 }
 
 const REASONS = [
@@ -18,16 +19,16 @@ const REASONS = [
   {
     key: 'Breach of Contract',
     color: '#9E5BF0',
-    desc: 'Subscription terms violated. Remaining days forfeited. Penalty fee required before reinstatement.',
+    desc: 'AR is unpublished. Annual subscription, tier-based reinstatement, and the specified penalty must be paid. The renewal stays anchored to the previous expiry.',
   },
   {
     key: 'Other',
     color: '#2563EB',
-    desc: 'Any other reason not covered above. Notes are required. Lifting terms decided case by case.',
+    desc: 'Specify the reason and penalty. Verified annual subscription and reinstatement payment is required; the renewal stays anchored to the previous expiry.',
   },
 ]
 
-export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm }) {
+export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm, busy = false }) {
   const [reason, setReason] = useState('Non-Payment')
   const [notes, setNotes] = useState('')
   const [penalty, setPenalty] = useState('')
@@ -41,10 +42,10 @@ export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm }) {
   }, [onCancel])
 
   const requiresNotes = reason === 'Breach of Contract' || reason === 'Other'
-  const requiresPenalty = reason === 'Breach of Contract'
+  const requiresPenalty = reason === 'Breach of Contract' || reason === 'Other'
   const penaltyNumber = Number(penalty) || 0
 
-  const canConfirm = (!requiresNotes || notes.trim().length > 0) && (!requiresPenalty || penaltyNumber > 0)
+  const canConfirm = (!requiresNotes || notes.trim().length > 0) && (!requiresPenalty || (penalty.trim() !== '' && penaltyNumber >= 0))
 
   let reinstateLabel
   if (reason === 'Non-Payment') {
@@ -53,14 +54,13 @@ export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm }) {
   } else if (reason === 'Operational') {
     reinstateLabel = 'Keeps Running'
   } else {
-    reinstateLabel = penaltyNumber > 0
-      ? `Annual ${formatPeso(tierInfo.annualFee)} + penalty ${formatPeso(penaltyNumber)} = ${formatPeso(tierInfo.annualFee + penaltyNumber)}`
-      : `Annual ${formatPeso(tierInfo.annualFee)} (add penalty if any)`
+    const reinstatement = Math.round(tierInfo.annualFee * tierInfo.reinstatementRate / 100)
+    reinstateLabel = `Annual ${formatPeso(tierInfo.annualFee)} + reinstatement ${formatPeso(reinstatement)} + penalty ${formatPeso(penaltyNumber)} = ${formatPeso(tierInfo.annualFee + reinstatement + penaltyNumber)}`
   }
 
   function handleConfirm() {
-    if (!canConfirm) return
-    onConfirm({ reason, notes: notes.trim(), penalty: penaltyNumber })
+    if (!canConfirm || busy) return
+    return onConfirm({ reason, notes: notes.trim(), penalty: penaltyNumber })
   }
 
   return (
@@ -68,7 +68,7 @@ export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm }) {
       <div className="sub-modal-box">
         <div className="sub-modal-top">
           <h2 className="sub-modal-title">Suspend Subscription</h2>
-          <button className="sub-modal-x" onClick={onCancel} aria-label="Close">X</button>
+          <button className="sub-modal-x" disabled={busy} onClick={onCancel} aria-label="Close">X</button>
         </div>
 
         <div className="sub-modal-divider" />
@@ -160,13 +160,15 @@ export default function SuspendModal({ mall, tierInfo, onCancel, onConfirm }) {
         </div>
 
         <div className="sub-modal-footer">
-          <button className="sub-modal-btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className="sub-modal-btn-cancel" disabled={busy} onClick={onCancel}>Cancel</button>
           <button
             className="sub-modal-btn-confirm"
             onClick={handleConfirm}
-            disabled={!canConfirm}
+            disabled={!canConfirm || busy}
+            aria-busy={busy}
           >
-            Confirm Suspension
+            {busy && <LoadingSpinner label="Suspending subscription" />}
+            {busy ? 'Suspending...' : 'Confirm Suspension'}
           </button>
         </div>
       </div>

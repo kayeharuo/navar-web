@@ -1,5 +1,15 @@
 # Progress
 
+## 25 October 2026 - Beacon links per AR version
+
+Beacon add/edit now loads actual AR development IDs, nodes and saved assignments for the mall. Each version has a single optional node selector; counts come from real assignments. Backend validation rejects duplicate versions and mismatched nodes. Applied backend-only SECURITY INVOKER RPC `save_beacon_with_assignments` to save beacon details, links and battery changes atomically. The existing unique constraint enforces one node per beacon per AR development. AR Development now displays the same bidirectional For Revision / Approved application-flow arrow as Application Management.
+
+Verification: two focused tests pass (including PostgreSQL transaction rollback and cross-mall/version rejection), focused frontend lint and backend syntax pass, production build passes with the existing bundle-size warning, and the live mall read-back endpoint passes. Live RPC existence, role privileges and validation were verified. Browser interactions were not tested.
+
+## 25 October 2026 - Beacon assignment table spelling
+
+Applied `rename_beacon_node_assignment` to the NavAR Supabase project. Renamed the table in place, its four named constraints and two named RLS policies; updated the live `save_node_map` function in the same transaction. Verified the table OID, row count (0 before and after), all grants, three policies and six constraints are preserved, and no database function references the old spelling. Updated SQL setup/verification/rollback scripts and current usage documentation. Mall Management uses `beacon` directly and needs no JavaScript changes. External Unity clients must query `beacon_node_assignment`. Historical comparison snapshots below retain the original spelling.
+
 ## 21 October 2026 - Application and AR workflow
 
 Implemented the super-admin workflow and database/backend support described in [the handoff](navar-workflow-handoff.md). No mall screens, wallet/payment changes or renewal logic. Migration 23 remains unapplied. Existing uncommitted edits preserved.

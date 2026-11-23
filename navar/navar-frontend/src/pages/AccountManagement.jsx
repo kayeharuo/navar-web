@@ -749,7 +749,6 @@ export default function AccountManagement() {
         </div>
       </div>
 
-      {actionBusy && <div className="acct-request-tools" role="status">Processing account request...</div>}
       {/* Stats */}
       <div className="acct-mgmt-stats">
         <div className="acct-stat-card acct-stat-card--super">

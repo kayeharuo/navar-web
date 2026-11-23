@@ -9,7 +9,7 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
       arr.push(
         initialDetails && initialDetails[i]
           ? { ...initialDetails[i], floorNo: String(i + 1) }
-          : { floorNo: String(i + 1), label: '' }
+          : { floorNo: String(i + 1), label: '', floorAreaSqm: '' }
       )
     }
     return arr
@@ -35,6 +35,7 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
     details.forEach((d, i) => {
       if (!/^\d+$/.test(d.floorNo.trim()) || Number(d.floorNo) !== i + 1) errs.push({ index: i, field: 'floorNo' })
       if (!d.label.trim()) errs.push({ index: i, field: 'label' })
+      if (!d.floorAreaSqm || Number(d.floorAreaSqm) <= 0) errs.push({ index: i, field: 'floorAreaSqm' })
     })
     return errs
   }
@@ -90,6 +91,20 @@ export default function FloorInfoModal({ floorCount, initialDetails, onSave, onC
                   value={detail.label}
                   onChange={e => handleChange(index, 'label', e.target.value)}
                   placeholder="e.g. Ground Floor"
+                />
+              </div>
+              <div className="mall-field-group">
+                <label className="mall-field-label">
+                  FLOOR AREA (SQM) <span className="mall-field-required">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className={`mall-field-input${hasError(index, 'floorAreaSqm') ? ' mall-field-input--error' : ''}`}
+                  value={detail.floorAreaSqm || ''}
+                  onChange={e => handleChange(index, 'floorAreaSqm', e.target.value)}
+                  placeholder="e.g. 4000"
                 />
               </div>
             </div>

@@ -61,3 +61,8 @@ END; $$;
 REVOKE ALL ON FUNCTION public.manage_super_admin_account(bigint,bigint,text,jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.manage_super_admin_account(bigint,bigint,text,jsonb) TO service_role;
 COMMIT;
+
+-- Beacon majors identify malls and must be unique across the mall table.
+CREATE UNIQUE INDEX IF NOT EXISTS mall_beacon_major_unique_idx
+ ON public.mall (mall_beacon_major)
+ WHERE mall_beacon_major IS NOT NULL;

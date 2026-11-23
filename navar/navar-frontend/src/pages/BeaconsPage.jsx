@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import BeaconManager from '../components/mallManagement/BeaconManager'
 import { apiRequest } from '../config/api'
+import { MALL_BEACONS_UPDATED } from '../utils/mallDataEvents'
 
 const SAMPLE_MALLS = [
   {
@@ -91,8 +92,12 @@ export default function BeaconsPage() {
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    apiRequest(`/api/malls/${mallId}`)
-      .then(foundMall => setMall({
+    let active = true
+    let requestId = 0
+    const refresh = () => {
+      const current = ++requestId
+      return apiRequest(`/api/malls/${mallId}`)
+      .then(foundMall => { if (!active || current !== requestId) return; setLoadError(''); setMall({
         ...foundMall,
         beacons: (foundMall.beacons || []).map(beacon => ({
           ...beacon,
@@ -101,8 +106,29 @@ export default function BeaconsPage() {
           batteryHistory: beacon.batteryHistory || [],
           ticketHistory: beacon.ticketHistory || [],
         })),
-      }))
-      .catch(error => setLoadError(error.message || 'Unable to load beacons.'))
+      }) })
+      .catch(error => { if (active && current === requestId) setLoadError(error.message || 'Unable to load beacons.') })
+    }
+    const refreshVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    const onUpdated = event => { if (String(event.detail?.mallId) === String(mallId)) void refresh() }
+    const onStorage = event => {
+      if (event.key !== MALL_BEACONS_UPDATED || !event.newValue) return
+      try { if (String(JSON.parse(event.newValue).mallId) === String(mallId)) void refresh() } catch { /* Ignore unrelated storage content. */ }
+    }
+    void refresh()
+    window.addEventListener('focus', refreshVisible)
+    document.addEventListener('visibilitychange', refreshVisible)
+    window.addEventListener(MALL_BEACONS_UPDATED, onUpdated)
+    window.addEventListener('storage', onStorage)
+    const timer = window.setInterval(refreshVisible, 30000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshVisible)
+      document.removeEventListener('visibilitychange', refreshVisible)
+      window.removeEventListener(MALL_BEACONS_UPDATED, onUpdated)
+      window.removeEventListener('storage', onStorage)
+    }
   }, [mallId, navigate])
 
   useEffect(() => {

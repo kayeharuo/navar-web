@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../../config/api'
 
+const imageRequests = new Map()
+
+function loadImage(src) {
+  if (!imageRequests.has(src)) {
+    const request = apiRequest(src, { responseType: 'blob' }).catch(error => {
+      imageRequests.delete(src)
+      throw error
+    })
+    imageRequests.set(src, request)
+  }
+  return imageRequests.get(src)
+}
+
 export default function AuthImage({ src, alt = '', ...props }) {
   const [objectUrl, setObjectUrl] = useState(null)
   const [loading, setLoading] = useState(Boolean(src))
@@ -14,7 +27,7 @@ export default function AuthImage({ src, alt = '', ...props }) {
       return undefined
     }
     setLoading(true)
-    apiRequest(src, { responseType: 'blob' }).then(blob => {
+    loadImage(src).then(blob => {
       if (!mounted) return
       createdUrl = URL.createObjectURL(blob)
       setObjectUrl(createdUrl)

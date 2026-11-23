@@ -56,6 +56,18 @@ function buildNodeMap(body, context) {
 		calibrationByFloor.set(item.floorId, { ...item, pixelsPerMeter })
 	}
 
+    const groupsIn = Array.isArray(body.transitionGroups) ? body.transitionGroups : [];
+    const groupById = new Map();
+    const names = new Set();
+    for (const group of groupsIn) {
+        if (typeof group.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(group.id) || groupById.has(group.id)) { fail('Invalid or duplicate transition group ID.'); continue }
+        const name = String(group.name || '').trim();
+        if (!NODE_TYPES[group.type]?.isFloorTransition || !name || name.length > 100) { fail('A transition group needs a valid type and a name of 1 to 100 characters.'); continue }
+        const key = `${group.type}:${name.toLowerCase()}`;
+        if (names.has(key)) { fail('A transition group with this name and type already exists.'); continue }
+        names.add(key); groupById.set(group.id, { id: group.id, type: group.type, name });
+    }
+    const occupiedLandings = new Set();
 	// ---- Nodes ----
 	const nodeByClientId = new Map()
 	const usedDbIds = new Set()
@@ -64,7 +76,7 @@ function buildNodeMap(body, context) {
 		if (nodeByClientId.has(item.clientId)) { fail(`Node id "${item.clientId}" is duplicated.`); continue }
 		const label = String(item.label || '').trim()
 		const type = NODE_TYPES[item.type]
-		const where = `Node "${label || item.clientId}"`
+		const where = `Node "${label || item.clientId}" [${item.clientId}] on ${floorLabel(item.floorId)}`
 		if (!context.floorIds.has(item.floorId)) { fail(`${where} is on a floor that is not part of this application.`); continue }
 		if (!type) { fail(`${where} has an unknown type.`); continue }
 		if (!label || label.length > 100) { fail(`A ${item.type} node on ${floorLabel(item.floorId)} needs a label of 1 to 100 characters.`); continue }
@@ -90,12 +102,20 @@ function buildNodeMap(body, context) {
 		} else if (item.type === 'STALL') {
 			const store = context.stores.get(item.storeId)
 			if (!store || store.store_type !== 'stall') { fail(`${where} must be linked to a stall store.`); continue }
+            if (store.onboarding_floor_id != null && store.onboarding_floor_id !== item.floorId) { fail(`${where} is linked to a stall on a different floor.`); continue }
 			storeId = store.store_id
 		} else if (item.unitId != null || item.storeId != null) {
 			fail(`${where} is a ${type.group.toLowerCase()} node and cannot be linked to a store.`)
 			continue
 		}
 
+        if (type.isFloorTransition) {
+            const group = groupById.get(item.transitionGroupId);
+            if (!group || group.type !== item.type) { fail(`${where} must select a matching transition group.`); continue }
+            const landing = `${group.id}:${item.floorId}`;
+            if (occupiedLandings.has(landing)) { fail(`${where}: group "${group.name}" already has a landing on this floor.`); continue }
+            occupiedLandings.add(landing);
+        } else if (item.transitionGroupId) { fail('Only transition nodes can belong to a transition group.'); continue }
 		const calibration = calibrationByFloor.get(item.floorId)
 		if (!calibration) {
 			if (!reportedUncalibrated.has(item.floorId)) {
@@ -116,44 +136,14 @@ function buildNodeMap(body, context) {
 			// Meters, same origin and axes as the image (y grows down). Millimeter precision.
 			x: round3(item.pixelX / calibration.pixelsPerMeter),
 			y: round3(item.pixelY / calibration.pixelsPerMeter),
-			is_accessible: type.isPwdType || item.isAccessible === true,
+            node_is_emergency: item.isEmergency === true,
 			is_store_entrance: item.type === 'STORE_ENTRANCE',
 			store_id: storeId,
 			unit_id: unitId,
-			cross_floor_client_id: item.crossFloorClientId ?? null,
+			transition_group_id: item.transitionGroupId || null,
 		})
 	}
 	if (errors.length) return { errors, warnings, payload: null }
-
-	// ---- Cross-floor links ----
-	for (const node of nodeByClientId.values()) {
-		const cfg = NODE_TYPES[node.type]
-		const where = `Node "${node.label}" (${floorLabel(node.floor_id)})`
-		if (!cfg.isFloorTransition) {
-			if (node.cross_floor_client_id) fail(`${where} is not a floor transition and cannot have a cross-floor link.`)
-			continue
-		}
-		if (!node.cross_floor_client_id) {
-			if (body.finalize) fail(`${where}: the ${node.type.toLowerCase()} is not linked to its counterpart on another floor.`)
-			continue
-		}
-		const target = nodeByClientId.get(node.cross_floor_client_id)
-		if (!target) { fail(`${where}: the linked node does not exist.`); continue }
-		if (target.floor_id === node.floor_id) { fail(`${where}: a cross-floor link must point to a different floor.`); continue }
-		if (target.type !== node.type) fail(`${where}: a ${node.type.toLowerCase()} must link to another ${node.type.toLowerCase()}, not a ${target.type.toLowerCase()}.`)
-	}
-	if (errors.length) return { errors, warnings, payload: null }
-
-	// Links are stored in both directions so Unity can read either end. A one-way link is
-	// completed here; a node that two different nodes point at is a mapping mistake.
-	for (const node of [...nodeByClientId.values()]) {
-		if (!node.cross_floor_client_id) continue
-		const target = nodeByClientId.get(node.cross_floor_client_id)
-		if (!target.cross_floor_client_id) { target.cross_floor_client_id = node.client_id; continue }
-		if (target.cross_floor_client_id !== node.client_id) {
-			fail(`Node "${target.label}" (${floorLabel(target.floor_id)}) is linked from "${node.label}" but is itself linked to a different node. Each ${target.type.toLowerCase()} links to exactly one counterpart.`)
-		}
-	}
 
 	// ---- Same-floor edges. Distance is recomputed from the meter coordinates. ----
 	const edges = []
@@ -163,40 +153,48 @@ function buildNodeMap(body, context) {
 		const to = nodeByClientId.get(item.toClientId)
 		if (!from || !to) { fail('An edge connects a node that does not exist.'); continue }
 		if (from === to) { fail(`Node "${from.label}" is connected to itself.`); continue }
-		if (from.floor_id !== to.floor_id) { fail(`The edge "${from.label}" - "${to.label}" crosses floors. Use a cross-floor link on a stairs, escalator, elevator or ramp instead.`); continue }
 		if (!PATH_TYPES.includes(item.pathType)) { fail(`The edge "${from.label}" - "${to.label}" has an unknown path type.`); continue }
 		const key = pairKey(from.client_id, to.client_id)
 		if (seenPairs.has(key)) { fail(`"${from.label}" and "${to.label}" are connected more than once.`); continue }
 		seenPairs.add(key)
 
-		const distance = round3(Math.hypot(to.x - from.x, to.y - from.y))
+        const cross = from.floor_id !== to.floor_id
+        const direction = item.direction || 'both'
+        if (!['both', 'forward', 'reverse'].includes(direction)) { fail('Unknown connection direction.'); continue }
+        if (cross && (!NODE_TYPES[from.type].isFloorTransition || from.type !== to.type)) { fail('Cross-floor connections must join matching transition types.'); continue }
+        if (cross && (!from.transition_group_id || from.transition_group_id !== to.transition_group_id)) { fail('Connected landings must share a transition group.'); continue }
+        if (cross && context.floorNumbers) {
+            const lower = Math.min(context.floorNumbers.get(from.floor_id), context.floorNumbers.get(to.floor_id));
+            const upper = Math.max(context.floorNumbers.get(from.floor_id), context.floorNumbers.get(to.floor_id));
+            const intermediate = [...context.floorNumbers.values()].some(n => n > lower && n < upper);
+            if (intermediate && from.type !== 'ELEVATOR') { fail('Stairs, escalators and ramps must connect adjacent floors.'); continue }
+        }
+        const distance = cross ? (FLOOR_CHANGE_COST_M[from.type] || 10) * Math.max(1, Math.abs((context.floorNumbers?.get(from.floor_id) || 0) - (context.floorNumbers?.get(to.floor_id) || 0))) : round3(Math.hypot(to.x - from.x, to.y - from.y))
 		// Only staircase edges are inaccessible (NavAR Complete Workflow 1.5).
-		const blocked = NODE_TYPES[from.type].blocksAccessibleRoute || NODE_TYPES[to.type].blocksAccessibleRoute
-		edges.push({ from_client_id: from.client_id, to_client_id: to.client_id, distance, path_type: item.pathType, is_accessible: !blocked, is_cross_floor: false })
-		if (distance > LONG_EDGE_WARNING_M) {
+		edges.push({ from_client_id: from.client_id, to_client_id: to.client_id, distance, path_type: item.pathType, is_cross_floor: cross, direction })
+		if (!cross && distance > LONG_EDGE_WARNING_M) {
 			warnings.push({ code: 'long_edge', message: `The edge "${from.label}" - "${to.label}" on ${floorLabel(from.floor_id)} is ${distance.toFixed(1)} m long. Add corridor nodes every 5 to 8 m so BLE coverage stays continuous.` })
 		}
 	}
 
-	// ---- Cross-floor edges are generated from the links, one per pair. ----
-	const crossPairs = new Set()
-	for (const node of nodeByClientId.values()) {
-		if (!node.cross_floor_client_id) continue
-		const target = nodeByClientId.get(node.cross_floor_client_id)
-		if (!target || target.floor_id === node.floor_id || target.type !== node.type) continue
-		const key = pairKey(node.client_id, target.client_id)
-		if (crossPairs.has(key)) continue
-		crossPairs.add(key)
-		const cfg = NODE_TYPES[node.type]
-		edges.push({
-			from_client_id: node.client_id,
-			to_client_id: target.client_id,
-			distance: FLOOR_CHANGE_COST_M[node.type] ?? 10,
-			path_type: cfg.isPwdType ? 'accessible' : 'normal',
-			is_accessible: !cfg.blocksAccessibleRoute,
-			is_cross_floor: true,
-		})
-	}
+    // Missing group-chain edges are generated server-side too, for every API client.
+    if (context.floorNumbers) for (const group of groupById.values()) {
+        const landings = [...nodeByClientId.values()].filter(n => n.transition_group_id === group.id).sort((a,b) => context.floorNumbers.get(a.floor_id)-context.floorNumbers.get(b.floor_id));
+        for (let i=1;i<landings.length;i++) {
+            const lower=landings[i-1], upper=landings[i];
+            const low=context.floorNumbers.get(lower.floor_id), high=context.floorNumbers.get(upper.floor_id);
+            if (group.type !== 'ELEVATOR' && [...context.floorNumbers.values()].some(n=>n>low && n<high)) continue;
+            const key=pairKey(lower.client_id,upper.client_id);
+            if (seenPairs.has(key)) continue;
+            seenPairs.add(key);
+            edges.push({from_client_id:upper.client_id,to_client_id:lower.client_id,distance:(FLOOR_CHANGE_COST_M[group.type] || 10)*Math.max(1,high-low),path_type:upper.node_is_emergency || lower.node_is_emergency ? 'restricted' : NODE_TYPES[group.type].isPwdType ? 'accessible' : 'normal',direction:'both',is_cross_floor:true});
+        }
+    }
+    if (body.finalize) {
+        for (const node of nodeByClientId.values()) {
+            if (NODE_TYPES[node.type].isFloorTransition && !edges.some(e => e.is_cross_floor && [e.from_client_id, e.to_client_id].includes(node.client_id))) fail(`Node "${node.label}" [${node.client_id}] on ${floorLabel(node.floor_id)} needs a matching landing in its group on another floor.`)
+        }
+    }
 	if (errors.length) return { errors, warnings, payload: null }
 
 	// ---- Graph health (warnings only, never blocks a draft save) ----
@@ -230,7 +228,7 @@ function buildNodeMap(body, context) {
 		ref_label: String(value.refLine || '').trim().slice(0, 200) || null,
 	}))
 
-	return { errors, warnings, payload: { calibrations, nodes: [...nodeByClientId.values()], edges } }
+	return { errors, warnings, payload: { transition_groups: [...groupById.values()], calibrations, nodes: [...nodeByClientId.values()], edges } }
 }
 
 module.exports = { buildNodeMap }

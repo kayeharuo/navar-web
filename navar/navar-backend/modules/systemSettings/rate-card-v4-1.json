@@ -1,0 +1,92 @@
+{
+  "version": "v4.1-draft-2026-11-21",
+  "rates": {
+    "version": "v4.1-draft-2026-11-21",
+    "beaconCost": 740,
+    "installCost": 75,
+    "mapping": 4,
+    "testing": 1.5,
+    "pairing": 125,
+    "training": 5000,
+    "travel": 5000,
+    "contingency": 0.1,
+    "margin": 0.2,
+    "spareRate": 0.05,
+    "rentCap": 0.01,
+    "extraVisit": 2250,
+    "defaultConnectors": 4,
+    "defaultHallwayRate": 0.3,
+    "hallwaySqmPerBeacon": 60,
+    "roundingIncrement": 1000,
+    "quoteExpiryDays": 30,
+    "suggestedTierStoreLimits": [
+      60,
+      200
+    ],
+    "confirmedRates": [
+      "beaconCost"
+    ]
+  },
+  "tiers": {
+    "basic": {
+      "key": "basic",
+      "label": "Basic",
+      "annual": 25000,
+      "graceDays": 15,
+      "reinstatementRate": 0.2,
+      "adminLimit": 2,
+      "historyDays": 30,
+      "analytics": "summary",
+      "queue": "Standard",
+      "visits": 1,
+      "freeStalls": 0,
+      "stallFee": 1100,
+      "freeMapUpdates": 0,
+      "mapUpdateFeePerFloor": 28000,
+      "beaconReplacementFee": 815,
+      "extraVisitFee": 2250,
+      "remoteResponse": "Within 5 business days",
+      "onsiteDispatch": "Within 6 business days"
+    },
+    "standard": {
+      "key": "standard",
+      "label": "Standard",
+      "annual": 33000,
+      "graceDays": 30,
+      "reinstatementRate": 0.15,
+      "adminLimit": 4,
+      "historyDays": 365,
+      "analytics": "export",
+      "queue": "Priority",
+      "visits": 2,
+      "freeStalls": 0,
+      "stallFee": 1000,
+      "freeMapUpdates": 0,
+      "mapUpdateFeePerFloor": 25000,
+      "beaconReplacementFee": 815,
+      "extraVisitFee": 2250,
+      "remoteResponse": "Within 2 business days",
+      "onsiteDispatch": "Within 4 business days"
+    },
+    "premium": {
+      "key": "premium",
+      "label": "Premium",
+      "annual": 47000,
+      "graceDays": 45,
+      "reinstatementRate": 0.1,
+      "adminLimit": 8,
+      "historyDays": null,
+      "analytics": "full",
+      "queue": "Dedicated slot",
+      "visits": 4,
+      "freeStalls": 10,
+      "stallFee": 1000,
+      "freeMapUpdates": 1,
+      "mapUpdateFeePerFloor": 25000,
+      "beaconReplacementFee": 815,
+      "extraVisitFee": 2250,
+      "remoteResponse": "Next business day",
+      "onsiteDispatch": "Within 48 hrs"
+    }
+  }
+}

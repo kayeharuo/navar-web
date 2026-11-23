@@ -21,7 +21,7 @@ DROP FUNCTION public.snapshot_map_allowance();
 ALTER TABLE public.ar_development DROP CONSTRAINT ar_workflow_status;
 UPDATE public.ar_development SET ar_development_status='suspended' WHERE ar_development_status='on_hold';
 ALTER TABLE public.edge DROP CONSTRAINT edge_start_node_same_version,DROP CONSTRAINT edge_end_node_same_version;
-ALTER TABLE public.beacon_node_assigment DROP CONSTRAINT assignment_node_same_version,DROP CONSTRAINT assignment_one_node_per_beacon_per_version;
+ALTER TABLE public.beacon_node_assignment DROP CONSTRAINT assignment_node_same_version,DROP CONSTRAINT assignment_one_node_per_beacon_per_version;
 ALTER TABLE public.node DROP CONSTRAINT node_cross_floor_same_version,DROP CONSTRAINT node_id_ar_development_key,DROP COLUMN ar_development_id;
 CREATE UNIQUE INDEX uq_application_mall_version ON public.application(mall_id,application_version);
 ALTER TABLE public.application DROP CONSTRAINT application_mall_version_attempt_key,DROP CONSTRAINT application_attempt_positive,DROP CONSTRAINT application_dispute_limit,
@@ -171,7 +171,7 @@ BEGIN
        AND n.floor_id = ANY (v_floor_ids);
 
     -- 3. Beacon assignments of THIS version that point at nodes being removed go too.
-    DELETE FROM public.beacon_node_assigment a
+    DELETE FROM public.beacon_node_assignment a
      USING public.node n
      WHERE a.ar_development_id = p_ar_development_id
        AND a.node_id = n.node_id

@@ -1,10 +1,11 @@
+import LoadingSpinner from '../ui/LoadingSpinner'
 import { useEffect } from 'react'
 
 function formatPeso(amount) {
-  return `₱${amount.toLocaleString('en-US')}.00`
+  return new Intl.NumberFormat('en-PH', {style:'currency',currency:'PHP',minimumFractionDigits:2}).format(Number(amount || 0))
 }
 
-export default function LiftSuspensionModal({ mall, tierInfo, onCancel, onConfirm }) {
+export default function LiftSuspensionModal({ mall, tierInfo, onCancel, onConfirm, busy = false }) {
   useEffect(() => {
     function handleEsc(e) {
       if (e.key === 'Escape') onCancel()
@@ -20,10 +21,10 @@ export default function LiftSuspensionModal({ mall, tierInfo, onCancel, onConfir
 
   return (
     <div className="sub-modal-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div className="sub-modal-box sub-modal-box--sm">
+      <div className="sub-modal-box sub-modal-box--sm sub-lift-modal">
         <div className="sub-modal-top">
           <h2 className="sub-modal-title">Lift Suspension</h2>
-          <button className="sub-modal-x" onClick={onCancel} aria-label="Close">X</button>
+          <button className="sub-modal-x" disabled={busy} onClick={onCancel} aria-label="Close">X</button>
         </div>
         <p className="sub-modal-subtext">{mall.name}</p>
 
@@ -56,9 +57,9 @@ export default function LiftSuspensionModal({ mall, tierInfo, onCancel, onConfir
         </div>
 
         <div className="sub-modal-footer">
-          <button className="sub-modal-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className="sub-modal-btn-lift" onClick={onConfirm}>
-            {isOperational ? 'Confirm and Restore' : 'Confirm and Restore'}
+          <button className="sub-modal-btn-cancel" disabled={busy} onClick={onCancel}>Cancel</button>
+          <button className="sub-modal-btn-lift" onClick={onConfirm} disabled={busy} aria-busy={busy}>
+            {busy && <LoadingSpinner label="Lifting suspension" />}{busy ? 'Restoring...' : 'Confirm and Restore'}
           </button>
         </div>
       </div>

@@ -770,18 +770,18 @@
 
 .acct-confirm-btn-proceed {
   border-radius: 5px;
-  background: #2563EB;
+  background: #7C3AED;
   color: #fff;
   font-family: Poppins, sans-serif;
   font-size: 14px;
   font-weight: 500;
   padding: 4px 20px;
-  border: 0.5px solid #2563EB;
+  border: 0.5px solid #7C3AED;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 
-.acct-confirm-btn-proceed:hover { opacity: 0.88; }
+.acct-confirm-btn-proceed:hover { background: #6D28D9; opacity: 1; }
 
 /* ─── Magic Link Sent Modal ─── */
 .acct-magic-sent-modal {

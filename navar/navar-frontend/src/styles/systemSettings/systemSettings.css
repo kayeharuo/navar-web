@@ -226,6 +226,19 @@
   margin: 2px 0 0;
 }
 
+.tier-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #000;
+  line-height: 1.5;
+}
+
+.tier-row-label--emphasis,
+.tier-value--emphasis {
+  font-weight: 700;
+}
+
 /* ─── Editable tier value input ──────────────────────────── */
 .tier-input {
   width: 100%;
@@ -243,6 +256,10 @@
 .tier-input:focus {
   outline: none;
   border-color: #155DFC;
+}
+
+.tier-input--emphasis {
+  font-weight: 700;
 }
 
 /* ─── Panel footer / save button ─────────────────────────── */
@@ -457,3 +474,9 @@
     font-size: 13px;
   }
 }
+
+.onboarding-rate-card { margin-top: 28px; }
+.onboarding-rate-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.onboarding-rate-card p { font-size: 14px; line-height: 1.6; margin: 12px 0; }
+.onboarding-rate-card .tier-table { min-width: 0; width: 100%; }
+.onboarding-rate-card .tier-table td { font-size: 14px; white-space: normal; }

@@ -6,7 +6,20 @@ async function action(supabase, applicationId, actorId, name, text = '', target 
 		p_id: applicationId, p_actor: actorId, p_action: name, p_text: text, p_target: target,
 	})
 	if (result.error) {
+		if (result.error.message?.includes('complete every profile')) {
+			const issues=await supabase.rpc('application_readiness_issues',{p_application:applicationId})
+			if(!issues.error && issues.data?.length) {
+				const error=new Error(`Complete the application requirements: ${issues.data.join('; ')}`)
+				error.statusCode=409;error.workflowMessage=error.message;throw error
+			}
+		}
 		const conflicts = {
+      'Record the map-update payment before approving or requesting revision.':'Record the map-update payment before approving or requesting revision.',
+			'Complete the map-update payment before approving this application.':'The mall must complete the map-update payment before application approval.',
+      'An active subscription is required.':'An active subscription is required.',
+      'First builds have priority. Start the pending version 1 builds first.':'Start the pending version 1 builds before this structural update.',
+      'An earlier or higher-priority map update is queued.':'An earlier or higher-priority map update is queued.',
+      'The application has already been accepted or cancelled.':'This request has already been accepted or cancelled. Refresh the application.',
 			'Older versions are read-only': 'A newer application version or attempt exists. This version is read-only.',
 			'Published versions are read-only': 'Live and Unpublished AR versions are read-only.',
 			'AR transition not allowed': 'The AR status could not change. The application must be Approved, its latest AR must be in the expected stage, and mall approval must not already be recorded. Refresh and check the current statuses.',
@@ -36,9 +49,9 @@ function createARService(supabase, gates = createGates(supabase)) {
 			if (d.ar_development_status !== 'ready' || !d.ar_development_mall_approved_at) return { published: false }
 			const application = await supabase.from('application').select('mall_id').eq('application_id', d.application_id).single()
 			if (application.error) throw application.error
-			const allowed = d.ar_development_version === 1
+			const allowed = d.ar_development_version === 1 && !d.ar_development_activated_at
 				? await gates.isFirstSubscriptionPaid(application.data.mall_id)
-				: await gates.isSubscriptionValid(application.data.mall_id)
+				: await gates.isSubscriptionValid(application.data.mall_id, { allowGrace: false })
 			if (!allowed) return { published: false, waiting: true }
 			// With no initiating request, attribute publication to the verified mall approver in the audit log.
 			if (!actorId) {

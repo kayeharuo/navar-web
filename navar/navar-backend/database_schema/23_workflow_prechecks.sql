@@ -2,7 +2,7 @@
 WITH refs AS (
  SELECT start_node_id node_id, ar_development_id FROM public.edge
  UNION SELECT end_node_id, ar_development_id FROM public.edge
- UNION SELECT node_id, ar_development_id FROM public.beacon_node_assigment
+ UNION SELECT node_id, ar_development_id FROM public.beacon_node_assignment
 ) SELECT node_id, array_agg(DISTINCT ar_development_id) versions
 FROM refs GROUP BY node_id HAVING count(DISTINCT ar_development_id)>1;
 
@@ -17,7 +17,7 @@ WITH proposed AS (
 ), refs AS (
  SELECT 'edge start' source, edge_id id, start_node_id node_id, ar_development_id FROM public.edge
  UNION ALL SELECT 'edge end', edge_id, end_node_id, ar_development_id FROM public.edge
- UNION ALL SELECT 'assignment', assignment_id, node_id, ar_development_id FROM public.beacon_node_assigment
+ UNION ALL SELECT 'assignment', assignment_id, node_id, ar_development_id FROM public.beacon_node_assignment
 ) SELECT r.*, p.ar_id proposed_ar_id FROM refs r JOIN proposed p USING(node_id) WHERE r.ar_development_id IS DISTINCT FROM p.ar_id;
 
 SELECT mall_id, application_version, count(*) FROM public.application GROUP BY 1,2 HAVING count(*)>1;

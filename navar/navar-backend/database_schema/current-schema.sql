@@ -8,6 +8,7 @@ CREATE TABLE public.mall (
   mall_city character varying NOT NULL,
   mall_zipcode character varying,
   mall_address text,
+  mall_barangay text,
   mall_floor_count integer,
   mall_description text,
   mall_logo bytea,
@@ -18,6 +19,10 @@ CREATE TABLE public.mall (
   mall_latitude double precision CHECK (mall_latitude >= '-90'::integer::double precision AND mall_latitude <= 90::double precision),
   mall_longitude double precision CHECK (mall_longitude >= '-180'::integer::double precision AND mall_longitude <= 180::double precision),
   mall_logo_path text,
+  initial_tier_key text CHECK (initial_tier_key IN ('basic','standard','premium')),
+  is_subscription_test boolean NOT NULL DEFAULT false,
+  quoted_store_count integer,
+  quoted_tenant_count integer,
   CONSTRAINT mall_pkey PRIMARY KEY (mall_id)
 );
 CREATE TABLE public.stall_application (
@@ -116,9 +121,17 @@ CREATE TABLE public.email_log (
   email_log_body text NOT NULL,
   email_log_status character varying NOT NULL,
   email_log_fail_reason text,
-  email_log_sent_at timestamp with time zone NOT NULL,
+  email_log_sent_at timestamp with time zone,
   email_log_triggered_by bigint,
   mall_id bigint,
+  email_log_created_at timestamptz NOT NULL DEFAULT now(),
+  email_log_sender text,
+  email_log_provider_id text,
+  email_log_source_type text,
+  email_log_source_id text,
+  email_log_attempt_of bigint REFERENCES public.email_log(email_log_id),
+  email_log_metadata jsonb NOT NULL DEFAULT '{}',
+  email_log_claimed_at timestamptz,
   CONSTRAINT email_log_pkey PRIMARY KEY (email_log_id),
   CONSTRAINT fk_email_log_email_log_triggered_by FOREIGN KEY (email_log_triggered_by) REFERENCES public.admin(admin_id),
   CONSTRAINT fk_email_log_mall_id FOREIGN KEY (mall_id) REFERENCES public.mall(mall_id)
@@ -184,7 +197,7 @@ CREATE TABLE public.beacon (
   beacon_installed_at timestamp with time zone NOT NULL,
   beacon_maintained_at timestamp with time zone NOT NULL,
   mall_id bigint NOT NULL,
-  floor_id integer NOT NULL,
+  floor_id integer,
   CONSTRAINT beacon_pkey PRIMARY KEY (beacon_id),
   CONSTRAINT fk_beacon_floor_id FOREIGN KEY (floor_id) REFERENCES public.floor(floor_id),
   CONSTRAINT fk_beacon_mall_id FOREIGN KEY (mall_id) REFERENCES public.mall(mall_id)
@@ -219,6 +232,13 @@ CREATE TABLE public.audit_log (
   audit_log_performed_at timestamp with time zone NOT NULL,
   audit_log_performed_by bigint NOT NULL,
   mall_id bigint,
+  audit_log_target_type text,
+  audit_log_target_id text,
+  audit_log_target_name text,
+  audit_log_metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  audit_log_request_id text,
+  audit_log_actor_name text,
+  audit_log_actor_role text,
   CONSTRAINT audit_log_pkey PRIMARY KEY (audit_log_id),
   CONSTRAINT fk_audit_log_audit_log_performed_by FOREIGN KEY (audit_log_performed_by) REFERENCES public.admin(admin_id),
   CONSTRAINT fk_audit_log_mall_id FOREIGN KEY (mall_id) REFERENCES public.mall(mall_id)
@@ -329,6 +349,15 @@ CREATE TABLE public.subscription_tier (
   s_tier_included_tenant_count integer NOT NULL,
   s_tier_spare_units_onsite boolean NOT NULL,
   s_tier_additional_stall_fee double precision NOT NULL,
+  s_tier_analytics_tools text,
+  s_tier_included_onsite_visits integer,
+  s_tier_extra_onsite_visit_fee numeric(12,2),
+  s_tier_beacon_replacement_fee numeric(12,2),
+  s_tier_free_extra_stalls_per_year integer,
+  s_tier_map_update_pricing text,
+  s_tier_map_update_fee_per_floor numeric(12,2) NOT NULL DEFAULT 0 CHECK (s_tier_map_update_fee_per_floor >= 0),
+  included_visits_per_year integer NOT NULL DEFAULT 0 CHECK (included_visits_per_year >= 0),
+  free_stalls_per_year integer NOT NULL DEFAULT 0 CHECK (free_stalls_per_year >= 0),
   CONSTRAINT subscription_tier_pkey PRIMARY KEY (s_tier_id)
 );
 CREATE TABLE public.contract (
@@ -348,6 +377,7 @@ CREATE TABLE public.contract (
   s_tier_id bigint NOT NULL,
   mall_id bigint NOT NULL,
   contract_status character varying,
+  is_test boolean NOT NULL DEFAULT false,
   CONSTRAINT contract_pkey PRIMARY KEY (contract_id),
   CONSTRAINT fk_contract_admin_id FOREIGN KEY (admin_id) REFERENCES public.admin(admin_id),
   CONSTRAINT fk_contract_s_tier_id FOREIGN KEY (s_tier_id) REFERENCES public.subscription_tier(s_tier_id),
@@ -412,7 +442,6 @@ CREATE TABLE public.node (
   node_x_coordinate double precision NOT NULL,
   node_y_coordinate double precision NOT NULL,
   node_is_store_entrance boolean NOT NULL,
-  node_is_accessible boolean NOT NULL,
   node_created_at timestamp with time zone NOT NULL,
   node_updated_at timestamp with time zone NOT NULL,
   floor_id bigint NOT NULL,
@@ -420,12 +449,13 @@ CREATE TABLE public.node (
   unit_id bigint,
   node_pixel_x double precision,
   node_pixel_y double precision,
-  node_cross_floor_link_id integer,
+  transition_group_id uuid,
+  node_is_emergency boolean NOT NULL DEFAULT false,
   CONSTRAINT node_pkey PRIMARY KEY (node_id),
   CONSTRAINT fk_node_floor_id FOREIGN KEY (floor_id) REFERENCES public.floor(floor_id),
   CONSTRAINT fk_node_store_id FOREIGN KEY (store_id) REFERENCES public.store(store_id),
   CONSTRAINT fk_node_unit_id FOREIGN KEY (unit_id) REFERENCES public.unit(unit_id),
-  CONSTRAINT fk_node_cross_floor_link_id FOREIGN KEY (node_cross_floor_link_id) REFERENCES public.node(node_id)
+  CONSTRAINT fk_node_transition_group FOREIGN KEY (transition_group_id, ar_development_id, node_type) REFERENCES public.transition_group(transition_group_id, ar_development_id, transition_group_type)
 );
 CREATE TABLE public.navigation_session (
   navsesh_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -461,17 +491,17 @@ CREATE TABLE public.application_entry_point (
   CONSTRAINT fk_application_entry_point_application_id FOREIGN KEY (application_id) REFERENCES public.application(application_id),
   CONSTRAINT fk_application_entry_point_floor_id FOREIGN KEY (floor_id) REFERENCES public.floor(floor_id)
 );
-CREATE TABLE public.beacon_node_assigment (
+CREATE TABLE public.beacon_node_assignment (
   assignment_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   assignment_created_at timestamp with time zone NOT NULL,
   assignment_updated_at timestamp with time zone NOT NULL,
   beacon_id bigint,
   node_id bigint NOT NULL,
   ar_development_id bigint NOT NULL,
-  CONSTRAINT beacon_node_assigment_pkey PRIMARY KEY (assignment_id),
-  CONSTRAINT fk_beacon_node_assigment_beacon_id FOREIGN KEY (beacon_id) REFERENCES public.beacon(beacon_id),
-  CONSTRAINT fk_beacon_node_assigment_node_id FOREIGN KEY (node_id) REFERENCES public.node(node_id),
-  CONSTRAINT fk_beacon_node_assigment_ar_development_id FOREIGN KEY (ar_development_id) REFERENCES public.ar_development(ar_development_id)
+  CONSTRAINT beacon_node_assignment_pkey PRIMARY KEY (assignment_id),
+  CONSTRAINT fk_beacon_node_assignment_beacon_id FOREIGN KEY (beacon_id) REFERENCES public.beacon(beacon_id),
+  CONSTRAINT fk_beacon_node_assignment_node_id FOREIGN KEY (node_id) REFERENCES public.node(node_id),
+  CONSTRAINT fk_beacon_node_assignment_ar_development_id FOREIGN KEY (ar_development_id) REFERENCES public.ar_development(ar_development_id)
 );
 CREATE TABLE public.store_visit (
   store_visit_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -568,6 +598,7 @@ CREATE TABLE public.notification (
   notif_target_role character varying,
   mall_id bigint NOT NULL,
   notif_recipient bigint,
+  notif_admin_recipient bigint REFERENCES public.admin(admin_id),
   CONSTRAINT notification_pkey PRIMARY KEY (notif_id),
   CONSTRAINT fk_notification_mall_id FOREIGN KEY (mall_id) REFERENCES public.mall(mall_id),
   CONSTRAINT fk_notification_notif_recipient FOREIGN KEY (notif_recipient) REFERENCES public.app_user(user_id)
@@ -621,8 +652,8 @@ CREATE TABLE public.edge (
   start_node_id bigint NOT NULL,
   end_node_id bigint NOT NULL,
   ar_development_id bigint NOT NULL,
-  edge_is_accessible boolean NOT NULL DEFAULT true,
   edge_is_cross_floor boolean NOT NULL DEFAULT false,
+  edge_direction text NOT NULL DEFAULT 'both' CHECK (edge_direction IN ('both', 'forward', 'reverse')),
   CONSTRAINT edge_pkey PRIMARY KEY (edge_id),
   CONSTRAINT fk_edge_start_node_id FOREIGN KEY (start_node_id) REFERENCES public.node(node_id),
   CONSTRAINT fk_edge_end_node_id FOREIGN KEY (end_node_id) REFERENCES public.node(node_id),
@@ -698,6 +729,9 @@ CREATE TABLE public.suspension (
   suspension_lifted_at timestamp with time zone,
   suspension_lifted_by bigint,
   contract_id bigint NOT NULL,
+  suspension_created_by bigint REFERENCES public.admin(admin_id),
+  suspension_resolution text,
+  affected_ar_ids bigint[] NOT NULL DEFAULT '{}',
   CONSTRAINT suspension_pkey PRIMARY KEY (suspension_id),
   CONSTRAINT fk_suspension_suspension_lifted_by FOREIGN KEY (suspension_lifted_by) REFERENCES public.admin(admin_id),
   CONSTRAINT fk_suspension_contract_id FOREIGN KEY (contract_id) REFERENCES public.contract(contract_id)
@@ -706,7 +740,7 @@ CREATE TABLE public.application_floor_plan (
   app_floor_plan_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   app_floor_plan_image bytea NOT NULL,
   app_floor_plan_reference_line text NOT NULL,
-  app_floor_plan_meter_length integer NOT NULL,
+  app_floor_plan_meter_length numeric(12,3) NOT NULL,
   app_floor_plan_accessibility_route text NOT NULL,
   app_floor_plan_emergency_route text NOT NULL,
   app_floor_plan_created_at timestamp with time zone NOT NULL,
@@ -972,3 +1006,27 @@ CREATE TABLE public.admin_account_email_attempt (
   CONSTRAINT admin_account_email_attempt_pkey PRIMARY KEY (admin_id),
   CONSTRAINT admin_account_email_attempt_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admin(admin_id)
 );
+
+-- Shared floor-transition groups (migration 37).
+CREATE TABLE public.transition_group (
+  transition_group_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ar_development_id bigint NOT NULL REFERENCES public.ar_development(ar_development_id),
+  transition_group_type text NOT NULL CHECK (transition_group_type IN ('STAIRS','ESCALATOR','ELEVATOR','RAMP')),
+  transition_group_name varchar(100) NOT NULL CHECK (length(trim(transition_group_name)) > 0),
+  UNIQUE (transition_group_id, ar_development_id, transition_group_type)
+);
+CREATE UNIQUE INDEX uq_transition_group_name ON public.transition_group(ar_development_id, transition_group_type, lower(trim(transition_group_name)));
+CREATE UNIQUE INDEX uq_transition_group_floor ON public.node(transition_group_id, floor_id) WHERE transition_group_id IS NOT NULL;
+ALTER TABLE public.transition_group ENABLE ROW LEVEL SECURITY;
+
+-- Subscription lifecycle events (backend only; see migrations 42-45 for RPCs).
+CREATE TABLE public.subscription_event (
+ event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ event_key text NOT NULL UNIQUE,
+ mall_id bigint NOT NULL REFERENCES public.mall(mall_id),
+ kind text NOT NULL,
+ title text NOT NULL,
+ message text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.subscription_event ENABLE ROW LEVEL SECURITY;

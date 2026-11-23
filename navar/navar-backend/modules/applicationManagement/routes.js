@@ -1,6 +1,11 @@
+const {threadIsSuperseded,threadWriteState,applicationThreads}=require('./threadPolicy')
+const {mapUpdateState}=require('../mapApplications/paymentState')
+const {reviewHistory,historyRecord,historyDetails,historyPlan}=require('./reviewHistory')
+const { summarizeMessages } = require('./conversationSummary')
+const { withQueueNumbers } = require('./queue')
 'use strict'
 
-const { signedImageUrl, uploadImage } = require('../storage/imageStorage')
+const { signedImageUrl, uploadImage, floorPlanImageUrl } = require('../storage/imageStorage')
 const {
 	parseImageDataUrl,
 	MAX_THREAD_IMAGES_PER_MESSAGE,
@@ -10,9 +15,19 @@ const {
 
 const arService = require('./arService')
 const { action } = arService
+const { recordAudit } = require('../auditLog/routes')
 
+async function allConversationRows(query) {
+ const data=[]
+ for(let offset=0;;offset+=500){
+  const page=await query.range(offset,offset+499)
+  if(page.error) return {data:null,error:page.error}
+  data.push(...(page.data||[]))
+  if((page.data||[]).length<500) return {data,error:null}
+ }
+}
 const now = () => new Date().toISOString()
-const titleCase = value => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+const titleCase = value => String(value || '').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 const dateLabel = value => value
 	? new Date(value).toLocaleDateString('en-US', {
 		timeZone: 'Asia/Manila',
@@ -67,8 +82,9 @@ async function serializeMessages(supabase, messages, includeAttachments = true) 
 	}
 	return messages.map(message => ({
 		id: message.message_id,
-		name: message.message_sender_type === 'admin' ? 'Super Admin' : 'Mall Admin',
-		isAdmin: message.message_sender_type === 'admin',
+        threadId: message.thread_id,
+		name: ['admin','super_admin'].includes(message.message_sender_type) ? 'Super Admin' : 'Mall Admin',
+		isAdmin: ['admin','super_admin'].includes(message.message_sender_type),
 		date: new Date(message.message_sent_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }),
 		message: message.message_content,
 		attachments: attachmentsByMessage.get(message.message_id) || [],
@@ -83,7 +99,7 @@ async function applicationDetails(supabase, applicationId, request) {
 	const plans = await supabase.from('application_floor_plan').select('*').eq('application_id', applicationId).order('floor_id')
 	const entries = await supabase.from('application_entry_point').select('*').eq('application_id', applicationId).order('floor_id')
 	const developments = await supabase.from('ar_development').select('*').eq('application_id', applicationId).order('ar_development_id', { ascending: false }).limit(1)
-	const thread = await supabase.from('thread').select('thread_id').eq('application_id', applicationId)
+	const thread = await applicationThreads(supabase,application.data)
 	let messages = []
 	if (thread.error) throw thread.error
 	if (thread.data?.length) {
@@ -92,6 +108,11 @@ async function applicationDetails(supabase, applicationId, request) {
 	}
 	const admin = await supabase.from('admin').select('admin_full_name, admin_email').eq('mall_id', application.data.mall_id).eq('admin_role', 'mall_admin').eq('admin_is_deactivated', false).limit(1).maybeSingle()
 	const hours = await supabase.from('operating_hours').select('*').eq('mall_id', application.data.mall_id).eq('opthrs_is_mall', true).order('opthrs_id')
+ const [provenanceResult,mapService]=await Promise.all([
+  supabase.from('map_application_floor_source').select('*').eq('application_id',applicationId),
+  mapUpdateState(supabase,applicationId),
+ ])
+ if(provenanceResult.error)throw provenanceResult.error
 	const floorById = new Map((floors.data || []).map(floor => [floor.floor_id, floor]))
 	const floorPlans = (plans.data || []).map(plan => {
 		const floor = floorById.get(plan.floor_id)
@@ -99,6 +120,7 @@ async function applicationDetails(supabase, applicationId, request) {
 			...plan,
 			floor: floor?.floor_label || `Floor ${floor?.floor_num ?? plan.floor_id}`,
 			filename: plan.app_floor_plan_file_name || 'Floor plan',
+      reuseLabel: provenanceResult.data?.find(p=>p.floor_id===plan.floor_id)?.reused_image?'Reused plan':provenanceResult.data?.some(p=>p.floor_id===plan.floor_id)?'Updated plan':null,
 			size: plan.app_floor_plan_file_size ? `${(plan.app_floor_plan_file_size / 1024 / 1024).toFixed(1)} MB` : '-',
 			referenceLine: plan.app_floor_plan_reference_line,
 			lengthInMeters: plan.app_floor_plan_meter_length,
@@ -107,15 +129,17 @@ async function applicationDetails(supabase, applicationId, request) {
 		}
 	})
 	const scalePlan = floorPlans.find(plan => plan.referenceLine)
-	const versions = await supabase.from('application').select('application_id,application_version,application_attempt,application_status').eq('mall_id', application.data.mall_id).order('application_version', { ascending: false }).order('application_attempt', { ascending: false })
+	const versions = await supabase.from('application').select('application_id,application_version,application_attempt,application_status,application_accepted_at').eq('mall_id', application.data.mall_id).order('application_version', { ascending: false }).order('application_attempt', { ascending: false })
 	if (versions.error) throw versions.error
 	const d = developments.data?.[0]
 	const readOnly = versions.data?.[0]?.application_id !== applicationId || ['live','unpublished'].includes(d?.ar_development_status)
 	return {
 		id: application.data.application_id,
-		versions: versions.data, readOnly, attempt: application.data.application_attempt,
+		threadReadOnly:threadIsSuperseded(versions.data||[],application.data), versions: versions.data, reviewHistory:await reviewHistory(supabase,(versions.data||[]).map(v=>v.application_id)), readOnly, attempt: application.data.application_attempt,
 		reasonCategory: application.data.application_reason_category, reasonNotes: application.data.application_reason_notes,
 		disputeCount: application.data.application_dispute_count,
+    updatedAt:application.data.application_updated_at,
+    mapUpdate:mapService?{...mapService,changedFloors:mapService.inputs?.floorIds?.length||0}:null,
 		canRevise: !readOnly && !d?.ar_development_ready_at && (
 			application.data.application_status === 'submitted'
 			|| (application.data.application_status === 'approved' && d && ['pending','node_mapping','testing'].includes(d.ar_development_status))
@@ -181,33 +205,42 @@ module.exports = function registerApplicationManagementRoutes(app) {
 				? await app.supabase.from('mall').select('*').in('mall_id', mallIds)
 				: { data: [], error: null }
 			if (malls.error) throw malls.error
-			const allApps = await app.supabase.from('application').select('application_id,mall_id,application_version,application_attempt').in('mall_id', mallIds.length ? mallIds : [0])
+			const contracts = await app.supabase.from('contract').select('*').eq('contract_is_current', true)
+      const tiers = await app.supabase.from('subscription_tier').select('s_tier_id,s_tier_key,s_tier_label')
+      const allApps = await app.supabase.from('application').select('application_id,mall_id,application_version,application_attempt,application_status,application_accepted_at').in('mall_id', mallIds.length ? mallIds : [0])
 			const admins = await app.supabase.from('admin').select('mall_id,admin_full_name,admin_email').eq('admin_role', 'mall_admin').eq('admin_is_deactivated', false)
 			const threads = await app.supabase.from('thread').select('ar_development_id').not('ar_development_id', 'is', null)
 			const nodes = await app.supabase.from('node').select('ar_development_id')
 			const edges = await app.supabase.from('edge').select('ar_development_id')
-			for (const r of [allApps, admins, threads, nodes, edges]) if (r.error) throw r.error
+			for (const r of [allApps, admins, threads, nodes, edges, contracts, tiers]) if (r.error) throw r.error
 			const applicationById = new Map((applications.data || []).map(item => [item.application_id, item]))
 			const mallById = new Map((malls.data || []).map(item => [item.mall_id, item]))
-			return (developments.data || []).map(item => {
+			return withQueueNumbers((developments.data || []).map(item => {
 				const application = applicationById.get(item.application_id)
 				const mall = mallById.get(application?.mall_id)
+        const contract = contracts.data.find(c => c.mall_id === application?.mall_id)
+        const tier = { ...tiers.data.find(t => t.s_tier_id === contract?.s_tier_id), ...contract?.tier_snapshot }
 				return {
 					id: item.ar_development_id,
 					mallId: application?.mall_id,
 					readOnly: ['live','unpublished'].includes(item.ar_development_status) || (allApps.data || []).some(a => a.mall_id === application?.mall_id && (a.application_version > application.application_version || (a.application_version === application.application_version && a.application_attempt > application.application_attempt))),
+          threadReadOnly:threadIsSuperseded((allApps.data||[]).filter(a=>a.mall_id===application?.mall_id),application),
 					hasThread: (threads.data || []).some(t => t.ar_development_id === item.ar_development_id),
 					readyAt: item.ar_development_ready_at, mallApprovedAt: item.ar_development_mall_approved_at, resumeStatus: item.ar_development_resume_status,
 					waitingDays: item.ar_development_status === 'ready' && item.ar_development_ready_at ? Math.max(0, Math.floor((Date.now() - new Date(item.ar_development_ready_at)) / 86400000)) : 0,
 					applicationId: item.application_id,
+          attempt: application?.application_attempt || 1,
 					mallName: mall?.mall_name || 'Unknown mall',
 					adminName: admins.data.find(a => a.mall_id === application?.mall_id)?.admin_full_name || 'No mall admin',
 					adminEmail: admins.data.find(a => a.mall_id === application?.mall_id)?.admin_email || '',
 					city: mall?.mall_city || '',
 					version: application?.application_version || item.ar_development_version,
 					floors: mall?.mall_floor_count || 0,
-					tier: '—',
-					agreement: 'Setup',
+					tier: tier?.s_tier_label || 'Not selected',
+          tierKey: tier?.s_tier_key || null,
+          applicationApprovedAt: application?.application_approved_at || null,
+          createdAt: item.ar_development_created_at,
+					agreement: titleCase(contract?.contract_status || 'setup'),
 					applicationStatus: titleCase(application?.application_status),
 					arStatus: titleCase(item.ar_development_status),
 					dateAdded: dateLabel(item.ar_development_created_at),
@@ -218,7 +251,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					testErrors: [],
 					stallAdditions: [],
 				}
-			})
+			}))
 		} catch (error) {
 			request.log.error({ code: error.code, message: error.message }, 'AR development list failed')
 			return reply.code(500).send({ message: 'Unable to load AR development projects.' })
@@ -281,12 +314,13 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					applicationStatus: titleCase(application.application_status),
 					arDevelopment: titleCase(developmentByApplication.get(String(application.application_id))?.ar_development_status || '-'),
 					submittedDate: dateLabel(application.application_created_at),
+          submittedAt:application.application_created_at,
 					lastUpdated: dateLabel(application.application_updated_at),
 					floorPlans: [],
 					thread: [],
 				})
 			}
-			rows.sort((a, b) => String(a.mallName).localeCompare(String(b.mallName)) || b.version - a.version)
+			rows.sort((a,b)=>(Date.parse(b.submittedAt)||0)-(Date.parse(a.submittedAt)||0)||(Number(b.id)||0)-(Number(a.id)||0))
 			return rows
 		} catch (error) {
 			request.log.error({ code: error.code, message: error.message }, 'Application list failed')
@@ -296,16 +330,19 @@ module.exports = function registerApplicationManagementRoutes(app) {
 
 	app.get('/api/conversations', async (request, reply) => {
 		try {
-			const threads = await app.supabase.from('thread').select('*').order('thread_created_at', { ascending: false })
+			const threads = await allConversationRows(app.supabase.from('thread').select('*').order('thread_created_at', { ascending: false }).order('thread_id'))
 			if (threads.error) throw threads.error
 			const threadRows = threads.data || []
 			const messageRows = threadRows.length
-				? await app.supabase.from('thread_message').select('*').in('thread_id', threadRows.map(thread => thread.thread_id)).order('message_sent_at', { ascending: false })
+				? await allConversationRows(app.supabase.from('thread_message').select('*').in('thread_id', threadRows.map(thread => thread.thread_id)).order('message_id', { ascending: false }))
 				: { data: [], error: null }
 			if (messageRows.error) throw messageRows.error
-			const messagesByThread = new Map()
+			const receipts=await allConversationRows(app.supabase.from('thread_admin_read').select('thread_id,last_message_id').eq('admin_id',request.admin.id).order('thread_id'))
+            if(receipts.error) throw receipts.error
+            const readByThread=new Map((receipts.data||[]).map(r=>[String(r.thread_id),r.last_message_id]))
+            const messagesByThread = new Map()
 			for (const message of messageRows.data || []) {
-				if (!messagesByThread.has(message.thread_id)) messagesByThread.set(message.thread_id, message)
+				const group=messagesByThread.get(String(message.thread_id))||[];group.push(message);messagesByThread.set(String(message.thread_id),group)
 			}
 			const arApps = await app.supabase.from('ar_development').select('application_id').in('ar_development_id', threadRows.filter(t => t.ar_development_id).map(t => t.ar_development_id).concat([0]))
 			if (arApps.error) throw arApps.error
@@ -313,7 +350,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			const stallApplicationIds = threadRows.filter(thread => thread.s_application_id).map(thread => thread.s_application_id)
 			const arDevelopmentIds = threadRows.filter(thread => thread.ar_development_id).map(thread => thread.ar_development_id)
 			const [applications, stallApplications, developments, malls] = await Promise.all([
-				applicationIds.length ? app.supabase.from('application').select('application_id, mall_id').in('application_id', applicationIds) : { data: [], error: null },
+				applicationIds.length ? app.supabase.from('application').select('application_id, mall_id, application_version, application_attempt').in('application_id', applicationIds) : { data: [], error: null },
 				stallApplicationIds.length ? app.supabase.from('stall_application').select('s_application_id, mall_id').in('s_application_id', stallApplicationIds) : { data: [], error: null },
 				arDevelopmentIds.length ? app.supabase.from('ar_development').select('ar_development_id, application_id').in('ar_development_id', arDevelopmentIds) : { data: [], error: null },
 				app.supabase.from('mall').select('mall_id, mall_name'),
@@ -325,8 +362,21 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			const stallById = new Map((stallApplications.data || []).map(item => [item.s_application_id, item]))
 			const developmentById = new Map((developments.data || []).map(item => [item.ar_development_id, item]))
 			const mallById = new Map((malls.data || []).map(item => [item.mall_id, item]))
-			return threadRows.map(thread => {
-				const latest = messagesByThread.get(thread.thread_id)
+			const conversationGroups=new Map()
+            for(const thread of threadRows){
+              const application=applicationById.get(thread.application_id)
+              const key=application?.application_version!=null?`application:${application.mall_id}:${application.application_version}`:`thread:${thread.thread_id}`
+              if(!conversationGroups.has(key))conversationGroups.set(key,[])
+              conversationGroups.get(key).push(thread)
+            }
+            return [...conversationGroups.values()].map(group => {
+                const thread=group.reduce((latest,t)=>Number(applicationById.get(t.application_id)?.application_attempt||1)>Number(applicationById.get(latest.application_id)?.application_attempt||1)?t:latest,group[0])
+                const allMessages=group.flatMap(t=>messagesByThread.get(String(t.thread_id))||[])
+				const summary=summarizeMessages(allMessages,request.admin.id,0)
+                const unread=group.map(t=>summarizeMessages(messagesByThread.get(String(t.thread_id))||[],request.admin.id,readByThread.get(String(t.thread_id))||0))
+                summary.unreadCount=unread.reduce((n,s)=>n+s.unreadCount,0);summary.unread=summary.unreadCount>0
+                const preview=unread.filter(s=>s.unread).sort((a,b)=>new Date(b.time)-new Date(a.time))[0]||summarizeMessages(allMessages,request.admin.id,Number.MAX_SAFE_INTEGER)
+                summary.preview=preview.preview
 				const application = thread.application_id ? applicationById.get(thread.application_id) : null
 				const stallApplication = thread.s_application_id ? stallById.get(thread.s_application_id) : null
 				const development = thread.ar_development_id ? developmentById.get(thread.ar_development_id) : null
@@ -341,21 +391,33 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					moduleKey: source.key,
 					moduleLabel: source.label,
 					mallName: mallById.get(mallId)?.mall_name || 'Unknown mall',
-					preview: latest?.message_content || 'No messages yet.',
-					time: latest?.message_sent_at || thread.thread_created_at,
-					unread: Boolean(latest && latest.message_sender_type !== 'admin'),
+					...summary,
+                    time:summary.time||thread.thread_created_at,
 					path: source.path,
 				}
-			}).filter(thread => thread.mallName !== 'Unknown mall')
+			}).filter(thread => thread.mallName !== 'Unknown mall').sort((a,b)=>Number(b.unread)-Number(a.unread)||new Date(b.time)-new Date(a.time)||Number(b.latestMessageId)-Number(a.latestMessageId))
 		} catch (error) {
 			request.log.error({ code: error.code, message: error.message }, 'Conversation list failed')
 			return reply.code(500).send({ message: 'Unable to load conversations.' })
 		}
 	})
 
+    app.post('/api/conversations/:id/read',{schema:{params:{type:'object',required:['id'],properties:{id:{type:'integer',minimum:1}}},body:{type:'object',additionalProperties:false,required:['messageId'],properties:{messageId:{type:'integer',minimum:1,maximum:9007199254740991}}}}},async(request,reply)=>{
+        const result=await app.supabase.rpc('mark_admin_thread_read',{p_admin:request.admin.id,p_thread:Number(request.params.id),p_message:request.body.messageId})
+        if(result.error) return reply.code(result.error.code==='22023'?400:500).send({message:'Unable to mark conversation read.'})
+        return {read:true}
+    })
+
 	app.get('/api/applications/:id', async (request, reply) => {
 		const detail = await applicationDetails(app.supabase, Number(request.params.id), request)
 		if (!detail) return reply.code(404).send({ message: 'Application not found.' })
+    if(request.query.historyId!==undefined){
+      const id=Number(request.query.historyId)
+      if(!Number.isSafeInteger(id)||id<1)return reply.code(400).send({message:'Invalid review history ID.'})
+      const record=await historyRecord(app.supabase,Number(request.params.id),id)
+      if(!record)return reply.code(404).send({message:'Review history not found.'})
+      return historyDetails(app.supabase,detail,record,normalizeDay)
+    }
 		return detail
 	})
 
@@ -395,19 +457,20 @@ module.exports = function registerApplicationManagementRoutes(app) {
  app.post('/api/ar-developments/:id/publish', { schema: { params: idSchema } }, request => arService(app.supabase).tryPublish(request.params.id, request.admin.id))
 
 	app.get('/api/ar-developments/:id/thread', async (request, reply) => {
+    const permission=await threadWriteState(app.supabase,request.admin.id,'ar',Number(request.params.id))
 		const result = await app.supabase.from('thread').select('thread_id').eq('ar_development_id', Number(request.params.id)).order('thread_id').limit(1).maybeSingle()
 		if (result.error) throw result.error
 		if (!result.data) return { threadId: null, messages: [] }
 		const messages = await app.supabase.from('thread_message').select('*').eq('thread_id', result.data.thread_id).order('message_sent_at')
 		if (messages.error) throw messages.error
-		return { threadId: result.data.thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
+		return { threadReadOnly:permission.readOnly,threadId: result.data.thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
 	})
 
 	app.post('/api/ar-developments/:id/thread', { bodyLimit: 30 * 1024 * 1024 }, async (request, reply) => {
 		const id = Number(request.params.id)
 		const dev = await app.supabase.from('ar_development').select('application_id').eq('ar_development_id', id).single()
 		if (dev.error) return reply.code(404).send({ message: 'AR development not found.' })
-		await assertThreadWritable(app.supabase, dev.data.application_id, id)
+		await assertThreadWritable(app.supabase, dev.data.application_id, id, request.admin.id)
 		const content = String(request.body?.content || '').trim()
 		const attachments = Array.isArray(request.body?.attachments) ? request.body.attachments : []
 		if (!content && attachments.length === 0) return reply.code(400).send({ message: 'Message content or an image is required.' })
@@ -443,21 +506,42 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			})
 			if (inserted.error) throw inserted.error
 		}
+		const application = await app.supabase.from('application').select('mall_id').eq('application_id', dev.data.application_id).single()
+		if (application.error) throw application.error
+		await recordAudit(app.supabase, request, { module: 'ar_development', action: 'ar_thread_message_sent', mallId: application.data.mall_id, targetType: 'ar_development', targetId: id, targetName: `AR Development #${id}`, details: 'Sent an AR development thread message.', metadata: { messageId: message.data.message_id, attachmentCount: parsedAttachments.length } })
 		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
 	})
 
+ app.get('/api/applications/:id/review-history/:historyId/plans/:floorId',{schema:{params:{type:'object',required:['id','historyId','floorId'],properties:{id:{type:'integer',minimum:1},historyId:{type:'integer',minimum:1},floorId:{type:'integer',minimum:1}}}}},async(request,reply)=>{
+  const result=await historyPlan(app.supabase,Number(request.params.id),Number(request.params.historyId),Number(request.params.floorId))
+  return result||reply.code(404).send({message:'Historical floor plan not found.'})
+ })
+ app.get('/api/applications/:id/state',async(request,reply)=>{
+  const a=await app.supabase.from('application').select('*').eq('application_id',Number(request.params.id)).maybeSingle()
+  if(a.error)throw a.error
+  if(!a.data)return reply.code(404).send({message:'Application not found.'})
+  const [dev,latest,service]=await Promise.all([
+   app.supabase.from('ar_development').select('ar_development_status,ar_development_ready_at,ar_development_id').eq('application_id',a.data.application_id).order('ar_development_id',{ascending:false}).limit(1),
+   app.supabase.from('application').select('application_id,application_version,application_attempt,application_status,application_accepted_at').eq('mall_id',a.data.mall_id).order('application_version',{ascending:false}).order('application_attempt',{ascending:false}),
+   mapUpdateState(app.supabase,a.data.application_id),
+  ])
+  for(const result of [dev,latest])if(result.error)throw result.error
+  const d=dev.data?.[0],s=service,readOnly=latest.data?.[0]?.application_id!==a.data.application_id||['live','unpublished'].includes(d?.ar_development_status)
+  return {threadReadOnly:threadIsSuperseded(latest.data||[],a.data),versions:latest.data,reviewHistory:await reviewHistory(app.supabase,(latest.data||[]).map(v=>v.application_id)),applicationStatus:titleCase(a.data.application_status),updatedAt:a.data.application_updated_at,disputeCount:a.data.application_dispute_count,readOnly,canRevise:!readOnly&&!d?.ar_development_ready_at&&(a.data.application_status==='submitted'||(a.data.application_status==='approved'&&['pending','node_mapping','testing'].includes(d?.ar_development_status))),arDevelopmentId:d?.ar_development_id||null,mapUpdate:s?{...s,changedFloors:s.inputs?.floorIds?.length||0}:null}
+ })
 	app.get('/api/applications/:id/thread', async (request, reply) => {
-		const result = await app.supabase.from('thread').select('thread_id, thread_source, thread_created_at').eq('application_id', Number(request.params.id)).order('thread_id')
+    const permission=await threadWriteState(app.supabase,request.admin.id,'application',Number(request.params.id))
+		const result = await applicationThreads(app.supabase,permission)
 		if (result.error) throw result.error
-		if (!result.data?.length) return { threadId: null, messages: [] }
+		if (!result.data?.length) return { threadReadOnly:permission.readOnly,threadId: null, messages: [] }
 		const messages = await app.supabase.from('thread_message').select('*').in('thread_id', result.data.map(t => t.thread_id)).order('message_sent_at')
 		if (messages.error) throw messages.error
-		return { threadId: result.data[0].thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
+		return { threadReadOnly:permission.readOnly,threadId: result.data[0].thread_id, messages: await serializeMessages(app.supabase, messages.data || []) }
 	})
 
 	app.post('/api/applications/:id/thread', { bodyLimit: 30 * 1024 * 1024 }, async (request, reply) => {
 		const id = Number(request.params.id)
-		await assertThreadWritable(app.supabase, id)
+		await assertThreadWritable(app.supabase, id, null, request.admin.id)
 		const content = String(request.body?.content || '').trim()
 		const attachments = Array.isArray(request.body?.attachments) ? request.body.attachments : []
 		if (!content && attachments.length === 0) return reply.code(400).send({ message: 'Message content or an image is required.' })
@@ -493,27 +577,26 @@ module.exports = function registerApplicationManagementRoutes(app) {
 			})
 			if (inserted.error) throw inserted.error
 		}
+		const application = await app.supabase.from('application').select('mall_id,application_version').eq('application_id', id).single()
+		if (application.error) throw application.error
+		await recordAudit(app.supabase, request, { module: 'application_management', action: 'application_thread_message_sent', mallId: application.data.mall_id, targetType: 'application', targetId: id, targetName: `Application v${application.data.application_version}`, details: 'Sent an application thread message.', metadata: { messageId: message.data.message_id, attachmentCount: parsedAttachments.length } })
 		return (await serializeMessages(app.supabase, [message.data], parsedAttachments.length > 0))[0]
 	})
 
 	app.get('/api/application-floor-plans/:id/url', async (request, reply) => {
-		const plan = await app.supabase.from('application_floor_plan').select('app_floor_plan_storage_path, app_floor_plan_image, app_floor_plan_file_name').eq('app_floor_plan_id', Number(request.params.id)).single()
-		const storagePath = plan.data?.app_floor_plan_storage_path || plan.data?.app_floor_plan_image
-		if (plan.error || !storagePath) return reply.code(404).send({ message: 'Floor plan not found.' })
-		const url = await signedImageUrl(app.supabase, storagePath, 300)
-		return { url, fileName: plan.data.app_floor_plan_file_name || 'floor-plan' }
+  const plan=await app.supabase.from('application_floor_plan').select('app_floor_plan_storage_path,app_floor_plan_image,app_floor_plan_file_name').eq('app_floor_plan_id',Number(request.params.id)).single()
+  if(plan.error||!plan.data)return reply.code(404).send({message:'Floor plan not found.'})
+  return {url:await floorPlanImageUrl(app.supabase,plan.data,300),fileName:plan.data.app_floor_plan_file_name||'floor-plan'}
 	})
 }
-async function assertThreadWritable(supabase, applicationId, arId) {
- const a = await supabase.from('application').select('mall_id,application_status').eq('application_id', applicationId).single()
- if (a.error) throw a.error
- const latest = await supabase.from('application').select('application_id').eq('mall_id', a.data.mall_id).order('application_version', { ascending: false }).order('application_attempt', { ascending: false }).limit(1).single()
- const d = await supabase.from('ar_development').select('ar_development_status').eq('application_id', applicationId)
- if (latest.error || d.error) throw latest.error || d.error
- if (latest.data.application_id !== applicationId || a.data.application_status === 'draft' || d.data.some(d => ['live','unpublished'].includes(d.ar_development_status))) { const e = new Error('This version is read-only.'); e.statusCode = 409; throw e }
- if (arId) {
-  const t = await supabase.from('thread').select('thread_id').eq('ar_development_id', arId).maybeSingle()
-  if (t.error) throw t.error
-  if (!t.data) { const e = new Error('This version is not ready yet.'); e.statusCode = 409; throw e }
+async function assertThreadWritable(supabase, applicationId, arId, actorId) {
+ const state=await threadWriteState(supabase,actorId,arId?'ar':'application',arId||applicationId)
+ if(state.readOnly){const error=new Error('A newer version or attempt exists. This thread is read-only.');error.statusCode=409;throw error}
+ if(arId){
+  const t=await supabase.from('thread').select('thread_id').eq('ar_development_id',arId).maybeSingle()
+  if(t.error)throw t.error
+  if(!t.data){const error=new Error('The AR thread has not been created yet.');error.statusCode=409;throw error}
  }
 }
+
+module.exports.serializeMessages = serializeMessages

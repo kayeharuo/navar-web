@@ -1,131 +1,16 @@
+import { apiRequest } from '../config/api'
 import { useState, useEffect, useMemo } from 'react'
+import BusyButton from '../components/ui/BusyButton'
+import { emailTypeLabel } from '../utils/emailTypeLabel'
+import LoadingSpinner from '../components/ui/LoadingSpinner'
 import '../styles/emailLogs/emailLogs.css'
 
-const INIT_LOGS = [
-  {
-    id: 1,
-    timestamp: 'March 14, 2026, 2:00 PM',
-    recipient: 'admin@ayalachbc.ph',
-    mall: 'Ayala Malls Central Block',
-    type: 'Suspension Lifted',
-    triggeredBy: 'System',
-    status: 'sent',
-    body: 'Your suspension has been lifted. Service is restored.',
-  },
-  {
-    id: 2,
-    timestamp: 'March 6, 2026, 8:00 AM',
-    recipient: 'admin@pacificmall.ph',
-    mall: 'Pacific Mall Cebu',
-    type: 'Contract Expiry Reminder',
-    triggeredBy: 'System (automated)',
-    status: 'sent',
-    body: 'Your contract is expiring soon. Please renew to avoid service interruption.',
-  },
-  {
-    id: 3,
-    timestamp: 'November 20, 2025, 8:00 AM',
-    recipient: 'jdelacruz@smseaside.ph',
-    mall: 'SM Seaside City Cebu',
-    type: 'Map Ready for Confirmation',
-    triggeredBy: 'System',
-    status: 'sent',
-    body: 'Your AR map is ready for review and confirmation before going live.',
-  },
-  {
-    id: 4,
-    timestamp: 'October 15, 2025, 3:30 PM',
-    recipient: 'admin@robinsons.ph',
-    mall: 'Robinsons Galleria Cebu',
-    type: 'Welcome / Account Created',
-    triggeredBy: 'Lorenzo Reyes',
-    status: 'sent',
-    body: 'Your account has been created. Click the link to set up your password.',
-  },
-  {
-    id: 5,
-    timestamp: 'September 28, 2025, 11:15 AM',
-    recipient: 'ltan@pacificmall.ph',
-    mall: 'Pacific Mall Cebu',
-    type: 'Password Reset',
-    triggeredBy: 'Admin',
-    status: 'failed',
-    body: 'Password reset link has been generated.',
-    failReason: '550: User not found on recipient server. Please verify the email address.',
-  },
-  {
-    id: 6,
-    timestamp: 'September 10, 2025, 9:00 AM',
-    recipient: 'admin@smcity.ph',
-    mall: 'SM City Cebu',
-    type: 'Grace Period Notice',
-    triggeredBy: 'System (automated)',
-    status: 'sent',
-    body: 'Your grace period has started. Settlement required within 30 days.',
-  },
-  {
-    id: 7,
-    timestamp: 'August 22, 2025, 2:45 PM',
-    recipient: 'info@gaisano.ph',
-    mall: 'Gaisano Grand Liloan',
-    type: 'Application — Approved',
-    triggeredBy: 'Bea Delicious',
-    status: 'sent',
-    body: 'Congratulations! Your application has been approved.',
-  },
-  {
-    id: 8,
-    timestamp: 'August 5, 2025, 10:30 AM',
-    recipient: 'admin@ayala.ph',
-    mall: 'Ayala Center Cebu',
-    type: 'Suspension Notice',
-    triggeredBy: 'System (automated)',
-    status: 'sent',
-    body: 'Your service has been suspended due to non-payment.',
-  },
-  {
-    id: 9,
-    timestamp: 'July 18, 2025, 4:20 PM',
-    recipient: 'billing@parkmall.ph',
-    mall: 'Parkmall Mandaue',
-    type: 'Payment Confirmed',
-    triggeredBy: 'System',
-    status: 'sent',
-    body: 'Payment received and confirmed. Thank you.',
-  },
-  {
-    id: 10,
-    timestamp: 'July 1, 2025, 8:00 AM',
-    recipient: 'lim@navar.ph',
-    mall: 'Internal',
-    type: 'AR Map Went Live',
-    triggeredBy: 'System (automated)',
-    status: 'pending',
-    body: 'AR map deployment completed successfully.',
-  },
-]
-
-const EMAIL_TYPES = [
-  'All Email Types',
-  'Welcome / Account Created',
-  'Password Reset',
-  'Application — Revision Requested',
-  'Application — Approved',
-  'Map Ready for Confirmation',
-  'Contract Expiry Reminder',
-  'Grace Period Notice',
-  'Suspension Notice',
-  'Suspension Lifted',
-  'Payment Confirmed',
-  'AR Map Went Live',
-]
-
-const STATUS_OPTIONS = ['All Statuses', 'Delivered', 'Failed', 'Pending']
+const STATUS_OPTIONS = ['All Statuses', 'Accepted by mail server', 'Failed', 'Pending', 'Unconfirmed']
 
 function StatusBadge({ status }) {
   return (
     <span className={`email-status-badge email-status-badge--${status}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {status === 'sent' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   )
 }
@@ -139,7 +24,6 @@ function SearchIcon() {
 }
 
 function DetailModal({ log, onResend, onClose }) {
-  const [resent, setResent] = useState(false)
 
   useEffect(() => {
     function handleEsc(e) {
@@ -149,20 +33,15 @@ function DetailModal({ log, onResend, onClose }) {
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose])
 
-  function handleResend() {
-    onResend(log.id)
-    setResent(true)
-  }
-
-  const isFailed = log.status === 'failed' && !resent
+  const isFailed = ['failed','unconfirmed'].includes(log.status)
 
   return (
     <div className="email-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="email-detail-modal">
         <div className="email-detail-top">
           <div>
-            <h2 className="email-detail-title">{log.type}</h2>
-            <StatusBadge status={resent ? 'sent' : log.status} />
+            <h2 className="email-detail-title">{emailTypeLabel(log.type)}</h2>
+            <StatusBadge status={log.status} />
           </div>
           <button className="email-detail-x" onClick={onClose}>X</button>
         </div>
@@ -184,7 +63,7 @@ function DetailModal({ log, onResend, onClose }) {
           </div>
           <div className="email-detail-row">
             <span className="email-detail-label">Type</span>
-            <span className="email-detail-value">{log.type}</span>
+            <span className="email-detail-value">{emailTypeLabel(log.type)}</span>
           </div>
           <div className="email-detail-row">
             <span className="email-detail-label">Triggered By</span>
@@ -197,24 +76,20 @@ function DetailModal({ log, onResend, onClose }) {
               <div className="email-detail-text-box email-detail-text-box--error">{log.failReason}</div>
             </div>
           )}
+          {isFailed && log.retryUnavailableReason && <div className="email-detail-section"><p className="email-detail-section-label">Resend unavailable</p><div className="email-detail-text-box">{log.retryUnavailableReason}</div></div>}
 
           <div className="email-detail-section">
             <p className="email-detail-section-label">Email Content</p>
             <div className="email-detail-text-box">{log.body}</div>
           </div>
 
-          {resent && (
-            <div className="email-resent-notice">
-              ✓ Email successfully resent to {log.recipient}
-            </div>
-          )}
         </div>
 
         <div className="email-detail-divider" />
 
         <div className="email-detail-footer">
-          {isFailed && (
-            <button className="email-modal-resend-btn" onClick={handleResend}>
+          {isFailed && log.canResend && (
+            <button className="email-modal-resend-btn" onClick={() => onResend(log.id)}>
               Resend Email
             </button>
           )}
@@ -225,14 +100,45 @@ function DetailModal({ log, onResend, onClose }) {
   )
 }
 
+function ResendModal({ dialog, onConfirm, onClose }) {
+  const working = dialog.phase === 'working'
+  const confirming = dialog.phase === 'confirm' || working
+  useEffect(() => {
+    const escape = event => { if (event.key === 'Escape' && !working) onClose() }
+    window.addEventListener('keydown', escape)
+    return () => window.removeEventListener('keydown', escape)
+  }, [working, onClose])
+  const title = confirming ? 'Resend Email' : dialog.phase === 'success' ? 'Email Resent' : dialog.phase === 'queued' ? 'Resend Queued' : 'Resend Failed or Unconfirmed'
+  return <div className="email-modal-overlay" onClick={e => { if (e.target === e.currentTarget && !working) onClose() }}>
+    <div className="email-detail-modal" role="dialog" aria-modal="true" aria-labelledby="resend-modal-title" aria-busy={working}>
+      <div className="email-detail-top"><h2 id="resend-modal-title" className="email-detail-title">{title}</h2><button disabled={working} className="email-detail-x" onClick={onClose} aria-label="Close">X</button></div>
+      <div className="email-detail-divider" />
+      <div className="email-detail-body">
+        <p>{confirming ? 'Resend' : 'Email:'} <strong>{emailTypeLabel(dialog.log.type)}</strong> {confirming ? 'to' : 'for'} <strong>{dialog.log.recipient}</strong>{confirming ? '?' : ''}</p>
+        {confirming && dialog.log.status === 'unconfirmed' && <p className="email-detail-text-box email-detail-text-box--error">This email may already have been sent. Check the sending mailbox before clicking Okay to try again.</p>}
+        {working && <p role="status">Sending and checking the delivery status…</p>}
+        {!confirming && <div className={`email-detail-text-box${dialog.phase === 'failed' ? ' email-detail-text-box--error' : ''}`} role={dialog.phase === 'failed' ? 'alert' : 'status'}>{dialog.message}</div>}
+      </div>
+      <div className="email-detail-divider" />
+      <div className="email-detail-footer">{confirming ? <><button className="email-modal-close-btn" disabled={working} onClick={onClose}>Cancel</button><BusyButton className="email-modal-resend-btn" onClick={onConfirm}>{working ? 'Resending…' : 'Okay'}</BusyButton></> : <button className="email-modal-close-btn" onClick={onClose}>Okay</button>}</div>
+    </div>
+  </div>
+}
+
 export default function EmailLogs() {
-  const [logs, setLogs] = useState(INIT_LOGS)
+  const [logs, setLogs] = useState([])
+  const [error,setError] = useState('')
+  const [loading,setLoading] = useState(true)
+  async function reload(){const rows=await apiRequest('/api/email-logs');setLogs(rows);setError('')}
+  useEffect(()=>{reload().catch(e=>setError(e.message)).finally(()=>setLoading(false));const timer=setInterval(()=>reload().catch(e=>setError(e.message)),30000);return()=>clearInterval(timer)},[])
+  const EMAIL_TYPES=['All Email Types',...new Set(logs.map(l=>l.type))]
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [typeFilter, setTypeFilter] = useState('All Email Types')
   const [selected, setSelected] = useState(null)
+  const [resendDialog, setResendDialog] = useState(null)
 
-  const statusMap = { 'Delivered': 'sent', 'Failed': 'failed', 'Pending': 'pending' }
+  const statusMap = { 'Accepted by mail server': 'sent', 'Failed': 'failed', 'Pending': 'pending', 'Unconfirmed':'unconfirmed' }
   const statusToDisplay = statusFilter === 'All Statuses' ? null : statusMap[statusFilter]
 
   const totalSent = logs.filter(l => l.status === 'sent').length
@@ -245,7 +151,7 @@ export default function EmailLogs() {
       const matchSearch = !q ||
         l.timestamp.toLowerCase().includes(q) ||
         l.recipient.toLowerCase().includes(q) ||
-        l.type.toLowerCase().includes(q) ||
+        emailTypeLabel(l.type).toLowerCase().includes(q) ||
         l.triggeredBy.toLowerCase().includes(q)
       const matchStatus = !statusToDisplay || l.status === statusToDisplay
       const matchType = typeFilter === 'All Email Types' || l.type === typeFilter
@@ -254,7 +160,32 @@ export default function EmailLogs() {
   }, [logs, search, typeFilter, statusToDisplay])
 
   function handleResend(id) {
-    setLogs(prev => prev.map(l => l.id === id ? { ...l, status: 'sent' } : l))
+    const log = logs.find(l => l.id === id)
+    if (!log) return
+    setSelected(null)
+    if (!log.canResend) { setResendDialog({ log, phase: 'failed', message: log.retryUnavailableReason || 'This attempt is no longer eligible for resend. Refresh Email Logs.' }); return }
+    setResendDialog({ log, phase: 'confirm' })
+  }
+
+  async function confirmResend() {
+    const log = resendDialog.log
+    setResendDialog({ log, phase: 'working' })
+    try {
+      const result = await apiRequest(`/api/email-logs/${log.id}/resend`, { method: 'POST', body: JSON.stringify({ acknowledged: true }) })
+      let attempt = result.attempt
+      for (let i = 0; result.attemptId && i < 15 && (!attempt || ['queued','pending','sending'].includes(attempt.status)); i++) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        attempt = await apiRequest(`/api/email-logs/${result.attemptId}/status`)
+      }
+      if (result.warning || ['failed','unconfirmed'].includes(attempt?.status)) {
+        setResendDialog({ log, phase: 'failed', message: attempt?.reason || result.warning || 'Delivery could not be confirmed. Check the sending mailbox before retrying.' })
+      } else if (attempt?.status === 'sent') {
+        setResendDialog({ log, phase: 'success', message: `The mail server accepted the new email for ${log.recipient}. Inbox delivery is not confirmed by SMTP acceptance.` })
+      } else {
+        setResendDialog({ log, phase: 'queued', message: result.message || 'The resend is queued. Its final delivery status will appear in Email Logs.' })
+      }
+      await reload().catch(() => {})
+    } catch (e) { setResendDialog({ log, phase: 'failed', message: e.message }) }
   }
 
   return (
@@ -264,14 +195,15 @@ export default function EmailLogs() {
         <p className="email-subtitle">Record of all emails sent through the system, both admin-triggered and automated.</p>
       </div>
 
+      {error && <p className="mall-field-error" role="alert">{error}</p>}
       <div className="email-stats">
         <div className="email-stat-card email-stat-card--blue">
           <div className="email-stat-num">{logs.length}</div>
-          <div className="email-stat-label">Total Sent</div>
+          <div className="email-stat-label">Delivery Attempts</div>
         </div>
         <div className="email-stat-card email-stat-card--green">
           <div className="email-stat-num">{totalSent}</div>
-          <div className="email-stat-label">Delivered</div>
+          <div className="email-stat-label">Accepted by mail server</div>
         </div>
         <div className="email-stat-card email-stat-card--red">
           <div className="email-stat-num">{totalFailed}</div>
@@ -298,7 +230,7 @@ export default function EmailLogs() {
             {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select className="email-filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-            {EMAIL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {EMAIL_TYPES.map(t => <option key={t} value={t}>{t === 'All Email Types' ? t : emailTypeLabel(t)}</option>)}
           </select>
           <span className="email-result-count">{filtered.length} results</span>
         </div>
@@ -317,19 +249,20 @@ export default function EmailLogs() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
-                <tr className="email-empty-row"><td colSpan={5}>No email logs found.</td></tr>
+              {loading && <tr className="email-empty-row"><td colSpan={5}><LoadingSpinner label="Loading Email Logs..." showLabel /></td></tr>}
+              {!loading && filtered.length === 0 && (
+                <tr className="email-empty-row"><td colSpan={5}>{error ? 'Unable to load email logs.' : 'No email logs found.'}</td></tr>
               )}
-              {filtered.map(log => (
+              {!loading && filtered.map(log => (
                 <tr key={log.id} className="email-table-row" onClick={() => setSelected(log)}>
-                  <td>{log.type}</td>
+                  <td>{emailTypeLabel(log.type)}</td>
                   <td>{log.mall}</td>
                   <td>{log.recipient}</td>
                   <td>{log.timestamp}</td>
                   <td>
                     <div className="email-actions-cell">
                       <StatusBadge status={log.status} />
-                      {log.status === 'failed' && (
+                      {log.canResend && (
                         <button
                           className="email-resend-btn"
                           onClick={e => { e.stopPropagation(); handleResend(log.id) }}
@@ -337,6 +270,7 @@ export default function EmailLogs() {
                           Resend
                         </button>
                       )}
+                      {['failed','unconfirmed'].includes(log.status) && log.retryUnavailableReason && <span className="email-retry-note" title={log.retryUnavailableReason}>Resend unavailable</span>}
                     </div>
                   </td>
                 </tr>
@@ -354,6 +288,7 @@ export default function EmailLogs() {
           onClose={() => setSelected(null)}
         />
       )}
+      {resendDialog && <ResendModal dialog={resendDialog} onConfirm={confirmResend} onClose={() => setResendDialog(null)} />}
     </div>
   )
 }

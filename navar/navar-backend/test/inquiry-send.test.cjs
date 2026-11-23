@@ -12,6 +12,7 @@ test('replies appear before email acceptance, reuse connections, and do not rese
  const row={inquiry_id:1,inquiry_mall_name:'Example',inquiry_contact_person:'Ana',inquiry_contact_email:'ana@example.com',inquiry_mall_description:'Inquiry',inquiry_created_at:'2026-10-19T00:00:00Z'}
  const db={
   from(table){
+   if(table==='audit_log')return {insert:async()=>({error:null})}
    let update,before=Infinity,filters=[]
    const q={order(){return q},limit(){return q},select(){return q},eq(k,v){filters.push([k,v]);return q},lt(k,v){before=v;return q},update(v){update=v;return q},
     async maybeSingle(){

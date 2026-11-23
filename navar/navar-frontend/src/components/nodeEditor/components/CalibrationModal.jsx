@@ -49,7 +49,7 @@ export function CalibrationModal({ floor, calibPts, initial, suggested, onConfir
             boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
         }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, fontFamily: F, marginBottom: 2 }}>
-          Set Scale — {floor}
+          {initial ? "Edit Scale" : "Set Scale"} — {floor}
         </div>
         <div style={{ fontSize: 11, color: "#64748B", fontFamily: M, marginBottom: 20 }}>
           Line drawn: <b>{pxLen} px</b>
@@ -165,7 +165,7 @@ export function CalibrationModal({ floor, calibPts, initial, suggested, onConfir
             cursor: canSave ? "pointer" : "not-allowed",
             fontFamily: F, transition: "background 0.15s",
         }}>
-            Save Calibration
+            {initial ? "Update Calibration" : "Save Calibration"}
           </button>
         </div>
       </div>

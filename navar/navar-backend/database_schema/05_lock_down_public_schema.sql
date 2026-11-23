@@ -198,7 +198,7 @@ CREATE INDEX IF NOT EXISTS ix_notifpref_user_id          ON notif_preference (us
 CREATE INDEX IF NOT EXISTS ix_entrypoint_floor_id        ON application_entry_point (floor_id);
 CREATE INDEX IF NOT EXISTS ix_appfloorplan_floor_id      ON application_floor_plan (floor_id);
 CREATE INDEX IF NOT EXISTS ix_floorcalib_ar_id           ON floor_calibration (ar_development_id);
-CREATE INDEX IF NOT EXISTS ix_beaconnode_ar_id           ON beacon_node_assigment (ar_development_id);
+CREATE INDEX IF NOT EXISTS ix_beaconnode_ar_id           ON beacon_node_assignment (ar_development_id);
 CREATE INDEX IF NOT EXISTS ix_admin_auth_user_id         ON admin (admin_auth_user_id);
 
 -- =====================================================================
@@ -316,10 +316,10 @@ DROP POLICY IF EXISTS mobile_read_floor_calibration ON floor_calibration;
 CREATE POLICY mobile_read_floor_calibration ON floor_calibration FOR SELECT TO authenticated
     USING (app_private.ar_visible(ar_development_id));
 
--- ---- beacon_node_assigment (table name spelled as in the schema) ----
-GRANT SELECT ON beacon_node_assigment TO authenticated;
-DROP POLICY IF EXISTS mobile_read_beacon_node_assigment ON beacon_node_assigment;
-CREATE POLICY mobile_read_beacon_node_assigment ON beacon_node_assigment FOR SELECT TO authenticated
+-- ---- beacon_node_assignment (table name spelled as in the schema) ----
+GRANT SELECT ON beacon_node_assignment TO authenticated;
+DROP POLICY IF EXISTS mobile_read_beacon_node_assignment ON beacon_node_assignment;
+CREATE POLICY mobile_read_beacon_node_assignment ON beacon_node_assignment FOR SELECT TO authenticated
     USING (app_private.ar_visible(ar_development_id));
 
 -- ---- beacon (identification columns only; no status/maintenance/battery info) ----
@@ -508,7 +508,7 @@ CREATE POLICY mobile_own_rows ON beacon_scan_log FOR ALL TO authenticated
 GRANT INSERT, UPDATE, DELETE ON node                  TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON edge                  TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON floor_calibration     TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON beacon_node_assigment TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON beacon_node_assignment TO authenticated;
 
 DROP POLICY IF EXISTS staff_write_node ON node;
 CREATE POLICY staff_write_node ON node FOR ALL TO authenticated
@@ -522,8 +522,8 @@ DROP POLICY IF EXISTS staff_write_floor_calibration ON floor_calibration;
 CREATE POLICY staff_write_floor_calibration ON floor_calibration FOR ALL TO authenticated
     USING (app_private.is_super_admin()) WITH CHECK (app_private.is_super_admin());
 
-DROP POLICY IF EXISTS staff_write_beacon_node_assigment ON beacon_node_assigment;
-CREATE POLICY staff_write_beacon_node_assigment ON beacon_node_assigment FOR ALL TO authenticated
+DROP POLICY IF EXISTS staff_write_beacon_node_assignment ON beacon_node_assignment;
+CREATE POLICY staff_write_beacon_node_assignment ON beacon_node_assignment FOR ALL TO authenticated
     USING (app_private.is_super_admin()) WITH CHECK (app_private.is_super_admin());
 
 -- Auto-numbered IDs need sequence access for the tables the app can INSERT into.
@@ -547,7 +547,7 @@ BEGIN
             ('node',                        'node_id'),
             ('edge',                        'edge_id'),
             ('floor_calibration',           'calibration_id'),
-            ('beacon_node_assigment',       'assignment_id')
+            ('beacon_node_assignment',       'assignment_id')
         ) AS v(tbl, col)
     LOOP
         seq := pg_get_serial_sequence('public.' || r.tbl, r.col);

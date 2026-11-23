@@ -1,0 +1,37 @@
+.stall-start-card { display:flex; align-items:center; flex-wrap:wrap; gap:16px; padding:20px; margin:0 0 24px; background:#f0f6ff; border:1px solid #dbe7ff; border-radius:12px; font-family:Poppins,sans-serif; }
+.stall-start-card>div { flex:1 1 260px; }
+.stall-start-card h2 { margin:0 0 7px; font-size:17px; color:#172554; }
+.stall-start-card p { margin:0; font-size:13px; color:#64748b; line-height:1.7; }
+.stall-start-card select { flex:1 1 220px; max-width:340px; }
+.stall-start-card button { white-space:nowrap; }
+.stall-link-button { background:transparent; border:0; color:#2563eb; padding:8px 0; margin:0 8px; font:500 12px Poppins,sans-serif; cursor:pointer; text-decoration:underline; }
+.stall-floor-card { padding:22px; margin:18px 0; background:#fff; border:1px solid #dce5f2; border-radius:12px; font-family:Poppins,sans-serif; }
+.stall-floor-card h3 { font-size:17px; margin:0 0 12px; color:#172554; }
+.stall-detail-card { border:1px solid #e2e8f0; border-radius:9px; background:#f8fafc; padding:16px; margin:12px 0; min-width:0; }
+.stall-detail-card legend { padding:0 7px; color:#334155; font-size:13px; font-weight:600; }
+.stall-detail-card h4 { font-size:15px; margin:0 0 8px; color:#0f172a; }
+.stall-detail-card p,.stall-floor-card>p { font-size:13px; line-height:1.7; color:#475569; overflow-wrap:anywhere; white-space:pre-wrap; }
+.stall-full-width { grid-column:1/-1; }
+.stall-portal textarea { min-height:90px; resize:vertical; }
+.stall-plan-note { background:#eff6ff; border:1px solid #dbeafe; border-radius:8px; padding:14px 16px; color:#35557e; font:13px/1.7 Poppins,sans-serif; }
+.stall-plan-note p { margin:8px 0 0; }
+.stall-plan-note input[type=file] { margin-top:10px; max-width:100%; }
+.stall-plan-preview { display:block; width:100%; max-height:340px; object-fit:contain; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
+.stall-thread-list { max-height:400px; overflow-y:auto; }
+.stall-history-select { max-width:480px; margin:20px 0; font:500 13px Poppins,sans-serif; }
+.stall-portal .settings-save-btn:disabled,.stall-start-card .settings-save-btn:disabled { opacity:.5; cursor:not-allowed; }
+.stall-portal .sub-mgmt-header { margin-bottom:22px; }
+.stall-portal>h2 { font-size:19px; color:#172554; font-family:Poppins,sans-serif; }
+
+/* Stall review shares the application info drawer typography and spacing. */
+.stall-review-panel { position:relative; }
+.stall-review-panel .review-section-title { margin:0; }
+.stall-review-panel .review-info-value { word-break:normal; overflow-wrap:anywhere; white-space:pre-wrap; }
+.stall-review-note { margin:14px 0; padding:12px 14px; border:1px solid #e8ecf2; border-radius:5px; background:#f7f8fa; color:#64748b; font:12px/1.7 Poppins,sans-serif; }
+.stall-review-floor { margin-top:8px; }
+.stall-review-item { padding:16px 0; border-bottom:1px solid #e8ecf2; }
+.stall-review-item:last-child { border-bottom:0; }
+.stall-review-item-title { margin:0 0 12px; font:600 14px Poppins,sans-serif; color:#111827; }
+.stall-review-plan { margin-bottom:12px; }
+.stall-review-plan .stall-plan-preview { margin-top:10px; }
+.stall-review-panel .review-panel-close { z-index:1; }

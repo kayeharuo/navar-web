@@ -65,4 +65,17 @@ async function signedImageUrl(supabase, path, expiresIn = 3600) {
   return result.data.signedUrl
 }
 
-module.exports = { IMAGE_BUCKET, dataUrlToBuffer, bufferFromStored, contentTypeFromBuffer, uploadImage, uploadStoredImage, downloadImage, signedImageUrl }
+// Floor plans have both legacy Storage-path bytea and actual image-byte records.
+async function floorPlanImageUrl(supabase, plan, expiresIn = 300) {
+  if (plan.app_floor_plan_storage_path) return signedImageUrl(supabase, plan.app_floor_plan_storage_path, expiresIn)
+  const raw = plan.app_floor_plan_image
+  const parsed = bufferFromStored(raw)
+  const type = contentTypeFromBuffer(parsed?.buffer)
+  if (['image/png','image/jpeg'].includes(type)) return `data:${type};base64,${parsed.buffer.toString('base64')}`
+  const path = typeof raw === 'string' && !raw.startsWith('\\x') && !raw.startsWith('data:') && raw.includes('/')
+    ? raw : parsed?.buffer?.toString('utf8')
+  if (path && /^[a-zA-Z0-9][a-zA-Z0-9_/. -]+$/.test(path) && path.includes('/') && !path.includes('..')) return signedImageUrl(supabase,path,expiresIn)
+  throw new Error('Floor plan image is unavailable.')
+}
+
+module.exports = { IMAGE_BUCKET, dataUrlToBuffer, bufferFromStored, contentTypeFromBuffer, uploadImage, uploadStoredImage, downloadImage, signedImageUrl, floorPlanImageUrl }

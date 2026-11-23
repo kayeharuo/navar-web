@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import FlowDiagrams from './FlowDiagrams'
+import { sortApplicationsByMall } from './applicationOrder'
+import { useRealtimeRefresh } from '../../config/realtime'
 import { apiRequest } from '../../config/api'
 
 function SearchIcon() {
@@ -11,7 +13,7 @@ function SearchIcon() {
   )
 }
 
-const STATUS_FILTERS = ['All', 'Disputed', 'Submitted', 'For Revision', 'Approved', 'Rejected', 'Rejected Final', 'Draft']
+const STATUS_FILTERS = ['All', 'Pending', 'Disputed', 'Submitted', 'For Revision', 'Approved', 'Rejected', 'Rejected Final', 'Draft']
 
 export default function ApplicationsTable({ applications, onApplicationsChange, onReviewApp }) {
   const [cardIndex, setCardIndex] = useState(0)
@@ -20,6 +22,8 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [refreshSeq, setRefreshSeq] = useState(0)
+  useRealtimeRefresh(p=>{if(['application','ar_development','mall_service_request','contract_payment_request'].includes(p.table))setRefreshSeq(n=>n+1)})
 
   useEffect(() => {
     let cancelled = false
@@ -39,8 +43,10 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
       }
     }
     loadApplications()
-    return () => { cancelled = true }
-  }, [onApplicationsChange])
+    const timer=setInterval(loadApplications,10000)
+    window.addEventListener('focus',loadApplications)
+    return () => { cancelled = true;clearInterval(timer);window.removeEventListener('focus',loadApplications) }
+  }, [onApplicationsChange,refreshSeq])
 
   useEffect(() => {
     if (applications) setApps(applications)
@@ -52,7 +58,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
   }
 
   function getAppStatusVariant(status) {
-    const map = { 'Submitted': 'submitted', 'For Revision': 'for-revision', 'Approved': 'approved', 'Draft': 'draft' }
+    const map = { 'Submitted': 'submitted', 'For Revision': 'for-revision', 'Approved': 'approved', 'Draft': 'draft', 'Pending': 'pending', 'Disputed': 'submitted', 'Rejected': 'for-revision', 'Rejected Final': 'for-revision' }
     return map[status] || 'default'
   }
 
@@ -61,17 +67,14 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
     return map[status] || 'default'
   }
 
-  const filtered = apps.filter(app => {
+  const filtered = sortApplicationsByMall(apps).filter(app => {
     const matchesFilter = activeFilter === 'All' || app.applicationStatus === activeFilter
     const q = searchQuery.toLowerCase()
     const matchesSearch = !q || app.mallName.toLowerCase().includes(q) || app.city.toLowerCase().includes(q) || app.adminName.toLowerCase().includes(q)
     return matchesFilter && matchesSearch
   })
 
-  const sorted = [
-    ...filtered.filter(a => a.applicationStatus !== 'Approved'),
-    ...filtered.filter(a => a.applicationStatus === 'Approved'),
-  ]
+  const sorted = filtered
 
   return (
     <>
@@ -118,8 +121,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
               <tr>
                 <th>MALL NAME</th>
                 <th>CITY</th>
-                <th>ADMIN</th>
-                <th>VERSION</th>
+                <th className="app-mgmt-version-col">VERSION</th>
                 <th>NO. OF FLOORS</th>
                 <th>AGREEMENT</th>
                 <th>APPLICATION</th>
@@ -132,7 +134,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="app-mgmt-table-empty app-mgmt-table-loading">
+                  <td colSpan={10} className="app-mgmt-table-empty app-mgmt-table-loading">
                     <span className="table-loading"><span className="table-loading-spinner" />Loading applications...</span>
                   </td>
                 </tr>
@@ -146,11 +148,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
                     <div className="app-mgmt-mall-name">{app.mallName}</div>
                   </td>
                   <td>{app.city}</td>
-                  <td>
-                    <div className="app-mgmt-admin-name">{app.adminName}</div>
-                    <div className="app-mgmt-admin-email">{app.adminEmail}</div>
-                  </td>
-                  <td>{app.version}{app.attempt > 1 ? ` / attempt ${app.attempt}` : ''}</td>
+                  <td className="app-mgmt-version-col">{app.version}{app.attempt > 1 ? ` / attempt ${app.attempt}` : ''}</td>
                   <td>{app.floors}</td>
                   <td>{app.agreement}</td>
                   <td>
@@ -178,7 +176,7 @@ export default function ApplicationsTable({ applications, onApplicationsChange, 
               ))}
               {!loading && sorted.length === 0 && (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', color: '#9B9C9C', padding: '32px', fontFamily: 'Poppins' }}>
+                  <td colSpan={10} style={{ textAlign: 'center', color: '#9B9C9C', padding: '32px', fontFamily: 'Poppins' }}>
                     No applications found.
                   </td>
                 </tr>

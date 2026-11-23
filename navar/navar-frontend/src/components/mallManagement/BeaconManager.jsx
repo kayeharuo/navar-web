@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Search } from 'lucide-react'
 import AddBeaconModal from './AddBeaconModal'
 import { apiRequest } from '../../config/api'
+import { notifyMallBeaconsUpdated } from '../../utils/mallDataEvents'
 import BusyButton from '../ui/BusyButton'
 
 // Placeholder UUID — will be replaced by real value from backend
@@ -342,6 +343,7 @@ function ReactivateModal({ onCancel, onConfirm, requiresRemarks = true }) {
 // ─── Main Component ────────────────────────────────────────
 export default function BeaconManager({ mall, onClose, onSave }) {
   const [beacons, setBeacons] = useState(mall.beacons ? [...mall.beacons] : [])
+  useEffect(() => { setBeacons([...(mall.beacons || [])]) }, [mall.id, mall.beacons])
   const [statusFilter, setStatusFilter] = useState('All')
   const [searchQuery, setSearchQuery]   = useState('')
 
@@ -359,6 +361,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       const beacon = await apiRequest(`/api/malls/${mall.id}/beacons`, { method: 'POST', body: JSON.stringify(data) })
       setBeacons(prev => [...prev, { ...beacon, faultyNote: '', ticketHistory: [], dateAdded: now }])
       setShowAdd(false)
+      notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
       window.alert(error.message)
     }
@@ -369,6 +372,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       const beacon = await apiRequest(`/api/malls/${mall.id}/beacons/${editingBeacon.id}`, { method: 'PUT', body: JSON.stringify(data) })
       setBeacons(prev => prev.map(b => b.id === editingBeacon.id ? { ...b, ...beacon } : b))
       setEditing(null)
+      notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
       window.alert(error.message)
     }
@@ -386,6 +390,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       })
       setBeacons(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b))
       setBatteryBeacon(prev => prev && prev.id === id ? { ...prev, ...updated } : prev)
+      notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
       window.alert(error.message)
     }
@@ -399,6 +404,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       })
       setBeacons(prev => prev.map(b => b.id === faultyTarget.id ? updated : b))
       setFaulty(null)
+      notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
       window.alert(error.message)
     }
@@ -412,6 +418,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       })
       setBeacons(prev => prev.map(b => b.id === reactTarget.id ? updated : b))
       setReact(null)
+      notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
       window.alert(error.message)
     }
@@ -422,6 +429,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       const updated = await apiRequest(`/api/malls/${mall.id}/beacons/${deactivateTarget.id}/deactivate`, { method: 'POST' })
       setBeacons(prev => prev.map(b => b.id === deactivateTarget.id ? updated : b))
       setDeactivate(null)
+      notifyMallBeaconsUpdated(mall.id)
     } catch (error) {
       window.alert(error.message)
     }
@@ -449,7 +457,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
 
   return (
     <>
-      <div className="stores-page">
+      <div className="stores-page beacons-page">
         {/* Header */}
         <div className="stores-page-header">
           <div className="stores-page-header-info">
@@ -506,7 +514,6 @@ export default function BeaconManager({ mall, onClose, onSave }) {
               <thead>
                 <tr>
                   <th>BEACON CODE</th>
-                  <th>FLOOR</th>
                   <th>LOCATION</th>
                   <th>LABEL</th>
                   <th>MINOR</th>
@@ -523,12 +530,11 @@ export default function BeaconManager({ mall, onClose, onSave }) {
               <tbody>
                 {filteredBeacons.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="stores-empty">No beacons found.</td>
+                    <td colSpan={12} className="stores-empty">No beacons found.</td>
                   </tr>
                 ) : filteredBeacons.map(b => (
                   <tr key={b.id} className="stores-table-row">
                     <td className="stores-td-name">{b.beaconCode}</td>
-                    <td>{b.floorLabel || b.floorNo}</td>
                     <td>{b.location || '—'}</td>
                     <td className="beacons-td-label">{b.label || '—'}</td>
                     <td>{b.minor}</td>
@@ -574,7 +580,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       {/* Add Beacon Modal */}
       {showAdd && (
         <AddBeaconModal
-          mall={mall}
+          mall={{ ...mall, beacons }}
           onClose={() => setShowAdd(false)}
           onSave={handleAddSave}
         />
@@ -583,7 +589,7 @@ export default function BeaconManager({ mall, onClose, onSave }) {
       {/* Edit Beacon Modal */}
       {editingBeacon && (
         <AddBeaconModal
-          mall={mall}
+          mall={{ ...mall, beacons }}
           initialData={editingBeacon}
           onClose={() => setEditing(null)}
           onSave={handleEditSave}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, ImageIcon } from 'lucide-react'
 import BusyButton from '../ui/BusyButton'
+import AuthImage from '../ui/AuthImage'
 
 const BRAND_CATEGORIES = [
   'Fashion & Apparel',
@@ -17,12 +18,6 @@ const BRAND_CATEGORIES = [
 
 const MAX_LOGO_MB = 2
 
-function getLogoUrl(logo) {
-  return logo?.startsWith('/')
-    ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${logo}`
-    : logo
-}
-
 export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   const isEdit = !!initialData
 
@@ -33,7 +28,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   })
 
   const [, setLogo]                   = useState(null)
-  const [logoPreview, setLogoPreview] = useState(getLogoUrl(initialData?.logo) || null)
+  const [logoPreview, setLogoPreview] = useState(initialData?.logo || null)
   const [errors, setErrors]           = useState({})
   const fileInputRef = useRef(null)
 
@@ -151,7 +146,11 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
             />
             {logoPreview ? (
               <div className="mall-logo-input-wrap">
-                <img src={logoPreview} alt="Brand logo" className="brand-logo-preview-img" />
+                {logoPreview.startsWith('data:') || logoPreview.startsWith('blob:') ? (
+                  <img src={logoPreview} alt="Brand logo" className="brand-logo-preview-img" />
+                ) : (
+                  <AuthImage src={logoPreview} alt="Brand logo" className="brand-logo-preview-img" />
+                )}
                 <button
                   type="button"
                   className="mall-logo-browse-btn"

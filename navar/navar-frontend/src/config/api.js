@@ -36,5 +36,8 @@ export async function apiRequest(path, options = {}) {
     error.details = body
     throw error
   }
+  if (requestOptions.method && requestOptions.method.toUpperCase() !== 'GET' && /\/thread$/.test(path)) {
+    window.dispatchEvent(new Event('navar-conversations-changed'))
+  }
   return body
 }

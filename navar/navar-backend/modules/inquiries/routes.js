@@ -6,11 +6,12 @@ const {createOutbox}=require('./outbox')
 const {createInquiryEvents}=require('./events')
 const {registerFollowup}=require('./followup')
 const { uuid, text, fail } = require('./validation')
+const { recordAudit } = require('../auditLog/routes')
 const columns = 'inquiry_id,inquiry_mall_name,inquiry_mall_state,inquiry_mall_city,inquiry_mall_zip_code,inquiry_mall_address,inquiry_mall_floor_count,inquiry_mall_description,inquiry_contact_person,inquiry_contact_num,inquiry_contact_email,inquiry_interested_tier,inquiry_status,inquiry_created_at,inquiry_updated_at,inquiry_coverage_area,mall_id,inquiry_original_description,inquiry_has_revision,inquiry_reviewed_at,inquiry_rejection_reason'
 const messageColumns = 'i_message_id,i_message_sender_type,i_message_sender_email,i_message_message,i_message_sent_at,i_message_kind,i_message_delivery_status'
 const formatDate = value => value ? new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`).toLocaleString('en-PH',{timeZone:'Asia/Manila',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'Not recorded'
 const mapMessage=m=>({id:m.i_message_id,sender:['admin','super_admin'].includes(m.i_message_sender_type)?'admin':'mall',senderName:m.i_message_sender_email,text:m.i_message_message,time:formatDate(m.i_message_sent_at),deliveryStatus:m.i_message_delivery_status})
-function status(row) { return row.mall_id != null || ['approved','converted'].includes(String(row.inquiry_status).toLowerCase()) ? 'Approved' : row.inquiry_status || 'New' }
+function status(row) { return row.mall_id != null || ['approved','converted'].includes(String(row.inquiry_status).toLowerCase()) ? 'Approved' : String(row.inquiry_status || 'new').toLowerCase().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) }
 function mapInquiry(row, tiers) {
  const barangay=(row.inquiry_mall_address || '').match(/(?:^|,)\s*Barangay\s+([^,]+)/i)?.[1]?.trim() || ''
  const originalMessage=row.inquiry_has_revision ? row.inquiry_original_description : row.inquiry_mall_description
@@ -131,7 +132,23 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   await inquiry(req.params.id)
   if (!['New','In Progress'].includes(req.body?.status)) fail('Use Approve & Invite or Reject to decide an inquiry.')
   await rpc(req,'status',{status:req.body.status,updatedAt:req.body.updatedAt})
+  const row=await inquiry(req.params.id)
+  await recordAudit(db,req,{module:'inquiry_management',action:'inquiry_status_changed',mallId:row.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:`Inquiry status changed to ${req.body.status}.`,metadata:{status:req.body.status}})
   return {ok:true}
+ }))
+ app.post('/api/inquiry-messages/:messageId/retry',wrap(async(req,reply)=>{
+  const item=check(await db.from('inquiry_message').select('*').eq('i_message_id',req.params.messageId).single());
+  if(!['failed','unconfirmed','not_recorded'].includes(item.i_message_delivery_status)) return reply.code(409).send({message:item.i_message_delivery_status==='sent'?'A newer attempt for this inquiry message has already been accepted. Refresh Email Logs.':'This inquiry message is already queued, sending, or no longer eligible for retry. Refresh Email Logs.'});
+  if(['unconfirmed','not_recorded'].includes(item.i_message_delivery_status) && req.body?.acknowledged!==true) return reply.code(409).send({message:'Check the sending mailbox before retrying.'});
+  if(['convert','reissue','correction','corrections'].includes(item.i_message_kind)) {
+   const row=await inquiry(item.inquiry_id)
+   const result=await app.inject({method:'POST',url:`/api/inquiries/${item.inquiry_id}/followup`,headers:{authorization:req.headers.authorization},payload:{action:['correction','corrections'].includes(item.i_message_kind)?'corrections':'reissue',requestId:require('node:crypto').randomUUID(),updatedAt:row.inquiry_updated_at,acknowledgeUncertain:req.body?.acknowledged===true,reason:item.i_message_message}})
+   return reply.code(result.statusCode).send(result.json())
+  }
+  check(await db.from('inquiry_message').update({i_message_delivery_status:'pending'}).eq('i_message_id',item.i_message_id).eq('i_message_delivery_status',item.i_message_delivery_status));
+  if(item.i_message_kind==='reply') setImmediate(()=>{void outbox.kick()})
+  else { const row=await inquiry(item.inquiry_id);setImmediate(()=>{void deliver(req,row,{message_id:item.i_message_id},getTransport()).catch(error=>req.log.warn({code:error.code},'Inquiry retry failed'))}) }
+  return {message:'Inquiry delivery retry queued.',messageId:item.i_message_id};
  }))
  app.post('/api/inquiries/:id/replies', {bodyLimit:20000},wrap(async (req,reply)=>{
   const row=await inquiry(req.params.id), requestId=uuid(req.body?.requestId), message=text(req.body?.text,4000)
@@ -140,6 +157,7 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   getTransport()
   sharedInbox(env)
   const result=await rpc(req,'reply',{text:message},requestId)
+  await recordAudit(db,req,{module:'inquiry_management',action:'inquiry_reply_sent',mallId:row.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:'Sent a reply to the inquiry.',metadata:{messageId:result.message_id}})
   const [saved,current]=await Promise.all([
    db.from('inquiry_message').select(messageColumns).eq('i_message_id',result.message_id).single().then(check),
    inquiry(row.inquiry_id),
@@ -155,6 +173,7 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   const row=await inquiry(req.params.id),requestId=uuid(req.body?.requestId),reason=text(req.body?.reason,3000)
   getTransport();sharedInbox(env)
   const result=check(await db.rpc('review_super_admin_inquiry',{p_id:row.inquiry_id,p_actor:req.admin.id,p_action:'reject',p_request:requestId,p_data:{reason,updatedAt:req.body.updatedAt}}))
+  await recordAudit(db,req,{module:'inquiry_management',action:'inquiry_rejected',mallId:row.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:reason,metadata:{messageId:result.message_id}})
   setImmediate(()=>{void outbox.kick()});events.publish(row.inquiry_id)
   reply.code(202)
   return {ok:true,messageId:result.message_id}
@@ -177,6 +196,7 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   if(generated.error && ['email_exists','user_already_exists'].includes(generated.error.code)) generated=await db.auth.admin.generateLink({type:'magiclink',email:row.inquiry_contact_email,options:{redirectTo:redirect.href}})
   if(generated.error || !generated.data?.user?.id || !generated.data?.properties?.action_link) {const e=new Error('Unable to prepare the owner setup link. Check Supabase Auth configuration.');e.statusCode=503;throw e}
   const result=check(await db.rpc('review_super_admin_inquiry',{p_id:row.inquiry_id,p_actor:req.admin.id,p_action:'approve',p_request:requestId,p_data:{updatedAt:req.body.updatedAt,acknowledgeDuplicates:req.body.acknowledgeDuplicates===true,authUserId:generated.data.user.id,offer:{refund_terms:env.INQUIRY_REFUND_TERMS,fee_details:env.INQUIRY_FEE_DETAILS}}}))
+  await recordAudit(db,req,{module:'inquiry_management',action:'inquiry_approved',mallId:result.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:`Approved inquiry and created mall ${row.inquiry_mall_name}.`,metadata:{mallId:result.mall_id,messageId:result.message_id}})
   return {ok:true,mallId:result.mall_id,warning:await deliver(req,row,result,transport,generated.data.properties.action_link)}
  })
  app.post('/api/inquiries/:id/approve',{bodyLimit:20000},approve)

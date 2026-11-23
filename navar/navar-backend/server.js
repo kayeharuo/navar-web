@@ -13,6 +13,8 @@ const registerAccountManagementRoutes = require('./modules/accountManagement/rou
 const registerApplicationTestingRoutes = require('./modules/applicationTesting/routes')
 const registerApplicationManagementRoutes = require('./modules/applicationManagement/routes')
 const registerNodeMapRoutes = require('./modules/nodeMap/routes')
+const { registerAuditLogRoutes } = require('./modules/auditLog/routes')
+const registerSystemSettingsRoutes = require('./modules/systemSettings/routes')
 
 const app = Fastify({ logger: true, bodyLimit: 25 * 1024 * 1024 })
 
@@ -50,6 +52,8 @@ app.setErrorHandler((error, request, reply) => {
 	return reply.code(statusCode).send({ message: error.workflowMessage || 'Something went wrong.' })
 })
 
+require('./modules/subscriptions/routes').registerPublic(app)
+
 const startedAt = new Date().toISOString()
 app.get('/health', async () => ({
 	status: 'ok',
@@ -64,33 +68,48 @@ registerInquiryCorrections(app)
 app.register(async protectedApp => {
 	protectedApp.addHook('preHandler', requireAuth())
 	protectedApp.addHook('preHandler', requireSuperAdmin)
-	registerInquiryRoutes(protectedApp)
+	registerInquiryRoutes(protectedApp, {env:require('./modules/emailDelivery/service').officialEnv()})
 	registerMallManagementRoutes(protectedApp)
 	protectedApp.register(async workflowApp => {
 		registerApplicationManagementRoutes(workflowApp)
 	})
 	registerNodeMapRoutes(protectedApp)
+	registerAuditLogRoutes(protectedApp)
+	registerSystemSettingsRoutes(protectedApp)
+	require('./modules/subscriptions/routes').registerAdmin(protectedApp)
+ require('./modules/stallApplications/routes')(protectedApp)
+ require('./modules/mapApplications/routes')(protectedApp)
+	require('./modules/emailDelivery/routes')(protectedApp)
 })
 
 // Separate mall-portal API: same verified identity, ownership checked in its module.
 app.register(async mallWorkflowApp => {
  mallWorkflowApp.addHook('preHandler', requireAuth())
  require('./modules/applicationManagement/mallWorkflowRoutes')(mallWorkflowApp)
+ require('./modules/subscriptions/routes').registerMall(mallWorkflowApp)
+ require('./modules/stallApplications/routes').registerMall(mallWorkflowApp)
+ require('./modules/mapApplications/routes').registerMall(mallWorkflowApp)
 })
 
 // Opt in after applying migration 23. No schema changes run on server startup.
-if (process.env.WORKFLOW_REMINDERS_ENABLED === 'true') {
+if (process.env.WORKFLOW_REMINDERS_ENABLED === 'true' || process.env.SUBSCRIPTION_REMINDERS_ENABLED === 'true') {
  let running = false
  const tick = async () => {
   if (running) return
   running = true
-  try { await require('./modules/applicationManagement/reminders').runReadyReminders(supabase) }
-  catch (error) { app.log.error({ code: error.code }, 'Ready reminder job failed') }
+  try {
+   await require('./modules/subscriptions/service').runLifecycle(supabase)
+   if(process.env.WORKFLOW_REMINDERS_ENABLED==='true') await require('./modules/applicationManagement/reminders').runReadyReminders(supabase)
+   else await require('./modules/emailDelivery/service').sendQueued(supabase)
+  }
+  catch (error) { app.log.error({ code: error.code }, 'Subscription lifecycle or email delivery job failed') }
   finally { running = false }
  }
- const timer = setInterval(tick, 60 * 60 * 1000)
+ const configuredInterval = Number(process.env.SUBSCRIPTION_WORKER_INTERVAL_MS || 15 * 60 * 1000)
+ const workerInterval = Number.isSafeInteger(configuredInterval) && configuredInterval >= 60000 ? configuredInterval : 15 * 60 * 1000
+ const timer = setInterval(tick, workerInterval)
  timer.unref()
- app.addHook('onReady', tick)
+ app.addHook('onReady', async () => { setImmediate(() => { void tick() }) })
  app.addHook('onClose', async () => clearInterval(timer))
 }
 

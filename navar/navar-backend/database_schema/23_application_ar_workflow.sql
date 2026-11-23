@@ -1,12 +1,12 @@
 -- Application/AR workflow. Do not apply until 23_workflow_prechecks.sql is clear.
 -- Existing migrations 01-22 are deliberately unchanged. No payment/renewal logic.
 BEGIN;
-LOCK TABLE public.mall, public.application, public.ar_development, public.node, public.edge, public.beacon_node_assigment IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE public.mall, public.application, public.ar_development, public.node, public.edge, public.beacon_node_assignment IN SHARE ROW EXCLUSIVE MODE;
 DO $$ BEGIN
  IF EXISTS(WITH refs AS (
  SELECT start_node_id node_id, ar_development_id FROM public.edge
  UNION SELECT end_node_id, ar_development_id FROM public.edge
- UNION SELECT node_id, ar_development_id FROM public.beacon_node_assigment)
+ UNION SELECT node_id, ar_development_id FROM public.beacon_node_assignment)
  SELECT 1 FROM refs GROUP BY node_id HAVING count(DISTINCT ar_development_id)>1)
  THEN RAISE EXCEPTION 'STOP: nodes referenced by multiple AR versions'; END IF;
  IF EXISTS(SELECT 1 FROM public.node n JOIN public.floor f USING(floor_id)
@@ -54,7 +54,7 @@ UPDATE public.node n SET ar_development_id=(SELECT d.ar_development_id FROM publ
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM public.edge e JOIN public.node s ON s.node_id=e.start_node_id JOIN public.node t ON t.node_id=e.end_node_id
  WHERE e.ar_development_id IS DISTINCT FROM s.ar_development_id OR e.ar_development_id IS DISTINCT FROM t.ar_development_id)
- OR EXISTS(SELECT 1 FROM public.beacon_node_assigment b JOIN public.node n USING(node_id) WHERE b.ar_development_id IS DISTINCT FROM n.ar_development_id)
+ OR EXISTS(SELECT 1 FROM public.beacon_node_assignment b JOIN public.node n USING(node_id) WHERE b.ar_development_id IS DISTINCT FROM n.ar_development_id)
  THEN RAISE EXCEPTION 'STOP: edges/assignments disagree with proposed node versions'; END IF;
 END $$;
 ALTER TABLE public.node ALTER COLUMN ar_development_id SET NOT NULL;
@@ -63,7 +63,7 @@ ALTER TABLE public.node ADD CONSTRAINT node_id_ar_development_key UNIQUE(node_id
 ALTER TABLE public.edge
  ADD CONSTRAINT edge_start_node_same_version FOREIGN KEY(start_node_id,ar_development_id) REFERENCES public.node(node_id,ar_development_id),
  ADD CONSTRAINT edge_end_node_same_version FOREIGN KEY(end_node_id,ar_development_id) REFERENCES public.node(node_id,ar_development_id);
-ALTER TABLE public.beacon_node_assigment
+ALTER TABLE public.beacon_node_assignment
  ADD CONSTRAINT assignment_node_same_version FOREIGN KEY(node_id,ar_development_id) REFERENCES public.node(node_id,ar_development_id),
  ADD CONSTRAINT assignment_one_node_per_beacon_per_version UNIQUE(ar_development_id,beacon_id);
 CREATE INDEX ix_node_ar_floor ON public.node(ar_development_id,floor_id);
@@ -72,7 +72,7 @@ CREATE INDEX ix_ar_ready_reminders ON public.ar_development(ar_development_ready
 -- Preserve existing deny-by-default policies. No new grants to anon/authenticated.
 ALTER TABLE public.node ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.edge ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.beacon_node_assigment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.beacon_node_assignment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.floor_calibration ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ar_development ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.floor ENABLE ROW LEVEL SECURITY;
@@ -319,7 +319,7 @@ BEGIN
        AND n.floor_id = ANY (v_floor_ids);
 
     -- 3. Beacon assignments of THIS version that point at nodes being removed go too.
-    DELETE FROM public.beacon_node_assigment a
+    DELETE FROM public.beacon_node_assignment a
      USING public.node n
      WHERE a.ar_development_id = p_ar_development_id
        AND a.node_id = n.node_id

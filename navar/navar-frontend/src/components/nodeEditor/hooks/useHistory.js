@@ -20,6 +20,11 @@ export function useHistory(initial) {
         setSnapshot(next);
         syncFlags();
     }, []);
+    const replace = useCallback((next) => {
+        historyRef.current[idxRef.current] = next;
+        setSnapshot(next);
+        syncFlags();
+    }, []);
     const undo = useCallback(() => {
         if (idxRef.current <= 0)
             return;
@@ -38,5 +43,5 @@ export function useHistory(initial) {
         syncFlags();
         return s;
     }, []);
-    return { snapshot, push, undo, redo, canUndo, canRedo };
+    return { snapshot, push, replace, undo, redo, canUndo, canRedo };
 }

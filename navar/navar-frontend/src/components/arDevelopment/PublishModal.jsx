@@ -1,6 +1,7 @@
-export default function PublishModal({ mallName, onCancel, onConfirm }) {
+import LoadingSpinner from '../ui/LoadingSpinner'
+export default function PublishModal({ busy = false, mallName, onCancel, onConfirm }) {
   return (
-    <div className="ar-modal-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+    <div className="ar-modal-overlay" onClick={e => !busy && e.target === e.currentTarget && onCancel()}>
       <div className="ar-publish-box">
         <div className="ar-publish-icon">
           <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
@@ -12,8 +13,8 @@ export default function PublishModal({ mallName, onCancel, onConfirm }) {
           This will make the AR navigation for <strong>{mallName}</strong> publicly available. The mall admin will be notified and the status will change to <strong style={{ color: '#16A34A' }}>Live</strong>.
         </p>
         <div className="ar-publish-actions">
-          <button className="ar-publish-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className="ar-publish-btn-confirm" onClick={onConfirm}>Publish</button>
+          <button className="ar-publish-btn-cancel" disabled={busy} onClick={onCancel}>Cancel</button>
+          <button className="ar-publish-btn-confirm" disabled={busy} onClick={onConfirm}>{busy?<LoadingSpinner label="Publishing..." showLabel/>:'Publish'}</button>
         </div>
       </div>
     </div>

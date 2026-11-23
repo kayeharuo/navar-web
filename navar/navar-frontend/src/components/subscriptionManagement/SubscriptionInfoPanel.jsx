@@ -2,11 +2,11 @@ import { X, AlertTriangle } from 'lucide-react'
 import { useEffect } from 'react'
 
 function formatPeso(amount) {
-  return `₱${amount.toLocaleString('en-US')}.00`
+  return new Intl.NumberFormat('en-PH', {style:'currency',currency:'PHP',minimumFractionDigits:2}).format(Number(amount || 0))
 }
 
 function statusVariant(status) {
-  const map = { Active: 'active', 'Grace Period': 'grace', Suspended: 'suspended', Setup: 'setup' }
+  const map = { Active: 'active', 'Grace Period': 'grace', Suspended: 'suspended', Onboarding: 'setup' }
   return map[status] || 'default'
 }
 
@@ -30,6 +30,7 @@ function SectionHeader({ title }) {
 
 export default function SubscriptionInfoPanel({ mall, tierInfo, onClose, onSuspend, onLift }) {
   const reason = mall.suspension?.reason
+  const onboardingPayment = mall.paymentHistory.find(payment => payment.type.startsWith('Onboarding Fee'))
 
   useEffect(() => {
     function handleEsc(e) {
@@ -56,23 +57,12 @@ export default function SubscriptionInfoPanel({ mall, tierInfo, onClose, onSuspe
         <div className="sub-panel-body">
           <div className="sub-panel-badges">
             <span className={`sub-status-badge sub-status-badge--${statusVariant(mall.status)}`}>{mall.status}</span>
-            <span className={`sub-tier-badge sub-tier-badge--${tierVariant(mall.tier)}`}>{mall.tier}</span>
+            {mall.status !== 'Onboarding' && <span className={`sub-tier-badge sub-tier-badge--${tierVariant(mall.tier)}`}>{mall.tier}</span>}
           </div>
 
-          <div className="sub-wallet-box">
-            <div>
-              <p className="sub-wallet-label">Wallet Balance</p>
-              <p className={`sub-wallet-value${mall.wallet <= 0 ? ' sub-wallet-value--zero' : ''}`}>{formatPeso(mall.wallet)}</p>
-            </div>
-            <div className="sub-wallet-meta">
-              <p className="sub-wallet-annual">Annual Fee: {formatPeso(tierInfo.annualFee)}</p>
-              <p className="sub-wallet-days">{mall.daysLeftLabel}</p>
-            </div>
-          </div>
-
-          {mall.status === 'Setup' && (
+          {mall.status === 'Onboarding' && (
             <div className="sub-setup-note">
-              Onboarding fee has been paid. This subscription will begin once the AR map is published live for public use.
+              The annual subscription has not started. Review the recorded onboarding payment and complete AR approval and verified annual payment.
             </div>
           )}
 
@@ -86,26 +76,27 @@ export default function SubscriptionInfoPanel({ mall, tierInfo, onClose, onSuspe
               {mall.suspension.notes && <p className="sub-suspension-callout-notes">{mall.suspension.notes}</p>}
               {reason === 'Non-Payment' && (
                 <p className="sub-suspension-callout-hint">
-                  Auto-lifts once the wallet balance covers {formatPeso(tierInfo.annualFee + Math.round(tierInfo.annualFee * tierInfo.reinstatementRate / 100))} (annual fee + {tierInfo.reinstatementRate}% reinstatement fee). No manual action needed.
+                  Requires payment of {formatPeso(tierInfo.annualFee + Math.round(tierInfo.annualFee * tierInfo.reinstatementRate / 100))} (annual fee + {tierInfo.reinstatementRate}% reinstatement fee).
                 </p>
               )}
               {reason === 'Operational' && (
                 <p className="sub-suspension-callout-hint">
-                  Voluntary pause. The subscription clock keeps running and this can be lifted anytime at no charge.
+                  Voluntary pause. The subscription clock keeps running. There is no fee to lift the operational pause, but overdue renewal obligations still apply.
                 </p>
               )}
               {(reason === 'Breach of Contract' || reason === 'Other') && (
                 <p className="sub-suspension-callout-hint">
-                  Must be lifted manually. Reinstating requires paying the annual fee again{mall.suspension.penalty ? ` plus a ${formatPeso(mall.suspension.penalty)} penalty` : ''}, even though the subscription term hasn't ended.
+                  Requires verified annual subscription and tier-based reinstatement payment{mall.suspension.penalty ? ` plus a ${formatPeso(mall.suspension.penalty)} penalty` : ''}. The next period starts the day after the previous expiry, regardless of payment date.
                 </p>
               )}
             </div>
           )}
 
           <SectionHeader title="SUBSCRIPTION DETAILS" />
-          <InfoRow label="Tier" value={mall.tier} />
-          <InfoRow label="Annual Fee" value={formatPeso(tierInfo.annualFee)} />
-          <InfoRow label="Onboarding Fee" value={formatPeso(tierInfo.onboardingFee)} />
+          <InfoRow label="Subscription Status" value={mall.status} />
+          <InfoRow label="Tier" value={mall.status === 'Onboarding' ? 'Not subscribed' : mall.tier} />
+          <InfoRow label="Annual Fee" value={mall.status === 'Onboarding' ? 'Not started yet' : formatPeso(tierInfo.annualFee)} />
+          <InfoRow label="Onboarding Fee" value={onboardingPayment ? formatPeso(onboardingPayment.amount) : '—'} />
           <InfoRow label="Subscription Start" value={mall.subscriptionStart || 'Not started yet'} />
           <InfoRow label="Subscription End" value={mall.subscriptionEnd || 'Not started yet'} />
           <InfoRow label="Grace Period" value={`${tierInfo.gracePeriodDays} days`} />
@@ -142,7 +133,7 @@ export default function SubscriptionInfoPanel({ mall, tierInfo, onClose, onSuspe
                   </div>
                   <div className="sub-payment-right">
                     <p className="sub-payment-amount">{formatPeso(p.amount)}</p>
-                    <span className={`sub-payment-status sub-payment-status--${p.status === 'Paid' ? 'paid' : 'pending'}`}>{p.status}</span>
+                    <span className={`sub-payment-status sub-payment-status--${p.status === 'Paid' ? 'paid' : p.status === 'Simulated' ? 'simulated' : 'pending'}`}>{p.status}</span>
                   </div>
                 </div>
               ))}
@@ -171,16 +162,16 @@ export default function SubscriptionInfoPanel({ mall, tierInfo, onClose, onSuspe
         <div className="sub-panel-divider" />
 
         <div className="sub-panel-footer">
-          {mall.status !== 'Setup' && mall.status !== 'Suspended' && (
+          {mall.status !== 'Onboarding' && mall.status !== 'Suspended' && (
             <button className="sub-footer-btn sub-footer-btn--suspend" onClick={onSuspend}>Suspend</button>
           )}
-          {mall.status === 'Suspended' && reason !== 'Non-Payment' && (
+          {mall.status === 'Suspended' && reason === 'Operational' && (
             <button className="sub-footer-btn sub-footer-btn--lift" onClick={onLift}>Lift Suspension</button>
           )}
           {mall.status === 'Suspended' && reason === 'Non-Payment' && (
-            <p className="sub-footer-note">Auto-lifts when wallet is sufficient — no manual action available.</p>
+            <p className="sub-footer-note">Lift the suspension after the reinstatement payment is verified.</p>
           )}
-          {mall.status === 'Setup' && (
+          {mall.status === 'Onboarding' && (
             <p className="sub-footer-note">Subscription actions unlock once the AR map is published live.</p>
           )}
         </div>

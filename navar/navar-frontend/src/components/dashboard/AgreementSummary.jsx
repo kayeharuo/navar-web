@@ -1,8 +1,14 @@
 import { CheckCircle } from 'lucide-react'
 import StatCard from './StatCard'
+import { Link } from 'react-router-dom'
+import useDashboardData from './useDashboardData'
 import '../../styles/dashboard/dashboard.css'
 
 export default function AgreementSummary() {
+  const {data,loading,error}=useDashboardData('/api/subscriptions')
+  const malls=data.malls||[]
+  const count=status=>loading?'…':malls.filter(m=>m.status===status).length
+  const expiring=malls.filter(m=>m.status==='Active'&&m.subscriptionEnd&&new Date(m.subscriptionEnd)-Date.now()<=60*86400000)
   return (
     <div className="dash-card">
       <div className="dash-card-header">
@@ -10,21 +16,21 @@ export default function AgreementSummary() {
           <span className="dash-card-accent" style={{ backgroundColor: '#22C55E' }} />
           <span className="dash-card-label">Agreement Summary</span>
         </div>
-        <button className="dash-view-all">View All →</button>
+        <Link className="dash-view-all" to="/subscription-management">View All</Link>
       </div>
 
       <div className="dash-stat-grid">
-        <StatCard value="10" label="Setup"        color="#22C55E" />
-        <StatCard value="5"  label="Active"       color="#22C55E" />
-        <StatCard value="1"  label="Grace Period" color="#F97316" />
-        <StatCard value="1"  label="Suspended"    color="#EF4444" highlight />
+        <StatCard value={count('Onboarding')} label="Onboarding" color="#22C55E" />
+        <StatCard value={count('Active')} label="Active" color="#22C55E" />
+        <StatCard value={count('Grace Period')} label="Grace Period" color="#F97316" />
+        <StatCard value={count('Suspended')} label="Suspended" color="#EF4444" highlight />
       </div>
 
       <div>
         <p className="dash-section-label">Expiring Within 60 Days</p>
         <div className="dash-expiry-row">
           <CheckCircle size={14} strokeWidth={2} style={{ color: '#22C55E', flexShrink: 0 }} />
-          All contracts are healthy.
+          {error || (loading?'Loading subscriptions…':expiring.length?expiring.map(m=>m.name).join(', '):'No active subscriptions expire within 60 days.')}
         </div>
       </div>
     </div>

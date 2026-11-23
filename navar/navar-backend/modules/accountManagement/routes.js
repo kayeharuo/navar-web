@@ -35,7 +35,8 @@ async function issuePasswordRequest(supabase, authUserId, kind, requestId) {
 	})
 }
 
-async function sendInviteEmail(email, actionLink, reset = false) {
+async function sendInviteEmail(email, actionLink, reset = false, context = {}) {
+ if(context.supabase && !context.logged) return require('../emailDelivery/service').trackSend(context.supabase,{type:reset?'password_reset':'account_invitation',to:email,subject:reset?'Reset your NavAR password':'You have been invited to NavAR',body:reset?'A fresh password reset link was requested. Link tokens are not stored in email logs.':'An account invitation was requested. Link tokens are not stored in email logs.',actor:context.actor,mallId:context.mallId,sourceType:'account',sourceId:context.accountId},()=>sendInviteEmail(email,actionLink,reset,{...context,logged:true}));
     const parsedLink = new URL(actionLink)
     if (!['https:', 'http:'].includes(parsedLink.protocol)) throw new Error('Invalid password link')
     const htmlLink = escapeHtml(actionLink)
@@ -83,7 +84,8 @@ async function sendInviteEmail(email, actionLink, reset = false) {
 	</body>
 </html>`,
 	})
-	if (!sent.accepted?.length) throw new Error('Email delivery was not confirmed.')
+	if (!sent.accepted?.length) throw Object.assign(new Error('Email delivery was not confirmed.'), { code: 'EENVELOPE' })
+	return sent
     } finally { transporter.close() }
 }
 
@@ -117,7 +119,7 @@ async function writeAudit(supabase, request, action, details) {
 		audit_log_performed_by: request.admin.id,
 		mall_id: request.admin.mallId,
 	})
-	if (result.error) request.log.error({ code: result.error.code }, 'Audit log write failed')
+	if (result.error) throw result.error
 }
 
 function accountError(error) {
@@ -229,7 +231,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
         try {
             const generated = await supabase.auth.admin.generateLink({ type: 'magiclink', email, options: { redirectTo } })
             if (generated.error || generated.data?.user?.id !== invited.data.user.id || !generated.data?.properties?.action_link) throw new Error('Unable to prepare invitation')
-            await sendInviteEmail(email, generated.data.properties.action_link)
+            await sendInviteEmail(email, generated.data.properties.action_link, false, {supabase,actor:request.admin.id,accountId:inserted.data.admin_id,mallId:request.body.mall_id})
         }
         catch { warning = 'Account created, but email delivery was not confirmed. Check the inbox before using Resend invite.' }
         return reply.code(201).send({ ...accountResponse(inserted.data), warning })
@@ -270,7 +272,7 @@ function registerAccountManagementRoutes(app, { supabase, requireAuth, requireSu
                 }
                 const generated = await supabase.auth.admin.generateLink({ type: invite ? 'magiclink' : 'recovery', email: row.admin_email, options: { redirectTo } })
                 if (generated.error || generated.data?.user?.id !== row.admin_auth_user_id || !generated.data?.properties?.action_link) throw new Error('Identity mismatch or link unavailable')
-                await sendInviteEmail(row.admin_email, generated.data.properties.action_link, !invite)
+                await sendInviteEmail(row.admin_email, generated.data.properties.action_link, !invite, {supabase,actor:request.admin.id,accountId:row.admin_id,mallId:row.mall_id})
                 return { message: invite ? 'Invitation submitted to the email provider.' : 'Password reset submitted to the email provider.' }
             } catch (error) {
                 request.log.warn({ code: error.code || 'ACCOUNT_EMAIL_UNCONFIRMED' }, 'Account email delivery unconfirmed')

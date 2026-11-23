@@ -1846,33 +1846,31 @@ select.mall-field-input {
 .beacons-table th:nth-child(1),
 .beacons-table td:nth-child(1) { width: 150px; }
 .beacons-table th:nth-child(2),
-.beacons-table td:nth-child(2) { width: 125px; }
+.beacons-table td:nth-child(2) { width: 135px; }
 .beacons-table th:nth-child(3),
-.beacons-table td:nth-child(3) { width: 135px; }
-.beacons-table th:nth-child(4),
-.beacons-table td:nth-child(4) {
+.beacons-table td:nth-child(3) {
   width: 210px;
   white-space: normal;
   overflow-wrap: break-word;
 }
+.beacons-table th:nth-child(4),
+.beacons-table td:nth-child(4) { width: 70px; }
 .beacons-table th:nth-child(5),
-.beacons-table td:nth-child(5) { width: 70px; }
+.beacons-table td:nth-child(5) { width: 115px; }
 .beacons-table th:nth-child(6),
-.beacons-table td:nth-child(6) { width: 115px; }
+.beacons-table td:nth-child(6) { width: 90px; }
 .beacons-table th:nth-child(7),
-.beacons-table td:nth-child(7) { width: 90px; }
+.beacons-table td:nth-child(7),
 .beacons-table th:nth-child(8),
-.beacons-table td:nth-child(8),
+.beacons-table td:nth-child(8) { width: 145px; }
 .beacons-table th:nth-child(9),
-.beacons-table td:nth-child(9) { width: 145px; }
+.beacons-table td:nth-child(9) { width: 155px; }
 .beacons-table th:nth-child(10),
-.beacons-table td:nth-child(10) { width: 155px; }
+.beacons-table td:nth-child(10) { width: 145px; }
 .beacons-table th:nth-child(11),
-.beacons-table td:nth-child(11) { width: 145px; }
+.beacons-table td:nth-child(11) { width: 105px; }
 .beacons-table th:nth-child(12),
-.beacons-table td:nth-child(12) { width: 105px; }
-.beacons-table th:nth-child(13),
-.beacons-table td:nth-child(13) { width: 330px; }
+.beacons-table td:nth-child(12) { width: 330px; }
 
 .beacons-td-label {
   white-space: normal !important;
@@ -2754,3 +2752,11 @@ select.mall-field-input {
   border: 1px solid #16A34A;
   color: #16A34A;
 }
+
+.beacons-page { min-width: 0; overflow: hidden; }
+.beacons-page .stores-table-container,
+.beacons-page .stores-table-scroll { min-width: 0; width: 100%; box-sizing: border-box; }
+.beacons-page .stores-table-scroll { min-height: 0; overflow: auto; }
+.beacons-table th:last-child,
+.beacons-table td:last-child { width: 330px; min-width: 330px; max-width: none; overflow: visible; }
+.beacons-table .stores-action-row { flex-wrap: wrap; }

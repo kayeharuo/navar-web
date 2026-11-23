@@ -11,6 +11,7 @@ function locationFromPlace(place) {
     latitude: Number(place.lat),
     longitude: Number(place.lon),
     address: place.display_name || '',
+    barangay: details.suburb || details.neighbourhood || details.quarter || details.village || '',
     city: details.city || details.town || details.municipality || details.city_district || details.village || details.county || '',
     province: details.province || details.state || details.region || details.state_district || '',
     zipCode: details.postcode || '',
@@ -92,7 +93,7 @@ export default function MallLocationPicker({ query, address, latitude, longitude
       <div className="mall-location-picker-head">
         <div>
           <p className="mall-field-label">LOCATION ON MAP</p>
-          <p className="mall-field-hint">Search the mall name or click the map. We will fill in the address, city, province, ZIP code, and coordinates after you confirm the location.</p>
+          <p className="mall-field-hint">Search the mall name or click the map. We will fill in the address, barangay, city, province, ZIP code, and coordinates after you confirm the location.</p>
         </div>
         {searching && <span className="mall-location-searching">Searching...</span>}
       </div>

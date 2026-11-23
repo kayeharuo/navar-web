@@ -28,7 +28,7 @@ export async function loadNodeMap(arDevelopmentId) {
     const labelByFloorId = new Map(data.floors.map((f, i) => [f.floorId, labels[i]]));
     const floorMeta = {};
     data.floors.forEach((f, i) => {
-        floorMeta[labels[i]] = { floorId: f.floorId, imageUrl: f.imageUrl, submittedReference: f.submittedReference };
+        floorMeta[labels[i]] = { floorId: f.floorId, floorNum: f.floorNum, imageUrl: f.imageUrl, submittedReference: f.submittedReference };
     });
 
     const storeUnits = data.units.map(u => ({
@@ -36,7 +36,7 @@ export async function loadNodeMap(arDevelopmentId) {
     })).filter(u => u.floor);
     catalog.unitIdByKey = new Map(storeUnits.map(u => [unitKey(u.floor, u.unit), u.unitId]));
     catalog.stallIdByName = new Map(data.stalls.map(s => [s.storeName, s.storeId]));
-    setEditorCatalog({ floors: labels, storeUnits, stallStores: data.stalls.map(s => s.storeName) });
+    setEditorCatalog({ floors: labels, storeUnits, stallStores: data.stalls.map(s => s.storeName), stallFloorByName:data.stalls.map(s=>[s.storeName,labelByFloorId.get(s.floorId)]) });
 
     const unitLabelById = new Map(data.units.map(u => [u.unitId, u.unitLabel]));
     const stallNameById = new Map(data.stalls.map(s => [s.storeId, s.storeName]));
@@ -46,6 +46,7 @@ export async function loadNodeMap(arDevelopmentId) {
         edges[label] = [];
         calibration[label] = null;
     }
+    edges.__crossFloor = [];
     const floorOfNode = new Map();
     for (const n of data.nodes) {
         const label = labelByFloorId.get(n.floorId);
@@ -55,14 +56,14 @@ export async function loadNodeMap(arDevelopmentId) {
             id: dbNodeId(n.dbId), dbId: n.dbId, x: n.pixelX, y: n.pixelY, type: n.type, label: n.label, floor: label,
             related_store_id: n.type === "STORE_ENTRANCE" ? unitLabelById.get(n.unitId) ?? null : null,
             stall_name: n.type === "STALL" ? stallNameById.get(n.storeId) : undefined,
-            isPwd: Boolean(n.isAccessible), status: "active",
-            cross_floor_link: n.crossFloorDbId ? dbNodeId(n.crossFloorDbId) : null,
+            isEmergency: Boolean(n.isEmergency), status: "active",
+            transition_group_id: n.transitionGroupId || null,
         });
     }
     for (const e of data.edges) {
         const label = floorOfNode.get(e.fromDbId);
-        if (!label || floorOfNode.get(e.toDbId) !== label) continue;
-        edges[label].push({ id: dbEdgeId(e.dbId), from: dbNodeId(e.fromDbId), to: dbNodeId(e.toDbId), floor: label, path_type: e.pathType, distance_value: e.distance });
+        if (!label || !floorOfNode.has(e.toDbId)) continue;
+        edges[floorOfNode.get(e.toDbId) === label ? label : "__crossFloor"].push({ direction: e.direction || "both", id: dbEdgeId(e.dbId), dbId: e.dbId, from: dbNodeId(e.fromDbId), to: dbNodeId(e.toDbId), floor: label, path_type: e.pathType, distance_value: e.distance });
     }
     data.floors.forEach((f, i) => {
         const c = f.calibration;
@@ -71,9 +72,9 @@ export async function loadNodeMap(arDevelopmentId) {
         }
     });
     return {
-        meta: { arDevelopmentId: data.arDevelopmentId, mallName: data.mallName, status: data.status, revision: data.revision },
+        meta: { arDevelopmentId: data.arDevelopmentId, mallId: data.mallId, mallName: data.mallName, status: data.status, revision: data.revision, beaconRevision: data.beaconState.revision, beaconMajor: data.beaconState.major },
         floorMeta,
-        snapshot: { nodes, edges, calibration },
+        snapshot: { nodes, edges, calibration, groups: data.transitionGroups || [], beacons: data.beaconState.beacons },
     };
 }
 
@@ -88,17 +89,18 @@ export function buildSaveBody(snapshot, floorMeta, { baseRevision, finalize, dbI
         for (const n of snapshot.nodes[label] || []) {
             nodes.push({
                 clientId: n.id, dbId: n.dbId ?? dbIds.get(n.id) ?? null, floorId: meta.floorId, type: n.type, label: n.label,
-                pixelX: n.x, pixelY: n.y, isAccessible: Boolean(n.isPwd),
+                pixelX: n.x, pixelY: n.y, isEmergency: Boolean(n.isEmergency),
                 unitId: n.type === "STORE_ENTRANCE" ? catalog.unitIdByKey.get(unitKey(label, n.related_store_id)) ?? null : null,
                 storeId: n.type === "STALL" ? catalog.stallIdByName.get(n.stall_name) ?? null : null,
-                crossFloorClientId: n.cross_floor_link || null,
+                transitionGroupId: n.transition_group_id || null,
             });
         }
         for (const e of snapshot.edges[label] || []) {
-            edges.push({ fromClientId: e.from, toClientId: e.to, pathType: e.path_type });
+            edges.push({ fromClientId: e.from, toClientId: e.to, pathType: e.path_type, direction: e.direction || "both" });
         }
     }
-    return { baseRevision, finalize: Boolean(finalize), calibrations, nodes, edges };
+    for (const e of snapshot.edges.__crossFloor || []) edges.push({ fromClientId: e.from, toClientId: e.to, pathType: e.path_type, direction: e.direction || "both" });
+    return { transitionGroups: snapshot.groups || [], baseRevision, finalize: Boolean(finalize), calibrations, nodes, edges, beacons: snapshot.beacons || [] };
 }
 
 export function saveNodeMap(arDevelopmentId, body) {

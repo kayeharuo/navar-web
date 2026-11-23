@@ -1,3 +1,5 @@
+ALTER TABLE public.node ADD COLUMN IF NOT EXISTS is_emergency BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- ============================================================
 -- 22_node_map_backend.sql
 -- Backend support for the AR-development node editor (Edit Map).
@@ -186,6 +188,7 @@ BEGIN
                 node_pixel_y = (v_rec ->> 'pixel_y')::DOUBLE PRECISION,
                 node_is_store_entrance = (v_rec ->> 'is_store_entrance')::BOOLEAN,
                 node_is_accessible = (v_rec ->> 'is_accessible')::BOOLEAN,
+                is_emergency = COALESCE((v_rec ->> 'is_emergency')::BOOLEAN, FALSE),
                 node_updated_at = v_now,
                 floor_id = (v_rec ->> 'floor_id')::INTEGER,
                 store_id = NULLIF(v_rec ->> 'store_id', '')::INTEGER,
@@ -200,13 +203,13 @@ BEGIN
         ELSE
             INSERT INTO public.node (
                 node_label, node_type, node_x_coordinate, node_y_coordinate,
-                node_pixel_x, node_pixel_y, node_is_store_entrance, node_is_accessible,
+                node_pixel_x, node_pixel_y, node_is_store_entrance, node_is_accessible, is_emergency,
                 node_created_at, node_updated_at, floor_id, store_id, unit_id
             ) VALUES (
                 v_rec ->> 'label', v_rec ->> 'type',
                 (v_rec ->> 'x')::DOUBLE PRECISION, (v_rec ->> 'y')::DOUBLE PRECISION,
                 (v_rec ->> 'pixel_x')::DOUBLE PRECISION, (v_rec ->> 'pixel_y')::DOUBLE PRECISION,
-                (v_rec ->> 'is_store_entrance')::BOOLEAN, (v_rec ->> 'is_accessible')::BOOLEAN,
+                (v_rec ->> 'is_store_entrance')::BOOLEAN, (v_rec ->> 'is_accessible')::BOOLEAN, COALESCE((v_rec ->> 'is_emergency')::BOOLEAN, FALSE),
                 v_now, v_now, (v_rec ->> 'floor_id')::INTEGER,
                 NULLIF(v_rec ->> 'store_id', '')::INTEGER, NULLIF(v_rec ->> 'unit_id', '')::INTEGER
             ) RETURNING node_id INTO v_node_id;
@@ -224,7 +227,7 @@ BEGIN
        AND n.floor_id = ANY (v_floor_ids);
 
     -- 3. Beacon assignments of THIS version that point at nodes being removed go too.
-    DELETE FROM public.beacon_node_assigment a
+    DELETE FROM public.beacon_node_assignment a
      USING public.node n
      WHERE a.ar_development_id = p_ar_development_id
        AND a.node_id = n.node_id

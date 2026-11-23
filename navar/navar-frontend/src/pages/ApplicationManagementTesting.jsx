@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { MAP_APPLICATION_CATEGORIES } from '../config/mapApplicationCategories'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../config/api'
 import '../styles/applicationManagement/applicationManagementTesting.css'
 
@@ -136,9 +138,9 @@ export default function ApplicationManagementTesting() {
       </label>
 
       {mall && !blocked && (
-        <div><p className="application-testing-info">This will create version {mall.nextVersion} for {mall.mall_name}.</p>{mall.nextVersion > 1 && <><label>Reason category<input maxLength={100} value={reasonCategory} onChange={e => setReasonCategory(e.target.value)} /></label><label>Reason notes<textarea maxLength={5000} value={reasonNotes} onChange={e => setReasonNotes(e.target.value)} /></label></>}</div>
+        <div><p className="application-testing-info">This will create version {mall.nextVersion} for {mall.mall_name}.</p>{mall.nextVersion > 1 && <><label>Reason category<select required value={reasonCategory} onChange={e => setReasonCategory(e.target.value)}><option value="">Select a category</option>{MAP_APPLICATION_CATEGORIES.map(value=><option key={value} value={value}>{value}</option>)}</select></label><label>Reason notes<textarea maxLength={5000} value={reasonNotes} onChange={e => setReasonNotes(e.target.value)} /></label></>}</div>
       )}
-      {blocked && <p className="application-testing-blocked">{mall.blockedReason}</p>}
+      {blocked && <p className="application-testing-blocked">{mall.blockedReason}{mall.portalUrl&&<> <Link to={mall.portalUrl}>Open map application</Link></>}</p>}
       {mall && !blocked && mallFloors.length === 0 && (
         <p className="application-testing-blocked">This mall has no floors yet. Add its floors in Mall Management first.</p>
       )}
@@ -163,7 +165,7 @@ export default function ApplicationManagementTesting() {
             <input value={data.referenceLine} onChange={event => updateFloor('referenceLine', event.target.value)} placeholder="e.g. Entrance A to Room A is 5 meters" />
           </label>
           <label>Meter length
-            <input type="number" min="1" value={data.meterLength} onChange={event => updateFloor('meterLength', event.target.value)} />
+            <input type="number" min="0.001" step="0.001" value={data.meterLength} onChange={event => updateFloor('meterLength', event.target.value)} />
           </label>
           <label>Accessibility route
             <textarea value={data.accessibilityRoute} onChange={event => updateFloor('accessibilityRoute', event.target.value)} />

@@ -1,3 +1,4 @@
+import { apiRequest } from '../../config/api'
 import { useEffect, useRef, useState } from 'react'
 
 export default function ThreadTab({ app, onSendNote }) {
@@ -39,6 +40,7 @@ export default function ThreadTab({ app, onSendNote }) {
     }
   }
 
+  const threadReadOnly=!!app.historyId||(app.threadReadOnly??app.readOnly)
   async function deliver(tempId, text, files) {
     try {
       const sent = await onSendNote(text, files)
@@ -51,6 +53,7 @@ export default function ThreadTab({ app, onSendNote }) {
   }
 
   function handleSend() {
+    if(threadReadOnly)return
     const text = noteText.trim()
     const files = attachments
     if (!text && files.length === 0) return
@@ -63,6 +66,7 @@ export default function ThreadTab({ app, onSendNote }) {
   }
 
   function handleRetry(tempId) {
+    if(threadReadOnly)return
     const item = localMessages.find(entry => entry.tempId === tempId)
     if (!item) return
     setLocalMessages(current => current.map(entry => entry.tempId === tempId ? { ...entry, status: 'sending' } : entry))
@@ -70,6 +74,17 @@ export default function ThreadTab({ app, onSendNote }) {
   }
 
   const serverMessages = app.thread || []
+  const readFingerprint=serverMessages.map(m=>m.threadId&&m.id?`${m.threadId}:${m.id}`:'').filter(Boolean).join(',')
+  useEffect(()=>{
+    const latest=new Map()
+    for(const pair of readFingerprint.split(',').filter(Boolean)){
+      const [thread,id]=pair.split(':');latest.set(thread,Math.max(latest.get(thread)||0,Number(id)))
+    }
+    if(!latest.size)return
+    Promise.all([...latest].map(([thread,messageId])=>apiRequest(`/api/conversations/${thread}/read`,{method:'POST',body:JSON.stringify({messageId})})))
+      .then(()=>window.dispatchEvent(new Event('navar-conversations-changed')))
+      .catch(e=>console.error('Unable to mark thread read:',e.message))
+  },[readFingerprint])
   const serverIds = new Set(serverMessages.map(message => String(message.id)))
   const localByRealId = new Map(localMessages.filter(item => item.realId != null).map(item => [String(item.realId), item]))
   const items = [
@@ -100,6 +115,7 @@ export default function ThreadTab({ app, onSendNote }) {
 
   return (
     <div className="review-thread-wrap">
+      {threadReadOnly&&<p className="review-thread-lock-notice">{app.historyId?'Saved review history is read-only.':'A newer version or attempt exists. This thread is read-only.'}</p>}
       <div className="review-thread-messages" ref={listRef}>
         {items.length === 0
           ? <div className="review-thread-empty">No Messages yet.</div>
@@ -147,7 +163,7 @@ export default function ThreadTab({ app, onSendNote }) {
         }
       </div>
 
-      {!app.readOnly && <div className="review-note-area">
+      {!threadReadOnly && <div className="review-note-area">
         {attachments.length > 0 && (
           <div className="thread-attachment-list">
             {attachments.map((attachment, index) => (

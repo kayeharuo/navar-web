@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { BeaconDataTable } from './BeaconDataTable';
 import { C, F, M, NODE_TYPES, FLOORS, PATH_TYPE, STORE_UNITS, STALL_STORES } from "../editorConstants";
+const displayNodeId = node => node?.dbId ?? (node ? `Unsaved (${node.id})` : "—");
+const displayEdgeId = edge => edge?.dbId ?? (edge ? `Unsaved (${edge.id})` : "—");
 const PathBadge = ({ type }) => {
     const pt = PATH_TYPE[type] || PATH_TYPE.normal;
     return (<span style={{
@@ -13,10 +16,10 @@ const PathBadge = ({ type }) => {
     </span>);
 };
 /** Look up a store by unit code and render brand + store name */
-const StoreCell = ({ unitCode }) => {
+const StoreCell = ({ unitCode, floor }) => {
     if (!unitCode)
         return <span style={{ color: "#94A3B8" }}>—</span>;
-    const su = STORE_UNITS.find(s => s.unit === unitCode);
+    const su = STORE_UNITS.find(s => s.floor === floor && s.unit === unitCode);
     if (!su)
         return <span style={{ fontFamily: M, color: C.blue, fontSize: 11 }}>{unitCode}</span>;
     return (<div>
@@ -40,15 +43,17 @@ const StallCell = ({ stallName }) => {
       </div>
     </div>);
 };
-export function DataTable({ nodes, edges, calibration, onClose }) {
+export function DataTable({ nodes, edges, calibration, groups = [], beacons = [], beaconMajor, onClose }) {
     const [tab, setTab] = useState("nodes");
     const allNodes = Object.values(nodes).flat();
     const allEdges = Object.values(edges).flat();
     const tabs = [
         { id: "nodes", label: `Nodes (${allNodes.length})` },
         { id: "edges", label: `Edges (${allEdges.length})` },
+        { id: "beacons", label: `Beacons (${beacons.length})` },
+        { id: "scale", label: `Calibration (${Object.values(calibration).filter(Boolean).length})` },
+        { id: "groups", label: `Transition Groups (${groups.length})` },
         { id: "stores", label: `Store Units (${STORE_UNITS.length})` },
-        { id: "scale", label: "Scale Calibration" },
     ];
     return (<div style={{
             position: "fixed", inset: 0,
@@ -58,23 +63,23 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
             padding: 24,
         }}>
       <div style={{
-            background: C.white, borderRadius: 14, width: "100%", maxWidth: 980,
-            maxHeight: "90vh", display: "flex", flexDirection: "column",
+            background: C.white, borderRadius: 14, width: "100%", maxWidth: 1180, minWidth: 0, overflow: "hidden",
+            height: "85vh", maxHeight: "90vh", display: "flex", flexDirection: "column",
             boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
         }}>
         {/* Header */}
         <div style={{
-            padding: "18px 22px", borderBottom: `1px solid ${C.border}`,
+            flexShrink: 0, padding: "18px 22px", borderBottom: `1px solid ${C.border}`,
             display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, fontFamily: F }}>Map Data</div>
+          <div><div style={{ fontSize: 15, fontWeight: 800, color: C.txt, fontFamily: F }}>Map Data</div><div style={{ fontSize: 11, color: C.sub, fontFamily: F, marginTop: 4 }}>Current editor layout · includes changes not yet applied</div></div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#64748B", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}` }}>
-          {tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding: "10px 20px", border: "none",
+        <div role="tablist" aria-label="Map data categories" style={{ display: "flex", flexWrap: "wrap", flexShrink: 0, background: "#F8FAFC", borderBottom: `1px solid ${C.border}`, padding: "0 8px" }}>
+          {tabs.map(t => (<button type="button" role="tab" id={`map-data-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="map-data-panel" key={t.id} onClick={() => setTab(t.id)} style={{
+                flexShrink: 0, padding: "12px 14px", border: "none",
                 borderBottom: `2px solid ${tab === t.id ? C.blue : "transparent"}`,
                 background: "transparent",
                 fontSize: 12, fontWeight: tab === t.id ? 700 : 500,
@@ -86,13 +91,20 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div id="map-data-panel" role="tabpanel" aria-labelledby={`map-data-tab-${tab}`} style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: tab === 'beacons' ? 'hidden' : 'auto' }}>
+          {tab === 'beacons' && <BeaconDataTable beacons={beacons} nodes={allNodes} major={beaconMajor} />}
 
           {/* ── Nodes ── */}
+          {tab === "groups" && <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr style={{ background: "#F1F5F9" }}>{["Group ID", "Name", "Type", "Landings", "Floor connections"].map(h => <th key={h} style={{ padding: "9px 13px", textAlign: "left", fontFamily: M, fontSize: 10, color: "#475569", borderBottom: `1px solid ${C.border}` }}>{h}</th>)}</tr></thead>
+            <tbody>{groups.map((g,i) => <tr key={g.id} style={{ background: i % 2 ? "#F8FAFC" : C.white, borderBottom: `1px solid ${C.line}` }}>
+              {[g.id,g.name,NODE_TYPES[g.type]?.label || g.type,allNodes.filter(n => n.transition_group_id === g.id).map(n => `${n.floor}: ${n.label} (${displayNodeId(n)})`).join("; ") || "No landings",(edges.__crossFloor || []).filter(e => allNodes.find(n => n.id === e.from)?.transition_group_id === g.id).length].map((value,index) => <td key={index} style={{ padding: "8px 13px", fontSize: 11, fontFamily: index === 0 ? M : F, color: index === 1 ? C.violet : "#475569", overflowWrap: "anywhere" }}>{value}</td>)}
+            </tr>)}</tbody>
+          </table>}
           {tab === "nodes" && (<table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#F1F5F9", position: "sticky", top: 0 }}>
-                  {["node_id", "floor", "type", "label", "linked_store_unit", "linked_store", "x", "y", "pwd", "cross_floor", "status"].map(h => (<th key={h} style={{
+                  {["node_id", "floor", "type", "label", "linked_store_unit", "linked_store", "x", "y", "transition_group", "node_is_emergency", "connected_floors", "status"].map(h => (<th key={h} style={{
                     padding: "9px 13px", fontSize: 10, fontWeight: 700, color: "#475569",
                     letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: M,
                     textAlign: "left", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap",
@@ -103,7 +115,7 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
                 {allNodes.map((n, i) => {
                 const cfg = NODE_TYPES[n.type] || NODE_TYPES.WALKWAY;
                 return (<tr key={n.id} style={{ borderBottom: `1px solid ${C.line}`, background: i % 2 === 0 ? C.white : "#F8FAFC" }}>
-                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#64748B" }}>{n.id}</td>
+                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#64748B" }}>{displayNodeId(n)}</td>
                       <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#475569" }}>{n.floor}</td>
                       <td style={{ padding: "8px 13px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -117,7 +129,7 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
                       {/* linked_store_unit — only meaningful for STORE_ENTRANCE nodes */}
                       <td style={{ padding: "8px 13px" }}>
                         {n.type === "STORE_ENTRANCE"
-                        ? <StoreCell unitCode={n.related_store_id}/>
+                        ? <StoreCell floor={n.floor} unitCode={n.related_store_id}/>
                         : <span style={{ color: "#94A3B8" }}>—</span>}
                       </td>
                       {/* linked_store — only meaningful for STALL nodes */}
@@ -129,14 +141,11 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
                       <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#475569" }}>{Math.round(n.x)}</td>
                       <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#475569" }}>{Math.round(n.y)}</td>
                       <td style={{ padding: "8px 13px" }}>
-                        {n.isPwd
-                        ? <span style={{ fontSize: 10, color: "#0F766E", background: "#CCFBF1", border: "1px solid #99F6E4", padding: "2px 7px", borderRadius: 4, fontFamily: M, fontWeight: 700 }}>PWD</span>
-                        : <span style={{ color: "#94A3B8" }}>—</span>}
+                        <span style={{ fontSize: 11, fontFamily: F, color: C.violet }}>{groups.find(g => g.id === n.transition_group_id)?.name || (cfg.isFloorTransition ? "Missing group" : "None")}</span>
                       </td>
-                      <td style={{ padding: "8px 13px" }}>
-                        {n.cross_floor_link
-                        ? <span style={{ fontSize: 10, color: "#6D28D9", background: "#F5F3FF", border: "1px solid #DDD6FE", padding: "2px 7px", borderRadius: 4, fontFamily: M, fontWeight: 700 }}>⇅ {n.cross_floor_link}</span>
-                        : <span style={{ color: "#94A3B8" }}>—</span>}
+                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M }}>{n.isEmergency ? "Yes" : "No"}</td>
+                      <td style={{ padding: "8px 13px", fontSize: 10, fontFamily: M, color: C.violet }}>
+                        {(edges.__crossFloor || []).filter(e => e.from === n.id || e.to === n.id).map(e => { const other = allNodes.find(node => node.id === (e.from === n.id ? e.to : e.from)); return `${other?.floor}: ${other?.label}`; }).join("; ") || "None"}
                       </td>
                       <td style={{ padding: "8px 13px" }}>
                         <span style={{
@@ -157,7 +166,7 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
           {tab === "edges" && (<table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#F1F5F9", position: "sticky", top: 0 }}>
-                  {["edge_id", "from_node_id", "to_node_id", "floor_id", "distance_value", "path_type"].map(h => (<th key={h} style={{
+                  {["edge_id", "from_node_id", "to_node_id", "floor_id", "distance_value", "path_type", "direction", "transition_group"].map(h => (<th key={h} style={{
                     padding: "9px 13px", fontSize: 10, fontWeight: 700, color: "#475569",
                     letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: M,
                     textAlign: "left", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap",
@@ -169,20 +178,20 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
                 const fromNode = allNodes.find(n => n.id === e.from);
                 const toNode = allNodes.find(n => n.id === e.to);
                 return (<tr key={e.id} style={{ borderBottom: `1px solid ${C.line}`, background: i % 2 === 0 ? C.white : "#F8FAFC" }}>
-                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#64748B" }}>{e.id}</td>
+                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#64748B" }}>{displayEdgeId(e)}</td>
                       <td style={{ padding: "8px 13px" }}>
                         <div style={{ fontSize: 12, fontFamily: F, color: "#334155", fontWeight: 500 }}>
-                          {fromNode?.label || <span style={{ fontFamily: M, color: "#94A3B8", fontSize: 11 }}>{e.from}</span>}
+                          {fromNode?.label || <span style={{ fontFamily: M, color: "#94A3B8", fontSize: 11 }}>{displayNodeId(fromNode)}</span>}
                         </div>
-                        <div style={{ fontSize: 10, fontFamily: M, color: "#94A3B8" }}>{e.from}</div>
+                        <div style={{ fontSize: 10, fontFamily: M, color: "#94A3B8" }}>{displayNodeId(fromNode)}</div>
                       </td>
                       <td style={{ padding: "8px 13px" }}>
                         <div style={{ fontSize: 12, fontFamily: F, color: "#334155", fontWeight: 500 }}>
-                          {toNode?.label || <span style={{ fontFamily: M, color: "#94A3B8", fontSize: 11 }}>{e.to}</span>}
+                          {toNode?.label || <span style={{ fontFamily: M, color: "#94A3B8", fontSize: 11 }}>{displayNodeId(toNode)}</span>}
                         </div>
-                        <div style={{ fontSize: 10, fontFamily: M, color: "#94A3B8" }}>{e.to}</div>
+                        <div style={{ fontSize: 10, fontFamily: M, color: "#94A3B8" }}>{displayNodeId(toNode)}</div>
                       </td>
-                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#475569" }}>{e.floor}</td>
+                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: M, color: "#475569" }}>{fromNode?.floor === toNode?.floor ? fromNode?.floor : `${fromNode?.floor} / ${toNode?.floor}`}</td>
                       <td style={{ padding: "8px 13px" }}>
                         {e.distance_value != null
                         ? <span style={{ fontSize: 12, fontWeight: 700, fontFamily: M, color: "#0F172A" }}>
@@ -192,6 +201,8 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
                         : <span style={{ fontSize: 11, color: "#94A3B8", fontFamily: M }}>— no scale</span>}
                       </td>
                       <td style={{ padding: "8px 13px" }}><PathBadge type={e.path_type}/></td>
+                      <td style={{ padding: "8px 13px", fontSize: 10, fontFamily: M }}>{e.direction === "forward" ? `${fromNode?.floor}: ${fromNode?.label} ? ${toNode?.floor}: ${toNode?.label}` : e.direction === "reverse" ? `${toNode?.floor}: ${toNode?.label} ? ${fromNode?.floor}: ${fromNode?.label}` : "Both directions"}</td>
+                      <td style={{ padding: "8px 13px", fontSize: 11, fontFamily: F, color: C.violet }}>{fromNode?.floor !== toNode?.floor ? groups.find(g => g.id === fromNode?.transition_group_id)?.name || "None" : "None"}</td>
                     </tr>);
             })}
               </tbody>
@@ -266,7 +277,7 @@ export function DataTable({ nodes, edges, calibration, onClose }) {
 
         {/* Footer */}
         <div style={{
-            padding: "12px 22px", borderTop: `1px solid ${C.border}`,
+            flexShrink: 0, flexWrap: "wrap", gap: 10, padding: "12px 22px", borderTop: `1px solid ${C.border}`,
             display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span style={{ fontSize: 11, color: "#475569", fontFamily: M }}>

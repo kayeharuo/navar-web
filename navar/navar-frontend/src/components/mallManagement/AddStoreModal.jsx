@@ -18,7 +18,7 @@ const CATEGORIES = [
 
 const MAX_LOGO_MB = 2
 
-function UnitAssignModal({ count, units, selected, onSave, onClose }) {
+function UnitAssignModal({ count, units, selected, currentStoreId, onSave, onClose }) {
   const [localSelected, setLocalSelected] = useState(selected || [])
 
   useEffect(() => {
@@ -29,17 +29,13 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose])
 
-  function toggleUnit(unitNo, isOccupied = false) {
+  function toggleUnit(unit) {
     setLocalSelected(prev => {
-      // If clicking an occupied unit, only allow deselect
-      if (isOccupied) {
-        if (prev.includes(unitNo)) return prev.filter(u => u !== unitNo)
-        return prev
-      }
+      const unitNo = unit.unitNo
+      const occupiedByAnotherStore = unit.status !== 'vacant' && String(unit.storeId) !== String(currentStoreId)
+      if (occupiedByAnotherStore) return prev
 
-      // For vacant units
       if (prev.includes(unitNo)) {
-        // If already selected, deselect it
         return prev.filter(u => u !== unitNo)
       }
 
@@ -93,7 +89,7 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
                     <div
                       key={u.id}
                       className={`unit-assign-item${localSelected.includes(u.unitNo) ? ' unit-assign-item--selected' : ''}`}
-                      onClick={() => toggleUnit(u.unitNo, false)}
+                      onClick={() => toggleUnit(u)}
                     >
                       <span className="unit-assign-no">{u.unitNo}</span>
                       <span className="unit-assign-floor">{u.floorNo}</span>
@@ -106,12 +102,14 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
               )}
               {occupiedUnits.length > 0 && (
                 <>
-                  {occupiedUnits.map(u => (
-                    <div
+                  {occupiedUnits.map(u => {
+                    const belongsToCurrentStore = String(u.storeId) === String(currentStoreId)
+                    const isSelected = localSelected.includes(u.unitNo)
+                    return <div
                       key={u.id}
-                      className={`unit-assign-item${localSelected.includes(u.unitNo) ? ' unit-assign-item--selected' : ' unit-assign-item--disabled'}`}
-                      onClick={() => toggleUnit(u.unitNo, true)}
-                      title={localSelected.includes(u.unitNo) ? 'Click to deselect' : 'Occupied - can only keep currently assigned'}
+                      className={`unit-assign-item${isSelected ? ' unit-assign-item--selected' : belongsToCurrentStore ? '' : ' unit-assign-item--disabled'}`}
+                      onClick={() => toggleUnit(u)}
+                      title={belongsToCurrentStore ? (isSelected ? 'Assigned to this store; click to deselect' : 'Previously assigned to this store; click to select') : 'Occupied by another store'}
                     >
                       <span className="unit-assign-no">{u.unitNo}</span>
                       <span className="unit-assign-floor">{u.floorNo}</span>
@@ -119,7 +117,7 @@ function UnitAssignModal({ count, units, selected, onSave, onClose }) {
                         {u.status.toUpperCase()}
                       </span>
                     </div>
-                  ))}
+                  })}
                 </>
               )}
             </>
@@ -205,8 +203,9 @@ export default function AddStoreModal({
     setField('numUnits', val)
     const next = parseInt(val) || 0
     if (next !== unitNos.length) {
-      setUnitNos([])
-      setUnitsSaved(false)
+      const retainedUnits = unitNos.slice(0, next)
+      setUnitNos(retainedUnits)
+      setUnitsSaved(next > 0 && retainedUnits.length === next)
     }
   }
 
@@ -502,6 +501,7 @@ export default function AddStoreModal({
           count={numUnits}
           units={mallUnits}
           selected={unitNos}
+          currentStoreId={initialData?.id}
           onSave={handleUnitsSave}
           onClose={() => setShowUnitAssign(false)}
         />

@@ -287,11 +287,14 @@
   font-weight: 500;
 }
 
-.sub-mgmt-empty {
+.sub-mgmt-table td.sub-mgmt-empty {
   text-align: center;
-  color: #9B9C9C;
-  padding: 32px !important;
+  color: #979797;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 40px 20px;
 }
+.sub-mgmt-alert-loading { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 56px; }
 
 /* ─── Action buttons ─────────────────────────────────────── */
 .sub-mgmt-action-buttons {
@@ -754,6 +757,7 @@
 }
 
 .sub-payment-status--paid { color: #16A34A; }
+.sub-payment-status--simulated { color: #7c3aed; }
 .sub-payment-status--pending { color: #EA580C; }
 
 /* ─── Panel footer ────────────────────────────────────────── */
@@ -790,3 +794,21 @@
   color: #2563EB;
   margin: 0;
 }
+.sub-test-notice { border: 1px solid #ddd6fe; border-radius: 10px; background: #f5f3ff; padding: 16px 20px; margin-bottom: 20px; color: #6d28d9; font-family: Poppins,sans-serif; font-size: 13px; }
+.sub-test-notice p { margin: 5px 0 0; line-height: 1.7; }
+.sub-test-panel { background: white; padding: 22px; border: 1px solid #e8ecf2; border-radius: 10px; margin: 18px 0; }
+.sub-test-panel h2 { font-family: Poppins,sans-serif; font-size: 17px; font-weight: 600; margin: 0 0 12px; }
+.sub-test-panel p { font-family: Poppins,sans-serif; font-size: 13px; line-height: 1.7; margin: 10px 0; }
+.sub-test-panel .settings-save-btn { margin: 10px 8px 10px 0; }
+.sub-test-payment-box { border: 1px solid #dbeafe; border-radius: 8px; background: #f8fbff; padding: 16px; margin-top: 18px; }
+.sub-test-check { display: flex; align-items: flex-start; gap: 9px; font-family: Poppins,sans-serif; font-size: 13px; line-height: 1.7; margin: 12px 0; }
+.sub-test-check input { margin-top: 5px; accent-color: #2563eb; }
+.sub-test-panel .sub-test-success { color: #15803d; }
+.sub-test-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.sub-test-status { display:flex; flex-wrap:wrap; align-items:center; gap:20px; padding:18px 22px; border:1px solid #dbeafe; background:#f8fbff; border-radius:10px; margin:18px 0; font-family:Poppins,sans-serif; }
+.sub-test-status div { display:flex; flex:1 1 130px; flex-direction:column; gap:5px; }
+.sub-test-status span { color:#64748b; font-size:12px; }
+.sub-test-status strong { font-size:14px; color:#172554; text-transform:capitalize; }
+.sub-test-progress { padding:28px; gap:20px; }
+.sub-test-progress p { margin:0; color:#64748b; font:13px/1.7 Poppins,sans-serif; }
+.sub-test-panel .settings-save-btn:disabled { opacity:.5; cursor:not-allowed; }

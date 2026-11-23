@@ -5,7 +5,7 @@ import ChatInboxPanel from './ChatInboxPanel'
 import '../../styles/layout/topbar.css'
 import '../../styles/panels.css'
 import { Building2 as BuildingIcon } from 'lucide-react'
-import { apiRequest } from '../../config/api'
+import useConversations from './useConversations'
 
 const pageIconMap = {
   'Dashboard':              LayoutDashboard,
@@ -46,7 +46,8 @@ export default function TopBar({
   const [showAccount, setShowAccount] = useState(false)
   const [showNotifDropdown, setShowNotifDropdown] = useState(false)
   const [showChatInbox, setShowChatInbox] = useState(false)
-  const [conversationUnreadCount, setConversationUnreadCount] = useState(0)
+  const conversations=useConversations(user?.id||user?.admin_id)
+  const conversationUnreadCount=conversations.threads.filter(t=>t.unread).length
   const navigate = useNavigate()
 
   const accountRef = useRef(null)
@@ -55,15 +56,6 @@ export default function TopBar({
   useOutsideClick(accountRef, () => setShowAccount(false))
   useOutsideClick(notifRef,   () => setShowNotifDropdown(false))
 
-  useEffect(() => {
-    let mounted = true
-    apiRequest('/api/conversations')
-      .then(threads => {
-        if (mounted) setConversationUnreadCount(threads.filter(thread => thread.unread).length)
-      })
-      .catch(error => console.error('Conversation count request failed:', error))
-    return () => { mounted = false }
-  }, [])
 
   const unreadCount = notifications.filter(n => !n.read).length
   const recentNotifs = notifications.slice(0, 4)
@@ -99,13 +91,17 @@ export default function TopBar({
           <button
             className="topbar-icon-btn chat-inbox-trigger"
             aria-label="Open all conversations"
-            onClick={() => setShowChatInbox(s => !s)}
+            onClick={() => {conversations.refresh();setShowChatInbox(s => !s)}}
           >
             <MessageCircle size={18} strokeWidth={1.75} />
             {conversationUnreadCount > 0 && <span className="chat-inbox-count">{conversationUnreadCount}</span>}
           </button>
           {showChatInbox && (
             <ChatInboxPanel
+              threads={conversations.threads}
+              loading={conversations.loading}
+              error={conversations.error}
+              onRetry={conversations.refresh}
               onClose={() => setShowChatInbox(false)}
               onOpenThread={path => {
                 setShowChatInbox(false)

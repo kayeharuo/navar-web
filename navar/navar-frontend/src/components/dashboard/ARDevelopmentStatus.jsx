@@ -9,6 +9,7 @@ export default function ARDevelopmentStatus() {
     result[project.arStatus] = (result[project.arStatus] || 0) + 1
     return result
   }, {})
+  const displayCount = status => loading ? '…' : counts[status] || 0
   return (
     <div className="dash-card">
       <div className="dash-card-header">
@@ -19,14 +20,14 @@ export default function ARDevelopmentStatus() {
         <Link className="dash-view-all" to="/ar-development">View All &rarr;</Link>
       </div>
 
-      {loading ? <p role="status">Loading AR development...</p> : error ? <p role="alert">{error}</p> : <div className="dash-stat-grid">
-        <StatCard value={counts['Pending'] || 0} label="Pending"              color="#94A3B8" />
-        <StatCard value={counts['Node Mapping'] || 0} label="Node Mapping"         color="#3B82F6" />
-        <StatCard value={counts['Testing'] || 0} label="Navigation Testing"   color="#A855F7" />
-        <StatCard value={counts['Ready'] || 0} label="Ready for Activation" color="#A855F7" />
-        <StatCard value={counts['Live'] || 0} label="Live"                 color="#22C55E" />
-        <StatCard value={counts['Unpublished'] || 0} label="Unpublished"          color="#EF4444" highlight />
-        <StatCard value={counts['On Hold'] || 0} label="On Hold" color="#F97316" />
+      {error ? <p role="alert">{error}</p> : <div className="dash-stat-grid">
+        <StatCard value={displayCount('Pending')} label="Pending"              color="#94A3B8" />
+        <StatCard value={displayCount('Node Mapping')} label="Node Mapping"         color="#3B82F6" />
+        <StatCard value={displayCount('Testing')} label="Navigation Testing"   color="#A855F7" />
+        <StatCard value={displayCount('Ready')} label="Ready for Activation" color="#A855F7" />
+        <StatCard value={displayCount('Live')} label="Live"                 color="#22C55E" />
+        <StatCard value={displayCount('Unpublished')} label="Unpublished"          color="#EF4444" highlight />
+        <StatCard value={displayCount('On Hold')} label="On Hold" color="#F97316" />
       </div>}
     </div>
   )

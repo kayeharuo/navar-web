@@ -213,9 +213,9 @@ WHERE table_schema = 'public' AND grantee = 'authenticated'
 GROUP BY table_name ORDER BY table_name;
 ```
 
-You should see exactly **18 tables** (whole-table grants): `accessibility_preference`, `beacon_node_assigment`, `beacon_scan_log`, `edge`, `floor`, `floor_calibration`, `mall`, `navigation_plan`, `navigation_plan_destination`, `navigation_session`, `node`, `notif_preference`, `operating_hours`, `promotion_interaction`, `store_visit`, `unit`, `user_mall_visit`, `user_session`.
+You should see exactly **18 tables** (whole-table grants): `accessibility_preference`, `beacon_node_assignment`, `beacon_scan_log`, `edge`, `floor`, `floor_calibration`, `mall`, `navigation_plan`, `navigation_plan_destination`, `navigation_session`, `node`, `notif_preference`, `operating_hours`, `promotion_interaction`, `store_visit`, `unit`, `user_mall_visit`, `user_session`.
 
-Four of them (`node`, `edge`, `floor_calibration`, `beacon_node_assigment`) show `DELETE, INSERT, SELECT, UPDATE`. That is correct: the database only lets an active Super Admin use those write rights (Part 12). Ten more tables (`app_user`, `application_entry_point`, `application_floor_plan`, `ar_development`, `beacon`, `brand`, `promotion`, `store`, `store_additional_info`, `system_settings`) are granted **only specific columns**, so they do not appear in this list on purpose. If you see `admin`, `audit_log`, `contract`, `payment`, or any other table, stop and ask.
+Four of them (`node`, `edge`, `floor_calibration`, `beacon_node_assignment`) show `DELETE, INSERT, SELECT, UPDATE`. That is correct: the database only lets an active Super Admin use those write rights (Part 12). Ten more tables (`app_user`, `application_entry_point`, `application_floor_plan`, `ar_development`, `beacon`, `brand`, `promotion`, `store`, `store_additional_info`, `system_settings`) are granted **only specific columns**, so they do not appear in this list on purpose. If you see `admin`, `audit_log`, `contract`, `payment`, or any other table, stop and ask.
 
 **Security Advisor:**
 
@@ -879,7 +879,7 @@ Do this after Parts 1 to 5 (the database and Auth are ready). It needs no backen
 | Normal mobile user | Map, stores, beacons, entry points, floor plans, promotions, hours, brands, **only for malls whose AR status is public** (default `'Live'`) | Their own profile fields (name, gender, date of birth, last login) and their own plans, sessions, preferences, visits, scans |
 | **Tester** (a mobile user you mark) | The same data for **every** mall at **any** AR stage | Same as a normal user: only their own rows |
 | Mall Admin (activated, active) | Public malls **plus their own mall** at any stage | Nothing |
-| **Super Admin** (activated, active) | Every mall at any stage | **Map-building tables only:** `node`, `edge`, `floor_calibration`, `beacon_node_assigment` |
+| **Super Admin** (activated, active) | Every mall at any stage | **Map-building tables only:** `node`, `edge`, `floor_calibration`, `beacon_node_assignment` |
 
 Always hidden from the app: store contact person/phone/email, beacon status and maintenance data, and every admin, billing, contract, audit and log table. Other users' data is never readable, even by guessing IDs.
 
@@ -903,7 +903,7 @@ Always hidden from the app: store contact person/phone/email, beacon status and 
 3. **Own rows:** when inserting into a user-owned table, `user_id` must be the caller's own `USER_ID` (get it from `GET /rest/v1/app_user?select=user_id`). Any other value is rejected.
 4. **Deleting an account:** the app cannot delete rows. Account deletion needs a backend endpoint (or a small database function) later.
 5. **Storing tokens:** keep the refresh token in the platform's secure storage (iOS Keychain / Android Keystore via a plugin), not in plain `PlayerPrefs`.
-6. **Building the map (AR development):** log in inside Unity with a **Super Admin** web account (same email and password). The app then sees every mall and can insert, update and delete rows in `node`, `edge`, `floor_calibration` and `beacon_node_assigment`. A Super Admin has no `APP_USER` record, so Unity cannot save navigation sessions for that login. That is expected.
+6. **Building the map (AR development):** log in inside Unity with a **Super Admin** web account (same email and password). The app then sees every mall and can insert, update and delete rows in `node`, `edge`, `floor_calibration` and `beacon_node_assignment`. A Super Admin has no `APP_USER` record, so Unity cannot save navigation sessions for that login. That is expected.
 7. **Testing navigation on a mall that is not live:** log in with a **tester** account. Create it like any mobile user (sign up, confirm email, call `register_app_user`), then the project owner runs this once in the Supabase SQL Editor:
    `UPDATE app_user SET user_role = 'tester' WHERE user_email = 'them@example.com';`
    Users cannot promote themselves: the app has no permission to change `USER_ROLE`. To remove tester access, set the role back to `'user'`.

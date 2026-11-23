@@ -1,0 +1,31 @@
+BEGIN;
+DO $$DECLARE actor bigint; ctx jsonb; payload jsonb; bad jsonb; app_id bigint; denied boolean; service public.mall_service_request; c_id bigint; premium_id bigint;
+BEGIN
+ SELECT min(admin_id) INTO actor FROM public.admin WHERE admin_role='super_admin' AND admin_account_status='official' AND NOT admin_is_deactivated;
+ ctx:=public.map_application_portal(actor,12,'context');
+ SELECT jsonb_build_object('token',gen_random_uuid(),'sourceApplicationId',ctx->'liveApplicationId','sourceMapRevision',ctx->'eligibility'->'sourceMapRevision','reasonCategory','Structural layout change','reasonNotes','Rolled-back validation of floor-plan replacement.','floors',jsonb_agg(value||jsonb_build_object('changed',ordinality=1))) INTO payload FROM jsonb_array_elements(ctx->'floors') WITH ORDINALITY;
+ denied:=false;BEGIN PERFORM public.map_application_portal(actor,12,'submit',payload||jsonb_build_object('sourceApplicationId',-1));EXCEPTION WHEN SQLSTATE '40001' THEN denied:=true;END;IF NOT denied THEN RAISE EXCEPTION 'Foreign source accepted';END IF;
+ denied:=false;BEGIN PERFORM public.map_application_portal(actor,12,'submit',payload||jsonb_build_object('sourceMapRevision',-1));EXCEPTION WHEN SQLSTATE '40001' THEN denied:=true;END;IF NOT denied THEN RAISE EXCEPTION 'Stale source accepted';END IF;
+ bad:=jsonb_set(payload,'{floors,0,floorId}','-1');denied:=false;BEGIN PERFORM public.map_application_portal(actor,12,'submit',bad);EXCEPTION WHEN SQLSTATE 'P0001' THEN denied:=true;END;IF NOT denied THEN RAISE EXCEPTION 'Foreign floor accepted';END IF;
+ bad:=jsonb_set(payload,'{floors,0,changed}','false');denied:=false;BEGIN PERFORM public.map_application_portal(actor,12,'submit',bad);EXCEPTION WHEN SQLSTATE 'P0001' THEN denied:=true;END;IF NOT denied THEN RAISE EXCEPTION 'No-change application accepted';END IF;
+ bad:=jsonb_set(payload,'{floors,1,entryPoints,0,label}','"Edited without marking changed"');denied:=false;BEGIN PERFORM public.map_application_portal(actor,12,'submit',bad);EXCEPTION WHEN SQLSTATE 'P0001' THEN denied:=true;END;IF NOT denied THEN RAISE EXCEPTION 'Undeclared changed floor accepted';END IF;
+ bad:=jsonb_set(payload,'{floors,0,image}',jsonb_build_object('fileName','invalid.png','content',encode(convert_to('Not an image','UTF8'),'base64')));denied:=false;BEGIN PERFORM public.map_application_portal(actor,12,'submit',bad);EXCEPTION WHEN SQLSTATE 'P0001' THEN denied:=true;END;IF NOT denied THEN RAISE EXCEPTION 'Invalid image accepted';END IF;
+ IF has_function_privilege('authenticated','public.map_application_portal(bigint,bigint,text,jsonb)','EXECUTE') OR has_function_privilege('anon','public.map_application_portal(bigint,bigint,text,jsonb)','EXECUTE') THEN RAISE EXCEPTION 'Privileged actor impersonation RPC exposed';END IF;
+ -- Tier changes below are rollback-only fixtures, not actual subscription changes.
+ SELECT contract_id INTO c_id FROM public.contract WHERE mall_id=12 AND contract_is_current;
+ UPDATE public.contract SET contract_status='grace' WHERE contract_id=c_id;
+ IF (app_private.map_intake_eligibility(12)->>'allowed')::boolean THEN RAISE EXCEPTION 'Grace subscription allowed';END IF;
+ UPDATE public.contract SET contract_status='active' WHERE contract_id=c_id;
+ SELECT s_tier_id INTO premium_id FROM public.subscription_tier WHERE s_tier_key='premium';
+ UPDATE public.contract SET s_tier_id=premium_id WHERE contract_id=c_id;
+ payload:=jsonb_set(payload,'{floors,0,image}',jsonb_build_object('fileName','new-plan.png','content','iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII='));
+ app_id:=(public.map_application_portal(actor,12,'submit',payload)->>'id')::bigint;
+ IF (app_private.map_intake_eligibility(12)->>'allowed')::boolean THEN RAISE EXCEPTION 'Concurrent request allowed';END IF;
+ PERFORM public.workflow_action(app_id,actor,'accept');
+ SELECT * INTO STRICT service FROM public.mall_service_request WHERE application_id=app_id;
+ IF service.status<>'queued' OR (service.quote->>'amount_cent')::bigint<>0 OR service.allowance_units<>1 OR service.payment_request_id IS NOT NULL THEN RAISE EXCEPTION 'Premium included update was charged or not reserved';END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.application_floor_plan fp JOIN public.map_application_floor_source src ON src.application_id=fp.application_id AND src.floor_id=fp.floor_id WHERE fp.application_id=app_id AND NOT src.reused_image AND fp.app_floor_plan_storage_path IS NULL AND fp.app_floor_plan_mime_type='image/png' AND length(fp.app_floor_plan_image)>0) THEN RAISE EXCEPTION 'Replacement image not saved independently';END IF;
+ PERFORM public.workflow_action(app_id,actor,'approve');
+END $$;
+SELECT true AS ownership_staleness_validation_and_premium_inclusion_verified;
+ROLLBACK;
