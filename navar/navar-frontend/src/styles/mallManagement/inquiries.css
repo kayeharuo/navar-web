@@ -817,3 +817,12 @@
 .inq-toast-close:hover { background: #F1F5F9; }
 .inq-toast-reload { margin-top: 8px; padding: 0; border: 0; background: transparent; color: #2563EB; text-decoration: underline; font: inherit; cursor: pointer; }
 @media (max-width: 540px) { .inq-toast-stack { right: 16px; bottom: 16px; } }
+
+/* Onboarding quote in the approval dialog */
+.inq-decision-quote { margin-top: 20px; padding-top: 16px; border-top: 1px solid #E2E8F0; }
+.inq-decision-quote h3 { margin: 0 0 6px; font: 600 13px 'Poppins', sans-serif; color: #334155; }
+.inq-decision-quote > p { margin: 0 0 14px; line-height: 1.6; color: #64748B; }
+.inq-decision-quote .inq-decision-reason { margin-top: 16px; }
+.inq-decision-quote select { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; padding: 10px; border: 1px solid #CBD5E1; border-radius: 6px; font: inherit; background: #FFFFFF; }
+.inq-decision-quote select:focus { outline: 1px solid #2563EB; }
+.inq-decision-quote .inq-duplicate-warning p { margin: 6px 0 10px; line-height: 1.6; }

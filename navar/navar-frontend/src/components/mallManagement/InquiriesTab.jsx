@@ -48,7 +48,7 @@ function InquiryCard({ inquiry, summary, isSelected, onClick, onShowDuplicates }
       {!!summary?.duplicates?.length && (
         <button type="button" className="inq-duplicate-link" onClick={onShowDuplicates}
           aria-label={`Show possible duplicate inquiries for ${inquiry.mallName}`}>
-          Possible duplicate inquiry ? View matches ({summary.duplicates.length})
+          Possible duplicate inquiry · View matches ({summary.duplicates.length})
         </button>
       )}
     </div>
@@ -104,6 +104,7 @@ function ViewDetailsPanel({ inquiry, onClose }) {
 
 export default function InquiriesTab() {
   const [inquiries, setInquiries] = useState([])
+  const [tiers, setTiers] = useState([])
   const [selected, setSelected] = useState(null)
   const [statusFilter, setStatusFilter] = useState('All')
   const [duplicateSource, setDuplicateSource] = useState(null)
@@ -145,7 +146,7 @@ export default function InquiriesTab() {
     const controller = new AbortController()
     setLoading(true)
     apiRequest('/api/inquiries', { signal: controller.signal })
-      .then(data => { if (!controller.signal.aborted) setInquiries(data.inquiries) })
+      .then(data => { if (!controller.signal.aborted) { setInquiries(data.inquiries); setTiers(data.tiers || []) } })
       .catch(e => { if (!controller.signal.aborted) setError(e.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
@@ -275,11 +276,11 @@ export default function InquiriesTab() {
   }
 
 
-  async function handleDecision(reason, acknowledgeDuplicates) {
+  async function handleDecision(reason, acknowledgeDuplicates, quoteChoice = {}) {
     if (busyRef.current || !decisionInquiry) return
     const target = decisionInquiry
     const action = decision
-    const signature = `${target.id}:${action}:${reason || ''}`
+    const signature = `${target.id}:${action}:${reason || ''}:${quoteChoice.tierKey || ''}`
     if (requestRef.current?.signature !== signature) requestRef.current = { signature, id: crypto.randomUUID() }
     busyRef.current = true
     setBusy(true)
@@ -293,7 +294,7 @@ export default function InquiriesTab() {
     try {
       const result = await withRequestTimeout(signal => apiRequest(`/api/inquiries/${target.id}/${action}`, {
         method: 'POST', signal,
-        body: JSON.stringify({ reason, acknowledgeDuplicates, updatedAt: target.updatedAt, requestId: requestRef.current.id }),
+        body: JSON.stringify({ reason, acknowledgeDuplicates, ...quoteChoice, updatedAt: target.updatedAt, requestId: requestRef.current.id }),
       }), 90000)
       if (!result?.ok) throw new Error('The server did not confirm this decision. Reload the inquiry before retrying.')
       setDecisionNotice(result.warning || (action === 'approve'
@@ -506,6 +507,7 @@ export default function InquiriesTab() {
           key={`${decisionInquiry.id}:${decision}`}
           inquiry={decisionInquiry}
           duplicates={decisionInquiry.duplicates}
+          tiers={tiers}
           decision={decision}
           busy={busy}
           error={decisionError}

@@ -2,20 +2,26 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
-export default function InquiryDecisionModal({ inquiry, duplicates=[], decision, busy, error, onClose, onConfirm, onShowDuplicates }) {
+export default function InquiryDecisionModal({ inquiry, duplicates=[], tiers=[], decision, busy, error, onClose, onConfirm, onShowDuplicates }) {
   const dialog = useRef(null)
   const [reason, setReason] = useState('')
   const [acknowledgeDuplicates,setAcknowledgeDuplicates]=useState(false)
+  // Inquiries sent with an estimate carry an onboarding quote; approving finalizes it.
+  const quote = inquiry.quote
+  const [tierKey, setTierKey] = useState(quote?.tierKey || inquiry.tierKey || '')
+  const [acknowledgeQuote, setAcknowledgeQuote] = useState(false)
   const [validation, setValidation] = useState('')
   const submitting = useRef(false)
   async function confirm(event) {
     event?.preventDefault()
     if (busy || submitting.current) return
     if (approve && duplicates.length && !acknowledgeDuplicates) { setValidation('Review the possible duplicates and check the confirmation box before approving.'); return }
+    if (approve && quote && !tierKey) { setValidation('Choose a subscription tier before approving.'); return }
+    if (approve && quote?.requiresReview && !acknowledgeQuote) { setValidation('Confirm you have reviewed the onboarding fee before approving.'); return }
     if (!approve && !reason.trim()) { setValidation('Enter a reason for rejection.'); return }
     setValidation('')
     submitting.current = true
-    try { await onConfirm(approve ? undefined : reason.trim(), acknowledgeDuplicates) }
+    try { await onConfirm(approve ? undefined : reason.trim(), acknowledgeDuplicates, approve && quote ? { tierKey, acknowledgeQuoteReview: acknowledgeQuote } : {}) }
     catch (failure) { setValidation(failure.message || 'Unable to submit the decision.') }
     finally { submitting.current = false }
   }
@@ -44,6 +50,22 @@ export default function InquiryDecisionModal({ inquiry, duplicates=[], decision,
             : 'Provide a reason for declining this inquiry. The reason will be saved in the conversation and emailed to the mall contact.'}</p>
           <dl>{details.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? 'Not provided'}</dd></div>)}</dl>
           {approve && duplicates.length>0 && <div className="inq-duplicate-warning"><strong>Possible duplicate inquiries</strong><button type="button" className="inq-duplicate-link" disabled={busy} onClick={onShowDuplicates}>View matching submissions</button><ul>{duplicates.map(d=><li key={d.id}>{d.mallName} · #{d.id} · {d.status} — {d.reason}</li>)}</ul><label><input type="checkbox" checked={acknowledgeDuplicates} onChange={e=>setAcknowledgeDuplicates(e.target.checked)} disabled={busy}/> I reviewed these matches and confirm this inquiry should proceed.</label></div>}
+          {approve && quote && <section className="inq-decision-quote" aria-labelledby="inq-decision-quote-title">
+            <h3 id="inq-decision-quote-title">Onboarding Quote</h3>
+            <p>Approving finalizes this quote for 30 days. The owner pays this onboarding fee during setup.</p>
+            <dl><div><dt>Onboarding fee</dt><dd>{inquiry.onboardingFee || 'Not quoted yet'}</dd></div></dl>
+            <label className="inq-decision-reason">Subscription tier <span aria-hidden="true">*</span>
+              <select required value={tierKey} disabled={busy} onChange={event => setTierKey(event.target.value)}>
+                <option value="">Choose a tier</option>
+                {tiers.map(tier => <option key={tier.key} value={tier.key}>{tier.label}</option>)}
+              </select>
+            </label>
+            {quote.requiresReview && <div className="inq-duplicate-warning">
+              <strong>Fee needs review</strong>
+              <p>The mall's rent-based ceiling is below NavAR's setup cost, so the onboarding fee is set at cost.</p>
+              <label><input type="checkbox" checked={acknowledgeQuote} onChange={event => setAcknowledgeQuote(event.target.checked)} disabled={busy}/> I reviewed this onboarding fee and confirm it should be offered.</label>
+            </div>}
+          </section>}
           {!approve && <label className="inq-decision-reason">Reason for rejection <span aria-hidden="true">*</span>
             <textarea required maxLength={3000} rows={4} value={reason} disabled={busy} onChange={event => setReason(event.target.value)} placeholder="Explain why this inquiry cannot be approved." />
           </label>}

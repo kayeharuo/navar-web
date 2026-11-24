@@ -7,6 +7,7 @@ const {createInquiryEvents}=require('./events')
 const {registerFollowup}=require('./followup')
 const { uuid, text, fail } = require('./validation')
 const { recordAudit } = require('../auditLog/routes')
+const { prepareQuoteForApproval } = require('./quotes')
 const columns = 'inquiry_id,inquiry_mall_name,inquiry_mall_state,inquiry_mall_city,inquiry_mall_zip_code,inquiry_mall_address,inquiry_mall_floor_count,inquiry_mall_description,inquiry_contact_person,inquiry_contact_num,inquiry_contact_email,inquiry_interested_tier,inquiry_status,inquiry_created_at,inquiry_updated_at,inquiry_coverage_area,mall_id,inquiry_original_description,inquiry_has_revision,inquiry_reviewed_at,inquiry_rejection_reason'
 const messageColumns = 'i_message_id,i_message_sender_type,i_message_sender_email,i_message_message,i_message_sent_at,i_message_kind,i_message_delivery_status'
 const formatDate = value => value ? new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`).toLocaleString('en-PH',{timeZone:'Asia/Manila',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'Not recorded'
@@ -23,6 +24,11 @@ function onboardingFor(row, fees={}) {
  if (quote && Number(quote.amount_cent)>0) return {onboardingFee:peso(Number(quote.amount_cent)/100),onboardingStatus:quote.status==='paid'?'Paid':quote.status==='finalized'?'Quoted':'Draft Estimate'}
  return {onboardingFee:'Not quoted yet',onboardingStatus:''}
 }
+// Latest live quote for the approval dialog: tier, review flag and expiry.
+function quoteFor(row, fees={}) {
+ const quote=(fees.quotes || []).filter(q=>q.inquiry_id===row.inquiry_id && q.status!=='superseded').sort((a,b)=>b.revision-a.revision)[0]
+ return quote ? {status:quote.status,tierKey:quote.preferred_tier || null,requiresReview:!!quote.requires_review,expiresAt:quote.expires_at || null} : null
+}
 function mapInquiry(row, tiers, fees) {
  const barangay=(row.inquiry_mall_address || '').match(/(?:^|,)\s*Barangay\s+([^,]+)/i)?.[1]?.trim() || ''
  const originalMessage=row.inquiry_has_revision ? row.inquiry_original_description : row.inquiry_mall_description
@@ -32,6 +38,7 @@ function mapInquiry(row, tiers, fees) {
   tier:tier?.s_tier_label || row.inquiry_interested_tier || 'Not selected',
   annualFee:tier?.s_tier_annual_fee == null ? 'Not selected' : `${peso(tier.s_tier_annual_fee)}/yr`,
   ...onboardingFor(row,fees),
+  quote:quoteFor(row,fees),tierKey:row.inquiry_interested_tier || null,
   date:formatDate(row.inquiry_created_at),status:status(row),updatedAt:row.inquiry_updated_at,mallId:row.mall_id,
   reviewedAt:formatDate(row.inquiry_reviewed_at),rejectionReason:row.inquiry_rejection_reason || '',lastUpdated:formatDate(row.inquiry_updated_at),hasRevision:!!row.inquiry_has_revision,
   barangay,fullAddress:[row.inquiry_mall_address,row.inquiry_mall_city,row.inquiry_mall_state,row.inquiry_mall_zip_code].filter(Boolean).join(', '),
@@ -71,7 +78,7 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   req.log.error({code:e.code || 'INQUIRY_ERROR',action:req.routeOptions.url},'Inquiry operation failed')
   const schema=['42703','42P01','42883','PGRST202','PGRST204'].includes(e.code)
   if(schema)req.log.error({code:e.code,message:e.message},'Inquiry schema mismatch')
-  return reply.code(e.statusCode || (schema?503:e.code==='40001'?409:e.code==='42501'?403:e.code==='P0002'?404:e.code==='P0001'?400:500)).send({message:schema?`Inquiry database schema mismatch (${e.code}). Check the backend log for the affected column or function.`:e.statusCode || e.code==='40001' || e.code==='P0001'?e.message:'Unable to complete the inquiry request. Please try again.'})
+  return reply.code(e.statusCode || (schema?503:e.code==='40001'?409:e.code==='42501'?403:e.code==='P0002'?404:e.code==='P0001'?400:500)).send({message:schema?`Inquiry database schema mismatch (${e.code}). Check the backend log for the affected column or function.`:e.statusCode || e.code==='40001' || e.code==='P0001'?e.message:'Unable to complete the inquiry request. Please try again.',...(e.statusCode && /^[A-Z_]+$/.test(e.code || '') ? {code:e.code} : {})})
  }}
  const rpc=async(req,action,data,requestId=null)=>check(await db.rpc('manage_super_admin_inquiry',{p_id:Number(req.params.id),p_actor:req.admin.id,p_action:action,p_data:data,p_request:requestId}))
  async function deliver(req,row,result,transport,link,linkKind) {
@@ -134,13 +141,13 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   const optional=query=>all(query).catch(()=>[])
   const [rows,tiers,requests,quotes]=await Promise.all([all(()=>db.from('inquiry').select(columns).order('inquiry_created_at',{ascending:false}).order('inquiry_id',{ascending:false})),all(()=>db.from('subscription_tier').select('s_tier_key,s_tier_label,s_tier_annual_fee').order('s_tier_id')),
    optional(()=>db.from('contract_payment_request').select('request_id,mall_id,status,amount_cent').eq('fee_type','onboarding').order('request_id')),
-   optional(()=>db.from('onboarding_quote').select('quote_id,inquiry_id,mall_id,revision,status,amount_cent').order('quote_id'))])
-  return {inquiries:rows.map(row=>mapInquiry(row,tiers,{requests,quotes}))}
+   optional(()=>db.from('onboarding_quote').select('quote_id,inquiry_id,mall_id,revision,status,amount_cent,preferred_tier,requires_review,expires_at').order('quote_id'))])
+  return {inquiries:rows.map(row=>mapInquiry(row,tiers,{requests,quotes})),tiers:tiers.map(t=>({key:t.s_tier_key,label:t.s_tier_label,annualFee:t.s_tier_annual_fee}))}
  }))
  app.get('/api/inquiries/:id/messages',wrap(async req=>{
   const row=await inquiry(req.params.id)
   const rows=await all(()=>db.from('inquiry_message').select(messageColumns).eq('inquiry_id',row.inquiry_id).order('i_message_sent_at').order('i_message_id'))
-  const {tier,annualFee,onboardingFee,onboardingStatus,...currentInquiry}=mapInquiry(row,[])
+  const {tier,annualFee,onboardingFee,onboardingStatus,quote,tierKey,...currentInquiry}=mapInquiry(row,[])
   return {currentInquiry,inboxSync:{enabled:inbox.state.enabled,lastCheckedAt:inbox.state.lastCheckedAt,warning:inbox.state.error},messages:rows.map(mapMessage)}
  }))
  app.patch('/api/inquiries/:id/status',wrap(async req=>{
@@ -206,11 +213,17 @@ module.exports = function registerInquiryRoutes(app, {env=process.env, transport
   if (redirect.protocol!=='https:' && !['localhost','127.0.0.1'].includes(redirect.hostname)) fail('The owner setup URL must use HTTPS.')
   const profile=check(await db.from('admin').select('admin_id').eq('admin_email',row.inquiry_contact_email.toLowerCase()).maybeSingle())
   if(profile) fail('This contact already has an admin account. Use a separate owner email.')
+  // Refuse an outdated decision before changing anything.
+  if(String(req.body?.updatedAt)!==String(row.inquiry_updated_at)) {const e=new Error('Inquiry changed. Reload before continuing.');e.statusCode=409;throw e}
+  // Approval is the quote review: finalize (and if needed reissue) the onboarding quote first.
+  const prepared=await prepareQuoteForApproval(db,{inquiry:row,actorId:req.admin.id,tierKey:req.body?.tierKey,acknowledgeReview:req.body?.acknowledgeQuoteReview===true})
+  // Finalizing touches the inquiry, so continue from its new timestamp.
+  const updatedAt=prepared.changed ? (await inquiry(row.inquiry_id)).inquiry_updated_at : row.inquiry_updated_at
   // generateLink prepares identity/link but sends no email before the transaction commits.
   let generated=await db.auth.admin.generateLink({type:'invite',email:row.inquiry_contact_email,options:{redirectTo:redirect.href}})
   if(generated.error && ['email_exists','user_already_exists'].includes(generated.error.code)) generated=await db.auth.admin.generateLink({type:'magiclink',email:row.inquiry_contact_email,options:{redirectTo:redirect.href}})
   if(generated.error || !generated.data?.user?.id || !generated.data?.properties?.action_link) {const e=new Error('Unable to prepare the owner setup link. Check Supabase Auth configuration.');e.statusCode=503;throw e}
-  const result=check(await db.rpc('review_super_admin_inquiry',{p_id:row.inquiry_id,p_actor:req.admin.id,p_action:'approve',p_request:requestId,p_data:{updatedAt:req.body.updatedAt,acknowledgeDuplicates:req.body.acknowledgeDuplicates===true,authUserId:generated.data.user.id,offer:{refund_terms:env.INQUIRY_REFUND_TERMS,fee_details:env.INQUIRY_FEE_DETAILS}}}))
+  const result=check(await db.rpc('review_super_admin_inquiry',{p_id:row.inquiry_id,p_actor:req.admin.id,p_action:'approve',p_request:requestId,p_data:{updatedAt,acknowledgeDuplicates:req.body.acknowledgeDuplicates===true,authUserId:generated.data.user.id,offer:{refund_terms:env.INQUIRY_REFUND_TERMS,fee_details:env.INQUIRY_FEE_DETAILS}}}))
   await recordAudit(db,req,{module:'inquiry_management',action:'inquiry_approved',mallId:result.mall_id,targetType:'inquiry',targetId:row.inquiry_id,targetName:row.inquiry_mall_name,details:`Approved inquiry and created mall ${row.inquiry_mall_name}.`,metadata:{mallId:result.mall_id,messageId:result.message_id}})
   return {ok:true,mallId:result.mall_id,warning:await deliver(req,row,result,transport,generated.data.properties.action_link)}
  })
