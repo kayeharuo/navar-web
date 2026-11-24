@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiRequest } from '../../config/api'
+import useDashboardData from './useDashboardData'
 import '../../styles/dashboard/dashboard.css'
 
 const MODULE_COLORS = {
@@ -25,17 +24,8 @@ function relativeTime(value) {
 
 export default function RecentActivity() {
   const navigate = useNavigate()
-  const [activities, setActivities] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let active = true
-    apiRequest('/api/audit-logs?page=1&pageSize=10')
-      .then(result => active && setActivities((result.items || []).slice(0, 4)))
-      .catch(() => active && setActivities([]))
-      .finally(() => active && setLoading(false))
-    return () => { active = false }
-  }, [])
+  const {data,loading,error,refresh}=useDashboardData('/api/audit-logs?page=1&pageSize=10')
+  const activities=(data.items||[]).slice(0,4)
 
   return (
     <div className="dash-card">
@@ -49,7 +39,8 @@ export default function RecentActivity() {
 
       <div className="dash-activity-list">
         {loading && <p className="dash-activity-meta">Loading recent activity...</p>}
-        {!loading && activities.length === 0 && <p className="dash-activity-meta">No recent audit activity.</p>}
+        {error&&<p role="alert">{error} <button onClick={refresh}>Retry</button></p>}
+        {!loading && !error && activities.length === 0 && <p className="dash-activity-meta">No recent audit activity.</p>}
         {activities.map(item => (
           <div key={item.id} className="dash-activity-item">
             <span className="dash-activity-dot" style={{ backgroundColor: MODULE_COLORS[item.module] || '#94A3B8' }} />

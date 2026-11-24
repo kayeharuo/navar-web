@@ -22,6 +22,8 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
     description: initialData?.description || '',
     majorBeacons: initialData?.majorBeacons != null ? String(initialData.majorBeacons) : '1',
     floors: initialData?.floors != null ? String(initialData.floors) : '',
+    storeCount: initialData?.storeCount != null ? String(initialData.storeCount) : '',
+    tenantCount: initialData?.tenantCount != null ? String(initialData.tenantCount) : '',
     latitude: initialData?.latitude ?? null,
     longitude: initialData?.longitude ?? null,
     agreementType: initialData?.initialPreferredTier || '',
@@ -139,6 +141,8 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       errs.floors = 'At least 1 floor is required.'
     else if (!floorsSaved)
       errs.floors = 'Floor details are required.'
+    if(!form.storeCount||!Number.isInteger(Number(form.storeCount))||Number(form.storeCount)<1)errs.storeCount='Enter the total number of stores and stalls.'
+    if(form.tenantCount===''||!Number.isInteger(Number(form.tenantCount))||Number(form.tenantCount)<0||Number(form.tenantCount)>Number(form.storeCount))errs.tenantCount='Tenant count must be between zero and the store count.'
     if (new Set(operatingHours.flatMap(schedule => schedule.days)).size !== 7)
       errs.operatingHours = 'Set operating hours or mark Closed for all seven days.'
     if (!isEdit && !logo && !logoPreview) errs.logo = 'Logo is required.'
@@ -184,6 +188,8 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
       description: form.description.trim(),
       majorBeacons: Number(form.majorBeacons),
       floors: parseInt(form.floors),
+      storeCount: Number(form.storeCount),
+      tenantCount: Number(form.tenantCount),
       floorDetails,
       operatingHours,
       logo,
@@ -270,17 +276,19 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               {errors.zipCode && <p className="mall-field-error">{errors.zipCode}</p>}
             </div>
 
-            <div ref={element => { fieldRefs.current.floors = element }} className={`mall-field-group${shakingFields.includes('floors') ? ' mall-field-group--shake' : ''}`}>
+            {['storeCount','tenantCount'].map(key=><div key={key} ref={element=>{fieldRefs.current[key]=element}} className="mall-field-group"><label className="mall-field-label" htmlFor={`mall-${key}`}>{key==='storeCount'?'STORE COUNT (STORES + STALLS)':'TENANT COUNT'} <span className="mall-field-required">*</span></label><input id={`mall-${key}`} className={`mall-field-input${errors[key]?' mall-field-input--error':''}`} type="number" min={key==='storeCount'?1:0} step="1" max={key==='tenantCount'?form.storeCount:undefined} value={form[key]} disabled={!!initialData?.onboardingQuoteId} onChange={e=>setField(key,e.target.value)}/>{errors[key]&&<p className="mall-field-error">{errors[key]}</p>}</div>)}
+            {initialData?.onboardingQuoteId&&<p className="mall-field-hint mall-field-group--full">Counts come from onboarding quote #{initialData.onboardingQuoteId}. {initialData.approvedExtraStalls||0} approved additional stall slots bring the current total capacity to {initialData.storeCapacity}.</p>}
+            <div className="mall-field-group">
               <label className="mall-field-label">LATITUDE</label>
               <input className="mall-field-input" value={form.latitude ?? ''} readOnly placeholder="Select a location on the map" />
             </div>
-            <div ref={element => { fieldRefs.current.majorBeacons = element }} className={`mall-field-group${shakingFields.includes('majorBeacons') ? ' mall-field-group--shake' : ''}`}>
+            <div className="mall-field-group">
               <label className="mall-field-label">LONGITUDE</label>
               <input className="mall-field-input" value={form.longitude ?? ''} readOnly placeholder="Select a location on the map" />
             </div>
 
             {/* No. of Floors */}
-            <div ref={element => { fieldRefs.current.logo = element }} className={`mall-field-group${shakingFields.includes('logo') ? ' mall-field-group--shake' : ''}`}>
+            <div ref={element => { fieldRefs.current.floors = element }} className={`mall-field-group${shakingFields.includes('floors') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">
                 NO. OF FLOORS <span className="mall-field-required">*</span>
               </label>
@@ -313,7 +321,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
               )}
             </div>
 
-            <div ref={element => { fieldRefs.current.operatingHours = element }} className={`mall-field-group${shakingFields.includes('operatingHours') ? ' mall-field-group--shake' : ''}`}>
+            <div ref={element => { fieldRefs.current.majorBeacons = element }} className={`mall-field-group${shakingFields.includes('majorBeacons') ? ' mall-field-group--shake' : ''}`}>
               <label className="mall-field-label">BEACON MAJOR <span className="mall-field-required">*</span></label>
               <input type="number" min="1" className={`mall-field-input${errors.majorBeacons ? ' mall-field-input--error' : ''}`} value={form.majorBeacons} onChange={e => setField('majorBeacons', e.target.value)} />
               {errors.majorBeacons && <p className="mall-field-error">{errors.majorBeacons}</p>}
@@ -339,7 +347,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
             </div>
 
             {/* Logo */}
-            <div className="mall-field-group mall-field-group--full">
+            <div ref={element=>{fieldRefs.current.logo=element}} className="mall-field-group mall-field-group--full">
               <label className="mall-field-label">
                 LOGO <span className="mall-field-required">*</span>
               </label>
@@ -375,7 +383,7 @@ export default function AddMallModal({ onClose, onSave, initialData = null, stac
           </div>
 
           {/* Operating Hours */}
-          <div className="mall-field-group">
+          <div ref={element=>{fieldRefs.current.operatingHours=element}} className="mall-field-group">
             <label className="mall-field-label">
               OPERATING HOURS <span className="mall-field-required">*</span>
             </label>

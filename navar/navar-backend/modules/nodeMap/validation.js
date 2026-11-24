@@ -187,7 +187,7 @@ function buildNodeMap(body, context) {
             const key=pairKey(lower.client_id,upper.client_id);
             if (seenPairs.has(key)) continue;
             seenPairs.add(key);
-            edges.push({from_client_id:upper.client_id,to_client_id:lower.client_id,distance:(FLOOR_CHANGE_COST_M[group.type] || 10)*Math.max(1,high-low),path_type:upper.node_is_emergency || lower.node_is_emergency ? 'restricted' : NODE_TYPES[group.type].isPwdType ? 'accessible' : 'normal',direction:'both',is_cross_floor:true});
+            edges.push({from_client_id:upper.client_id,to_client_id:lower.client_id,distance:(FLOOR_CHANGE_COST_M[group.type] || 10)*Math.max(1,high-low),path_type:upper.node_is_emergency || lower.node_is_emergency ? 'restricted' : 'normal',direction:'both',is_cross_floor:true});
         }
     }
     if (body.finalize) {

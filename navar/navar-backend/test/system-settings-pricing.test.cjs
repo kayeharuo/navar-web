@@ -49,6 +49,11 @@ test('v4 migration and settings round trip preserve snapshots and save tiers ato
 
     await db.exec('CREATE TABLE application(application_status text)')
     await db.exec(fs.readFileSync(path.join(__dirname, '../database_schema/47_editable_rates_and_ar_queue.sql'), 'utf8'))
+    await db.exec("ALTER TABLE subscription_tier ADD COLUMN s_tier_map_update_rate numeric;UPDATE subscription_tier SET s_tier_map_update_rate=CASE s_tier_key WHEN 'basic' THEN 0.5 WHEN 'standard' THEN 0.4 ELSE 0.3 END")
+    const percentageMigration=fs.readFileSync(path.join(__dirname,'../database_schema/72_onboarding_based_map_updates.sql'),'utf8')
+    const patchStart=percentageMigration.indexOf("SELECT pg_get_functiondef('public.save_system_subscription_tiers(jsonb)'")
+    const patchEnd=percentageMigration.indexOf('END $migration$;',patchStart)
+    await db.exec('DO $migration$ DECLARE definition text;needle text;BEGIN '+percentageMigration.slice(patchStart,patchEnd)+'END $migration$;')
     app.decorate('supabase', {
       from(table) {
         if (table === 'navar_rate_card') return {select:()=>({eq:()=>({single:async()=>({data:(await db.query('SELECT * FROM navar_rate_card WHERE is_current')).rows[0]})})})}
@@ -72,7 +77,8 @@ test('v4 migration and settings round trip preserve snapshots and save tiers ato
     assert.equal(values.beaconReplacement.basic, '₱815 each')
     assert.equal(values.freeStalls.premium, '10')
     assert.equal(values.freeMapUpdates.premium, '1')
-    assert.equal(values.paidMapUpdate.basic, '₱28,000')
+    assert.equal(values.paidMapUpdate.basic, '50%')
+    assert.equal(values.paidMapUpdate.standard,'40%');assert.equal(values.paidMapUpdate.premium,'30%')
     const save = body => app.inject({ method: 'PUT', url: '/api/system-settings/subscription-tiers', payload: { values: body } })
     const valid = await save(values)
     assert.equal(valid.statusCode, 200, valid.body)
@@ -85,9 +91,14 @@ test('v4 migration and settings round trip preserve snapshots and save tiers ato
       assert.equal((await save(changed)).statusCode, 400)
       assert.deepEqual((await db.query('SELECT * FROM subscription_tier ORDER BY s_tier_key')).rows, before)
     }
+    for(const invalid of ['0%','101%','-1%','28000']) {
+      const changed=structuredClone(values);changed.paidMapUpdate.basic=invalid
+      assert.equal((await save(changed)).statusCode,400)
+      assert.deepEqual((await db.query('SELECT * FROM subscription_tier ORDER BY s_tier_key')).rows,before)
+    }
     const updates = structuredClone(before)
     updates[0].s_tier_annual_fee = 99999
-    updates[1].s_tier_map_update_fee_per_floor = -1
+    updates[1].s_tier_map_update_rate = 1.1
     await assert.rejects(db.query('SELECT save_system_subscription_tiers($1)', [JSON.stringify(updates)]), /Invalid tier/)
     assert.deepEqual((await db.query('SELECT * FROM subscription_tier ORDER BY s_tier_key')).rows, before)
     const changedRates = {...card.rates,installCost:125}

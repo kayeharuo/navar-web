@@ -281,7 +281,7 @@ export function DataTable({ nodes, edges, calibration, groups = [], beacons = []
             display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span style={{ fontSize: 11, color: "#475569", fontFamily: M }}>
-            {allNodes.length} nodes · {allEdges.length} edges · {allEdges.filter(e => e.path_type === "accessible").length} accessible · {allEdges.filter(e => e.path_type === "restricted").length} restricted
+            {allNodes.length} nodes · {allEdges.length} edges · {allEdges.filter(e => e.path_type === "restricted").length} restricted
             {" · "}{STORE_UNITS.filter(s => allNodes.some(n => n.related_store_id === s.unit)).length}/{STORE_UNITS.length} stores mapped
           </span>
           <button onClick={onClose} style={{

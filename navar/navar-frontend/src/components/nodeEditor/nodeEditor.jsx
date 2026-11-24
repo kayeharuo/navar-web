@@ -128,7 +128,7 @@ const EdgePanel = ({ edge, nodes, onChangeType, onDelete, locked }) => {
     return (<>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
         <div style={{ width: 22, height: 4, background: pt.color, borderRadius: 2, flexShrink: 0 }}/>
-        <span style={{ fontSize: 11, fontWeight: 700, color: pt.badgeTxt, fontFamily: M }}>EDGE · {edge.path_type.toUpperCase()}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: pt.badgeTxt, fontFamily: M }}>EDGE · {pt.label.toUpperCase()}</span>
       </div>
       <SecHead color={pt.color}>Path Type</SecHead>
       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
@@ -258,7 +258,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
     const selEdge = floorEdges.find(e => e.id === selectedEdgeId) || null;
     const totalNodes = Object.values(nodes).flat().length;
     const totalEdges = Object.values(edges).flat().length;
-    const accEdges = Object.values(edges).flat().filter(e => e.path_type === "accessible").length;
+    const restrictedEdges = Object.values(edges).flat().filter(e => e.path_type === "restricted").length;
     const liveNodes = dragNodes ?? nodes;
     const liveFloorNodes = liveNodes[floor] || [];
     // Canvas nodes: preview staged properties without overriding live drag coordinates.
@@ -578,8 +578,6 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             if (!exists) {
                 const fromNode = floorNodes.find(n => n.id === connectFrom);
                 let autoPt = pathType;
-                if (NODE_TYPES[fromNode?.type || ""]?.isPwdType || NODE_TYPES[node.type]?.isPwdType)
-                    autoPt = "accessible";
                 if (fromNode?.isEmergency || node.isEmergency || NODE_TYPES[fromNode?.type || ""]?.isEmergencyType || NODE_TYPES[node.type]?.isEmergencyType)
                     autoPt = "restricted";
                 const dist = fromNode ? edgeMeters(fromNode, node, floorCalib?.pxPerMeter) : null;
@@ -980,7 +978,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
           {/* Stats */}
           <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 14px", background: C.dim, marginTop: "auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {[["Nodes", totalNodes, "#0F172A"], ["Edges", totalEdges, "#0F172A"], ["Accessible", accEdges, C.teal], ["This floor", liveFloorNodes.length, C.violet]].map(([l, v, c]) => (<div key={String(l)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 8px" }}>
+              {[["Nodes", totalNodes, "#0F172A"], ["Edges", totalEdges, "#0F172A"], ["Restricted", restrictedEdges, C.red], ["This floor", liveFloorNodes.length, C.violet]].map(([l, v, c]) => (<div key={String(l)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 8px" }}>
                   <div style={{ fontSize: 9, color: "#94A3B8", fontFamily: M, marginBottom: 2 }}>{l}</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: String(c), fontFamily: M }}>{v}</div>
                 </div>))}
@@ -1201,7 +1199,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: M, marginBottom: 8 }}>Progress</div>
             {[
             ["Stores", Object.values(liveNodes).flat().filter(n => n.type === "STORE_ENTRANCE").length, STORE_UNITS.length, C.blue],
-            ["Accessible edges", accEdges, 10, C.teal],
+            ["Restricted edges", restrictedEdges, Math.max(1,totalEdges), C.red],
         ].map(([l, v, max, c]) => (<div key={String(l)} style={{ marginBottom: 7 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                   <span style={{ fontSize: 10, color: "#475569", fontFamily: M }}>{l}</span>

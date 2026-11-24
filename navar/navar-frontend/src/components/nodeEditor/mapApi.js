@@ -56,7 +56,7 @@ export async function loadNodeMap(arDevelopmentId) {
             id: dbNodeId(n.dbId), dbId: n.dbId, x: n.pixelX, y: n.pixelY, type: n.type, label: n.label, floor: label,
             related_store_id: n.type === "STORE_ENTRANCE" ? unitLabelById.get(n.unitId) ?? null : null,
             stall_name: n.type === "STALL" ? stallNameById.get(n.storeId) : undefined,
-            isEmergency: Boolean(n.isEmergency), status: "active",
+            isEmergency: Boolean(n.isEmergency), status: n.isActive===false?"inactive":"active",
             transition_group_id: n.transitionGroupId || null,
         });
     }

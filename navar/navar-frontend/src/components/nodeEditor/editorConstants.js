@@ -13,7 +13,6 @@ export const C = {
 };
 export const PATH_TYPE = {
     normal: { color: "#2563EB", label: "Normal", dash: [], badge: "#EFF4FF", badgeTxt: "#1D4ED8" },
-    accessible: { color: "#0D9488", label: "Accessible", dash: [4, 3], badge: "#F0FDFA", badgeTxt: "#0F766E" },
     restricted: { color: "#DC2626", label: "Restricted", dash: [5, 4], badge: "#FFF5F5", badgeTxt: "#B91C1C" },
 };
 export const NODE_TYPES = {

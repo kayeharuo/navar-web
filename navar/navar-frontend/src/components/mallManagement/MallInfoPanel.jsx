@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { X, ImageIcon } from 'lucide-react'
 import AuthImage from '../ui/AuthImage'
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }
 
 function formatTime(time) {
@@ -14,27 +14,12 @@ function formatTime(time) {
   return `${hour}:${m.toString().padStart(2, '0')} ${period}`
 }
 
-function formatDays(days) {
-  if (!days || days.length === 0) return ''
-  if (days.length === 7) return 'Daily'
-  const sorted = days.map(day => DAY_NAMES[day] || day).sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b))
-  const groups = []
-  let group = [sorted[0]]
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = DAYS.indexOf(group[group.length - 1])
-    const curr = DAYS.indexOf(sorted[i])
-    if (curr === prev + 1) group.push(sorted[i])
-    else { groups.push(group); group = [sorted[i]] }
-  }
-  groups.push(group)
-  return groups.map(g => (g.length === 1 ? g[0] : `${g[0]} – ${g[g.length - 1]}`)).join(', ')
-}
-
 function formatOperatingHours(hours) {
   if (!hours || hours.length === 0) return '—'
-  return hours
-    .map(h => `${formatDays(h.days)}: ${h.closed ? 'Closed' : `${formatTime(h.open)} – ${formatTime(h.close)}`}`)
-    .join('\n')
+  return DAYS.map(day=>{
+    const h=hours.find(schedule=>(schedule.days||[]).some(value=>(DAY_NAMES[value]||value).toLowerCase()===day.toLowerCase()))
+    return `${day}: ${!h?'Not provided':h.closed?'Closed':`${formatTime(h.open)} – ${formatTime(h.close)}`}`
+  }).join('\n')
 }
 
 function SectionHeader({ title }) {
@@ -100,6 +85,8 @@ export default function MallInfoPanel({ mall, onClose, onUnits, onBeacons, onEdi
           <InfoRow label="Floors" value={mall.floors} />
           <InfoRow label="Total Floor Area" value={mall.floorDetails?.length ? `${mall.floorDetails.reduce((total, floor) => total + Number(floor.floorAreaSqm || 0), 0).toLocaleString()} sqm` : '—'} />
           <InfoRow label="Stores" value={mall.storesCount} />
+          <InfoRow label="Store Capacity (Stores + Stalls)" value={mall.storeCapacity} />
+          <InfoRow label="Onboarding Tenant Count" value={mall.tenantCount} />
           <InfoRow label="Units" value={mall.unitsCount ?? mall.units?.length ?? 0} />
           <InfoRow label="Operating Hours" value={opHours} />
 

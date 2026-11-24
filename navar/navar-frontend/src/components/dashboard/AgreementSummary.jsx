@@ -7,8 +7,9 @@ import '../../styles/dashboard/dashboard.css'
 export default function AgreementSummary() {
   const {data,loading,error}=useDashboardData('/api/subscriptions')
   const malls=data.malls||[]
-  const count=status=>loading?'…':malls.filter(m=>m.status===status).length
-  const expiring=malls.filter(m=>m.status==='Active'&&m.subscriptionEnd&&new Date(m.subscriptionEnd)-Date.now()<=60*86400000)
+  const count=status=>loading?'…':error?'—':malls.filter(m=>m.status===status).length
+  const now=new Date(data.asOf||'')
+  const expiring=malls.filter(m=>m.status==='Active'&&m.subscriptionEnd&&new Date(m.subscriptionEnd)>=new Date(new Date(now).setHours(0,0,0,0))&&new Date(m.subscriptionEnd)-now<=60*86400000)
   return (
     <div className="dash-card">
       <div className="dash-card-header">

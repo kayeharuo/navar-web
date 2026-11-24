@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X, ImageIcon } from 'lucide-react'
 import BusyButton from '../ui/BusyButton'
 import AuthImage from '../ui/AuthImage'
+import ActionResultModal from '../ui/ActionResultModal'
 
 const BRAND_CATEGORIES = [
   'Fashion & Apparel',
@@ -20,10 +21,11 @@ const MAX_LOGO_MB = 2
 
 export default function AddBrandModal({ initialData = null, onClose, onSave }) {
   const isEdit = !!initialData
+  const [validationResult,setValidationResult]=useState(null)
 
   const [form, setForm] = useState({
     name:        initialData?.name        || '',
-    category:    initialData?.category    || '',
+    category:    BRAND_CATEGORIES.find(category=>category.toLowerCase()===String(initialData?.category||'').trim().toLowerCase()) || initialData?.category?.trim() || '',
     description: initialData?.description || '',
   })
 
@@ -68,7 +70,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
 
   function handleSave() {
     const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (Object.keys(errs).length > 0) { setErrors(errs);setValidationResult({success:false,title:'Complete the required fields',message:'Please check the highlighted brand fields before saving.'}); return }
     return onSave({
       name:        form.name.trim(),
       category:    form.category,
@@ -79,6 +81,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
 
   return (
     <>
+      {validationResult&&<ActionResultModal result={validationResult} onClose={()=>setValidationResult(null)}/>}
       <div className="modal-overlay" onClick={onClose} />
       <div className="mall-modal" role="dialog" aria-modal="true">
         <div className="mall-modal-header">
@@ -115,6 +118,7 @@ export default function AddBrandModal({ initialData = null, onClose, onSave }) {
               onChange={e => setField('category', e.target.value)}
             >
               <option value="">Select category</option>
+              {form.category&&!BRAND_CATEGORIES.includes(form.category)&&<option value={form.category}>{form.category}</option>}
               {BRAND_CATEGORIES.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}

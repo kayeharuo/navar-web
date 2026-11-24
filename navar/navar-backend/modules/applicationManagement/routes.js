@@ -3,6 +3,7 @@ const {mapUpdateState}=require('../mapApplications/paymentState')
 const {reviewHistory,historyRecord,historyDetails,historyPlan}=require('./reviewHistory')
 const { summarizeMessages } = require('./conversationSummary')
 const { withQueueNumbers } = require('./queue')
+const { agreementLabel } = require('./agreementLabel')
 'use strict'
 
 const { signedImageUrl, uploadImage, floorPlanImageUrl } = require('../storage/imageStorage')
@@ -95,6 +96,8 @@ async function applicationDetails(supabase, applicationId, request) {
 	const application = await supabase.from('application').select('*').eq('application_id', applicationId).single()
 	if (application.error) return null
 	const mall = await supabase.from('mall').select('*').eq('mall_id', application.data.mall_id).single()
+	const contract = await supabase.from('contract').select('contract_status,contract_start').eq('mall_id',application.data.mall_id).eq('contract_is_current',true).maybeSingle()
+	if(contract.error)throw contract.error
 	const floors = await supabase.from('floor').select('*').eq('mall_id', application.data.mall_id).order('floor_num')
 	const plans = await supabase.from('application_floor_plan').select('*').eq('application_id', applicationId).order('floor_id')
 	const entries = await supabase.from('application_entry_point').select('*').eq('application_id', applicationId).order('floor_id')
@@ -156,7 +159,7 @@ async function applicationDetails(supabase, applicationId, request) {
 		adminEmail: admin.data?.admin_email || '',
 		version: application.data.application_version,
 		floors: floors.data?.length || mall.data?.mall_floor_count || 0,
-		agreement: 'Setup',
+		agreement: agreementLabel(contract.data),
 		applicationStatus: titleCase(application.data.application_status),
 		arDevelopment: developments.data?.[0] ? titleCase(developments.data[0].ar_development_status) : '-',
 		arDevelopmentId: developments.data?.[0]?.ar_development_id || null,
@@ -240,7 +243,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
           tierKey: tier?.s_tier_key || null,
           applicationApprovedAt: application?.application_approved_at || null,
           createdAt: item.ar_development_created_at,
-					agreement: titleCase(contract?.contract_status || 'setup'),
+					agreement: agreementLabel(contract),
 					applicationStatus: titleCase(application?.application_status),
 					arStatus: titleCase(item.ar_development_status),
 					dateAdded: dateLabel(item.ar_development_created_at),
@@ -260,12 +263,14 @@ module.exports = function registerApplicationManagementRoutes(app) {
 
 	app.get('/api/applications', async (request, reply) => {
 		try {
-			const [malls, applications, developments] = await Promise.all([
+			const [malls, applications, developments, contracts] = await Promise.all([
 				app.supabase.from('mall').select('*').order('mall_name'),
 				app.supabase.from('application').select('*').order('application_updated_at', { ascending: false }),
 				app.supabase.from('ar_development').select('*').order('ar_development_updated_at', { ascending: false }),
+				app.supabase.from('contract').select('mall_id,contract_status,contract_start').eq('contract_is_current',true),
 			])
-			if (malls.error || applications.error || developments.error) throw malls.error || applications.error || developments.error
+			if (malls.error || applications.error || developments.error || contracts.error) throw malls.error || applications.error || developments.error || contracts.error
+			const contractByMall=new Map((contracts.data||[]).map(contract=>[String(contract.mall_id),contract]))
 			const mallById = new Map((malls.data || []).map(mall => [String(mall.mall_id), mall]))
 			const developmentByApplication = new Map()
 			for (const development of developments.data || []) {
@@ -291,7 +296,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					adminName: 'No mall account', adminEmail: '',
 					version: 1, floors: mall.mall_floor_count || 0,
 					address: mall.mall_address || '', cityProvince: [mall.mall_city, mall.mall_state].filter(Boolean).join(', '),
-					agreement: 'Setup', applicationStatus: 'Draft', arDevelopment: '-',
+					agreement: agreementLabel(contractByMall.get(String(mall.mall_id))), applicationStatus: 'Draft', arDevelopment: '-',
 					submittedDate: '-', lastUpdated: '-', floorPlans: [], thread: [],
 				})
 			}
@@ -310,7 +315,7 @@ module.exports = function registerApplicationManagementRoutes(app) {
 					isLatestVersion: !(applications.data || []).some(a => a.mall_id === application.mall_id && (a.application_version > application.application_version || (a.application_version === application.application_version && a.application_attempt > application.application_attempt))),
 					attempt: application.application_attempt,
 					floors: relatedMall.mall_floor_count || 0,
-					agreement: 'Setup',
+					agreement: agreementLabel(contractByMall.get(String(application.mall_id))),
 					applicationStatus: titleCase(application.application_status),
 					arDevelopment: titleCase(developmentByApplication.get(String(application.application_id))?.ar_development_status || '-'),
 					submittedDate: dateLabel(application.application_created_at),

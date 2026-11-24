@@ -13,7 +13,7 @@ export function autoConnect(snapshot, floorMeta) {
             if (!Number.isFinite(low) || !Number.isFinite(high) || low === high) continue;
             if (group.type !== "ELEVATOR" && floorNumbers.some(n => n>low && n<high)) continue;
             const key=[lower.id,upper.id].sort().join("::");
-            connections.push(existing.get(key) || {id:`auto-${key}`,from:upper.id,to:lower.id,direction:"both",path_type:upper.isEmergency || lower.isEmergency ? "restricted" : ["ELEVATOR","RAMP"].includes(group.type) ? "accessible" : "normal"});
+            connections.push(existing.get(key) || {id:`auto-${key}`,from:upper.id,to:lower.id,direction:"both",path_type:upper.isEmergency || lower.isEmergency ? "restricted" : "normal"});
         }
     }
     return {...snapshot,edges:{...snapshot.edges,__crossFloor:connections}};

@@ -7,6 +7,7 @@ import '../../styles/dashboard/dashboard.css'
 const variants = {
   Active: 'active', Setup: 'setup', 'Grace Period': 'grace', Suspended: 'suspended',
   Approved: 'approved', 'For Revision': 'revision', Submitted: 'pending', Draft: 'default',
+  Rejected: 'suspended', 'Rejected Final': 'suspended', Disputed: 'revision',
   Live: 'live', Unpublished: 'unpublished', 'Node Mapping': 'pending', Testing: 'pending', Ready: 'pending',
 }
 
@@ -34,7 +35,7 @@ export default function MallTable() {
               <th>Mall</th>
               <th>Tier</th>
               <th>Agreement</th>
-              <th>Application</th>
+              <th>Latest Application</th>
               <th>AR Development</th>
             </tr>
           </thead>
@@ -55,7 +56,7 @@ export default function MallTable() {
                 </td>
                 <td>{mall.tier}</td>
                 <td><Badge label={mall.agreementStatus || '-'} variant={variants[mall.agreementStatus] || 'default'}   /></td>
-                <td><Badge label={mall.application || '-'} variant={variants[mall.application] || 'default'} /></td>
+                <td><Badge label={mall.applicationVersion != null ? `Ver.${mall.applicationVersion} - ${mall.application}` : mall.application || '-'} variant={variants[mall.application] || 'default'} /></td>
                 <td><Badge label={mall.arDevelopment || '-'} variant={variants[mall.arDevelopment] || 'default'}       /></td>
               </tr>
             ))}

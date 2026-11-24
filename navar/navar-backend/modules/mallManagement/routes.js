@@ -117,30 +117,32 @@ function mallAgreementStatus(contractStatus) {
 
 function createMallService(supabase) {
 	async function getMall(mallId) {
-		const [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult] = await Promise.all([
+		const [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult,capacityResult] = await Promise.all([
 			supabase.from('mall').select('*').eq(dbColumn('MALL_ID'), mallId).single(),
 			supabase.from('floor').select('*').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('FLOOR_NUM')),
 			supabase.from('operating_hours').select('*').eq(dbColumn('MALL_ID'), mallId).or('opthrs_is_store.eq.false,opthrs_is_store.is.null').eq(dbColumn('OPTHRS_IS_INQUIRY'), false).order(dbColumn('OPTHRS_ID')),
 			supabase.from('contract').select('*, subscription_tier(s_tier_label, s_tier_key)').eq(dbColumn('MALL_ID'), mallId).eq(dbColumn('CONTRACT_IS_CURRENT'), true).maybeSingle(),
 			supabase.from('beacon').select('*').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('BEACON_ID')),
 			supabase.from('store').select('*').eq(dbColumn('MALL_ID'), mallId),
+			supabase.rpc('mall_capacity_state',{p_mall:Number(mallId)}),
 		])
 
-		const initialFailure = [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult].find(result => result.error)
+		const initialFailure = [mallResult, floorsResult, hoursResult, contractResult, beaconResult, storesResult,capacityResult].find(result => result.error)
 		if (initialFailure) throw initialFailure.error
 		const mall = upperKeys(mallResult.data)
+		const capacity=capacityResult.data||{}
+		const quoteFloors=Array.isArray(capacity.quoteFloors)?capacity.quoteFloors:[]
 		const floors = upperKeys(floorsResult.data || [])
 		const hours = upperKeys(hoursResult.data || [])
 		const contract = upperKeys(contractResult.data)
 		const status = mallAgreementStatus(contract?.CONTRACT_STATUS)
 		const hasSubscription = Boolean(contract) && !['Pending', 'Onboarding'].includes(status)
-		const applicationResult = contract
-			? await supabase.from('application').select('application_id, application_status').eq(dbColumn('MALL_ID'), mallId).order(dbColumn('APPLICATION_VERSION'), { ascending: false }).limit(1).maybeSingle()
-			: { data: null, error: null }
+		const applicationResult = await supabase.from('application').select('application_id, application_status, application_version, application_attempt').eq(dbColumn('MALL_ID'), mallId).order('application_version', { ascending: false }).order('application_attempt', { ascending: false }).order('application_id', { ascending: false }).limit(1).maybeSingle()
 		const application = upperKeys(applicationResult.data)
-		const arDevelopmentResult = application?.APPLICATION_ID
-			? await supabase.from('ar_development').select('ar_development_status, ar_development_version').eq('application_id', application.APPLICATION_ID).order('ar_development_version', { ascending: false }).limit(1).maybeSingle()
-			: { data: null, error: null }
+		const arDevelopmentResult = await supabase.from('ar_development')
+			.select('ar_development_id, ar_development_status, ar_development_version, application!inner(mall_id)')
+			.eq('application.mall_id', mallId)
+			.order('ar_development_version', { ascending: false }).order('ar_development_id', { ascending: false }).limit(1).maybeSingle()
 		const arDevelopment = upperKeys(arDevelopmentResult.data)
 		const floorIds = floors.map(floor => floor.FLOOR_ID)
 		const beaconRows = upperKeys(beaconResult.data || [])
@@ -191,9 +193,14 @@ function createMallService(supabase) {
 			longitude: mall.MALL_LONGITUDE,
 			description: mall.MALL_DESCRIPTION,
 			majorBeacons: mall.MALL_BEACON_MAJOR,
-			floors: mall.MALL_FLOOR_COUNT,
+			floors: mall.MALL_FLOOR_COUNT || quoteFloors.length,
+			storeCount: capacity.storeCount ?? mall.QUOTED_STORE_COUNT ?? null,
+			tenantCount: capacity.tenantCount ?? mall.QUOTED_TENANT_COUNT ?? null,
+			storeCapacity: capacity.totalCapacity ?? null,
+			onboardingQuoteId: capacity.quoteId ?? null,
+			approvedExtraStalls: capacity.approvedExtraStalls || 0,
 			initialPreferredTier: mall.INITIAL_TIER_KEY ? mall.INITIAL_TIER_KEY[0].toUpperCase() + mall.INITIAL_TIER_KEY.slice(1) : '',
-			floorDetails: floors.map(floor => ({ id: floor.FLOOR_ID, floorNo: String(floor.FLOOR_NUM), label: floor.FLOOR_LABEL, floorAreaSqm: floor.FLOOR_AREA_SQM == null ? '' : String(floor.FLOOR_AREA_SQM) })),
+			floorDetails: floors.length?floors.map(floor => ({ id: floor.FLOOR_ID, floorNo: String(floor.FLOOR_NUM), label: floor.FLOOR_LABEL, floorAreaSqm: String(floor.FLOOR_AREA_SQM ?? quoteFloors.find(f=>Number(f.floorNum)===Number(floor.FLOOR_NUM))?.areaSqm ?? '') })):quoteFloors.map((floor,index)=>({floorNo:String(floor.floorNum??index+1),label:`Floor ${floor.floorNum??index+1}`,floorAreaSqm:String(floor.areaSqm??'')})),
 			operatingHours: hours.reduce((groups, hour) => {
 				const existing = groups.find(group => group.open === hour.OPTHRS_OPEN_TIME && group.close === hour.OPTHRS_CLOSE_TIME && group.closed === hour.OPTHRS_IS_CLOSED)
 				if (existing) existing.days.push(hour.OPTHRS_DAY_OF_WEEK)
@@ -202,9 +209,12 @@ function createMallService(supabase) {
 			}, []),
 			agreementStatus: status,
 			tier,
-			application: contract ? displayStatus(application?.APPLICATION_STATUS) : '-',
-			arDevelopment: contract ? displayStatus(arDevelopment?.AR_DEVELOPMENT_STATUS) : '-',
+			application: displayStatus(application?.APPLICATION_STATUS),
+			applicationVersion: application?.APPLICATION_VERSION ?? null,
+			arDevelopment: displayStatus(arDevelopment?.AR_DEVELOPMENT_STATUS),
+			arDevelopmentVersion: arDevelopment?.AR_DEVELOPMENT_VERSION ?? null,
 			dateAdded: formatDate(mall.MALL_CREATED_AT),
+			createdAt: mall.MALL_CREATED_AT,
 			lastUpdated: formatDate(mall.MALL_UPDATED_AT),
 			note: ['Grace Period', 'Suspended'].includes(status) && overdueDays > 0 ? `${overdueDays} days overdue` : null,
 			units: units.map(unit => {
@@ -217,7 +227,6 @@ function createMallService(supabase) {
 			beacons: beaconRows.map(beacon => {
 				const floor = floors.find(item => item.FLOOR_ID === beacon.FLOOR_ID)
 				const beaconTickets = ticketRows.filter(ticket => ticket.BEACON_ID === beacon.BEACON_ID)
-				const hasOnlyResolvedTickets = beaconTickets.length > 0 && beaconTickets.every(ticket => ticket.TICKET_CURRENT_STATUS === 'resolved')
 				const history = batteries.filter(battery => battery.BEACON_ID === beacon.BEACON_ID).map(battery => ({
 					id: battery.BATTERY_ID,
 					batteryId: battery.BATTERY_CODE,
@@ -238,11 +247,7 @@ function createMallService(supabase) {
 					minor: beacon.BEACON_MINOR,
 					txPower: beacon.BEACON_TX_POWER,
 					numNodes: beaconContext.assignments.filter(item => item.beacon_id === beacon.BEACON_ID).length,
-					status: beacon.BEACON_STATUS?.toLowerCase() === 'deactivated'
-						? 'deactivated'
-						: hasOnlyResolvedTickets
-							? 'placed'
-							: beacon.BEACON_STATUS?.toLowerCase() || 'placed',
+					status: beacon.BEACON_STATUS?.toLowerCase() || 'placed',
 					dateInstalled: beacon.BEACON_INSTALLED_AT?.slice(0, 10),
 					lastMaintenanceDate: beacon.BEACON_MAINTAINED_AT?.slice(0, 10),
 					batteryHistory: history,
@@ -283,6 +288,13 @@ function createMallService(supabase) {
 		if (!Number.isInteger(requestedFloorCount) || requestedFloorCount < 1 || requestedFloors.length !== requestedFloorCount) {
 			return reply.code(400).send({ message: 'The floor count must match the configured floor details.' })
 		}
+		if(requestedFloors.some(f=>!Number.isFinite(Number(f.floorAreaSqm))||Number(f.floorAreaSqm)<=0))return reply.code(400).send({message:'Each floor must have an area greater than zero.'})
+		const capacityState=mallId?await supabase.rpc('mall_capacity_state',{p_mall:Number(mallId)}):{data:null}
+		if(capacityState.error)throw capacityState.error
+		const configuredStores=Number(payload.storeCount??capacityState.data?.storeCount),configuredTenants=Number(payload.tenantCount??capacityState.data?.tenantCount)
+		if(!Number.isSafeInteger(configuredStores)||configuredStores<1||!Number.isSafeInteger(configuredTenants)||configuredTenants<0||configuredTenants>configuredStores)return reply.code(400).send({message:'Enter a positive store count and a tenant count from zero to the store count.'})
+		if(capacityState.data?.quoteId&&(configuredStores!==capacityState.data.storeCount||configuredTenants!==capacityState.data.tenantCount))return reply.code(409).send({message:'Store and tenant counts are defined by the linked onboarding quote. Request an approved expansion to increase capacity.'})
+		if(mallId){const used=await supabase.from('store').select('store_id',{count:'exact',head:true}).eq('mall_id',mallId).or('store_status.neq.inactive,store_status.is.null');if(used.error)throw used.error;if(used.count>configuredStores+Number(capacityState.data?.approvedExtraStalls||0))return reply.code(409).send({message:'The store capacity cannot be lower than the current total of active stores and stalls.'})}
 		const mallData = {
 			MALL_NAME: payload.name,
 			MALL_STATE: payload.province,
@@ -293,6 +305,8 @@ function createMallService(supabase) {
 			MALL_LATITUDE: payload.latitude == null ? null : Number(payload.latitude),
 			MALL_LONGITUDE: payload.longitude == null ? null : Number(payload.longitude),
 			MALL_FLOOR_COUNT: requestedFloorCount,
+			QUOTED_STORE_COUNT: configuredStores,
+			QUOTED_TENANT_COUNT: configuredTenants,
 			MALL_DESCRIPTION: payload.description || null,
 			MALL_BEACON_MAJOR: Number(payload.majorBeacons),
 			MALL_UPDATED_AT: timestamp,
@@ -451,6 +465,10 @@ async function registerMallManagementRoutes(app) {
 			if (existingResult.error) throw existingResult.error
 			const existingRows = upperKeys(existingResult.data || [])
 			const existingIds = new Set(existingRows.map(store => String(store.STORE_ID)))
+			const submittedIds=new Set(payload.filter(s=>s.id!=null).map(s=>String(s.id)))
+			const currentActive=existingRows.filter(s=>String(s.STORE_STATUS).toLowerCase()!=='inactive').length
+			const nextActive=payload.filter(s=>s.active!==false).length+existingRows.filter(s=>String(s.STORE_STATUS).toLowerCase()!=='inactive'&&!submittedIds.has(String(s.STORE_ID))).length
+			if(nextActive>currentActive&&(mall.storeCapacity==null||nextActive>mall.storeCapacity))return reply.code(409).send({message:mall.storeCapacity==null?'Set the mall onboarding store capacity before adding stores or stalls.':`Store capacity reached (${mall.storeCapacity} total stores and stalls). Deactivate an existing establishment or approve additional capacity first.`})
 			const validUnitByLabel = new Map((mall.units || []).map(unit => [String(unit.unitNo), unit]))
 			const timestamp = now()
 			const savedIds = []
@@ -512,7 +530,7 @@ async function registerMallManagementRoutes(app) {
 		} catch (error) {
 			request.log.error(error, 'Could not save stores')
 			request.log.error({ code: error.code }, 'Could not save stores')
-			return reply.code(400).send({ message: 'Unable to save stores.' })
+			return reply.code(400).send({ message: error.code==='P0001'&&/capacity/i.test(error.message)?error.message:'Unable to save stores.' })
 		}
 	}
 
@@ -528,7 +546,7 @@ async function registerMallManagementRoutes(app) {
 	app.put('/api/malls/:id/stores', (request, reply) => saveStoresForMall(request, reply))
 
 	app.get('/api/malls', async (request, reply) => {
-		const { data, error } = await app.supabase.from('mall').select(dbColumn('MALL_ID')).order(dbColumn('MALL_NAME'))
+		const { data, error } = await app.supabase.from('mall').select(dbColumn('MALL_ID')).order('mall_created_at', {ascending:false}).order('mall_id',{ascending:false})
 		if (error) { request.log.error({ code: error.code }, 'Could not list malls'); return reply.code(500).send({ message: 'Unable to load malls.' }) }
 		try {
 			return await Promise.all(data.map(mall => service.getMall(upperKeys(mall).MALL_ID)))
@@ -769,9 +787,9 @@ async function registerMallManagementRoutes(app) {
 		try {
 			const beacon = await app.supabase.from('beacon').select('beacon_id, beacon_code, mall_id').eq('beacon_id', request.params.beaconId).eq('mall_id', request.params.id).single()
 			if (beacon.error) throw beacon.error
-			const { issue, description, status = 'faulty' } = request.body || {}
+			const { issue, description } = request.body || {}
 			if (!issue?.trim() || !description?.trim()) return reply.code(400).send({ message: 'Issue and description are required.' })
-			const ticketStatus = status === 'pending' ? 'pending' : 'faulty'
+			const ticketStatus = 'faulty'
 			const created = await app.supabase.from('beacon_ticket').insert({
 				ticket_current_status: ticketStatus,
 				ticket_reported_at: now(),
@@ -781,7 +799,7 @@ async function registerMallManagementRoutes(app) {
 				ticket_issue: issue.trim(),
 			}).select('ticket_id').single()
 			if (created.error) throw created.error
-			await addTicketLog(created.data.ticket_id, ticketStatus === 'pending' ? 'Marked as pending' : 'Marked as faulty', description.trim(), request.admin.id)
+			await addTicketLog(created.data.ticket_id, 'Marked as Faulty', description.trim(), request.admin.id)
 			await notifyMallAdminsOfTicket({
 				mallId: beacon.data.mall_id,
 				ticketId: created.data.ticket_id,
@@ -899,7 +917,7 @@ async function registerMallManagementRoutes(app) {
 			const ticketsResult = await app.supabase.from('beacon_ticket').select('*').order('ticket_reported_at', { ascending: false })
 			if (ticketsResult.error) throw ticketsResult.error
 			const tickets = upperKeys(ticketsResult.data || [])
-			const beaconIds = [...new Set(tickets.map(ticket => ticket.BEACON_ID))]
+			const beaconIds = [...new Set(tickets.map(ticket => ticket.BEACON_ID).filter(id=>id!=null))]
 			const [beaconsResult, adminsResult] = await Promise.all([
 				beaconIds.length ? app.supabase.from('beacon').select('beacon_id, beacon_code, beacon_location, mall_id, floor_id').in('beacon_id', beaconIds) : { data: [], error: null },
 				app.supabase.from('admin').select('admin_id, admin_full_name'),
@@ -907,8 +925,8 @@ async function registerMallManagementRoutes(app) {
 			if (beaconsResult.error || adminsResult.error) throw beaconsResult.error || adminsResult.error
 			const beacons = upperKeys(beaconsResult.data || [])
 			const admins = upperKeys(adminsResult.data || [])
-			const mallIds = [...new Set(beacons.map(beacon => beacon.MALL_ID))]
-			const floorIds = [...new Set(beacons.map(beacon => beacon.FLOOR_ID))]
+			const mallIds = [...new Set([...beacons.map(beacon => beacon.MALL_ID),...tickets.map(ticket=>ticket.MALL_ID)].filter(id=>id!=null))]
+			const floorIds = [...new Set(beacons.map(beacon => beacon.FLOOR_ID).filter(id=>id!=null))]
 			const [mallsResult, floorsResult, logsResult] = await Promise.all([
 				mallIds.length ? app.supabase.from('mall').select('mall_id, mall_name').in('mall_id', mallIds) : { data: [], error: null },
 				floorIds.length ? app.supabase.from('floor').select('floor_id, floor_num, floor_label').in('floor_id', floorIds) : { data: [], error: null },
@@ -922,13 +940,13 @@ async function registerMallManagementRoutes(app) {
 			return tickets.map(ticket => {
 				const beacon = beacons.find(item => item.BEACON_ID === ticket.BEACON_ID) || {}
 				const floor = floors.find(item => item.FLOOR_ID === beacon.FLOOR_ID) || {}
-				const mall = malls.find(item => item.MALL_ID === beacon.MALL_ID) || {}
+				const mall = malls.find(item => item.MALL_ID === (beacon.MALL_ID??ticket.MALL_ID)) || {}
 				return {
 					id: ticket.TICKET_ID,
 					ticketId: `TKT-${String(ticket.TICKET_ID).padStart(4, '0')}`,
-					beaconCode: beacon.BEACON_CODE,
-					mall: mall.MALL_NAME,
-					floor: floor.FLOOR_LABEL || `Floor ${floor.FLOOR_NUM || ''}`,
+					beaconCode: beacon.BEACON_CODE || 'Not assigned',
+					mall: mall.MALL_NAME || 'Unknown mall',
+					floor: floor.FLOOR_LABEL || (floor.FLOOR_NUM!=null?`Floor ${floor.FLOOR_NUM}`:'Not assigned'),
 					location: beacon.BEACON_LOCATION,
 					status: ticket.TICKET_CURRENT_STATUS?.toLowerCase() || 'faulty',
 					reason: ticket.TICKET_ISSUE || '',
@@ -956,9 +974,9 @@ async function registerMallManagementRoutes(app) {
 			const { status, note, assignedTo } = request.body || {}
 			const allowed = ['faulty', 'investigating', 'maintenance', 'resolved']
 			if (!allowed.includes(status)) return reply.code(400).send({ message: 'Invalid ticket status.' })
-			const ticket = await app.supabase.from('beacon_ticket').select('ticket_id, beacon_id, ticket_current_status, ticket_issue').eq('ticket_id', request.params.ticketId).single()
+			const ticket = await app.supabase.from('beacon_ticket').select('ticket_id, beacon_id, mall_id, ticket_current_status, ticket_issue').eq('ticket_id', request.params.ticketId).single()
 			if (ticket.error) throw ticket.error
-			const beacon = await app.supabase.from('beacon').select('beacon_id, beacon_code, mall_id').eq('beacon_id', ticket.data.beacon_id).single()
+			const beacon = ticket.data.beacon_id!=null?await app.supabase.from('beacon').select('beacon_id, beacon_code, mall_id').eq('beacon_id', ticket.data.beacon_id).single():{data:{mall_id:ticket.data.mall_id,beacon_code:'Service request'},error:null}
 			if (beacon.error) throw beacon.error
 			if (status === 'investigating' && !assignedTo) return reply.code(400).send({ message: 'Please select who to assign.' })
 			let assignedAdminId = null
@@ -971,7 +989,7 @@ async function registerMallManagementRoutes(app) {
 			if (status === 'investigating') updates.ticket_assigned_to = assignedAdminId
 			const updated = await app.supabase.from('beacon_ticket').update(updates).eq('ticket_id', request.params.ticketId)
 			if (updated.error) throw updated.error
-			const labels = { faulty: 'Marked as faulty', investigating: 'Marked as investigating', maintenance: 'Marked as under maintenance', resolved: 'Marked as resolved' }
+			const labels = { faulty: 'Marked as Faulty', investigating: 'Marked as Investigating', maintenance: 'Marked as Under Maintenance', resolved: 'Marked as Resolved' }
 			await addTicketLog(request.params.ticketId, labels[status], note, request.admin.id)
 			await notifyMallAdminsOfTicket({
 				mallId: beacon.data.mall_id,
@@ -982,8 +1000,8 @@ async function registerMallManagementRoutes(app) {
 				actorId: request.admin.id,
 				actorRole: request.admin.role,
 			})
-			if (status === 'faulty' || status === 'resolved') {
-				const updatedBeacon = await app.supabase.from('beacon').update({ beacon_status: status === 'resolved' ? 'placed' : 'faulty' }).eq('beacon_id', ticket.data.beacon_id)
+			if (ticket.data.beacon_id!=null&&['faulty','maintenance','resolved'].includes(status)) {
+				const updatedBeacon = await app.supabase.from('beacon').update({ beacon_status: status === 'resolved' ? 'placed' : status==='maintenance'?'maintenance':'faulty' }).eq('beacon_id', ticket.data.beacon_id)
 				if (updatedBeacon.error) throw updatedBeacon.error
 			}
 			await recordAudit(app.supabase, request, { module: 'mall_management', action: 'beacon_ticket_status_changed', mallId: beacon.data.mall_id, targetType: 'beacon_ticket', targetId: ticket.data.ticket_id, targetName: beacon.data.beacon_code, details: `Beacon ticket changed from ${ticket.data.ticket_current_status} to ${status}.${note ? ` ${note}` : ''}`, metadata: { beaconId: ticket.data.beacon_id, from: ticket.data.ticket_current_status, to: status, assignedTo: assignedAdminId } })

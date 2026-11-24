@@ -76,6 +76,7 @@ app.register(async protectedApp => {
 	registerNodeMapRoutes(protectedApp)
 	registerAuditLogRoutes(protectedApp)
 	registerSystemSettingsRoutes(protectedApp)
+	require('./modules/analytics/routes')(protectedApp)
 	require('./modules/subscriptions/routes').registerAdmin(protectedApp)
  require('./modules/stallApplications/routes')(protectedApp)
  require('./modules/mapApplications/routes')(protectedApp)

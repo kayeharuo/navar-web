@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
 import BusyButton from '../ui/BusyButton'
+import ActionResultModal from '../ui/ActionResultModal'
 
 function getMallCodePrefix(name) {
   const words = String(name || 'MALL').toUpperCase().match(/[A-Z0-9]+/g) || ['MALL']
@@ -17,6 +18,7 @@ function getNextGeneratedCode(rows, field, prefix, suffix) {
 }
 
 export default function AddBeaconModal({ mall, initialData = null, onClose, onSave, isEdit = false, editorMode = false }) {
+  const [validationResult,setValidationResult]=useState(null)
   const arVersions = mall.arVersions || []
   const initialNodeConfig = initialData?.nodeConfig || []
   const codePrefix = getMallCodePrefix(mall.name)
@@ -84,7 +86,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
       window.clearTimeout(shakeTimer.current)
       window.requestAnimationFrame(() => setShakeFields(true))
       shakeTimer.current = window.setTimeout(() => setShakeFields(false), 500)
-      window.alert('Please fill in all required fields before saving.')
+      setValidationResult({success:false,title:'Complete the required fields',message:'Please check the highlighted beacon fields before saving.'})
       return
     }
     const numNodes = nodeConfig.length
@@ -127,6 +129,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
   return (
     <>
       <div className="modal-overlay" onClick={onClose} />
+      {validationResult&&<ActionResultModal result={validationResult} onClose={()=>setValidationResult(null)}/>}
       <div className="mall-modal" role="dialog" aria-modal="true">
         <div className="mall-modal-header">
           <div><h2 className="mall-modal-title">{editorMode ? isEdit ? 'Edit map beacon' : 'Add map beacon' : isEdit ? 'Edit Beacon' : 'Add Beacon'}</h2>
@@ -286,7 +289,7 @@ export default function AddBeaconModal({ mall, initialData = null, onClose, onSa
               {arVersions.map(version => {
                 const versionNodes = (mall.nodes || []).filter(node => node.versionId === version.id)
                 const selectedNodeId = nodeConfig.find(item => item.versionId === version.id)?.nodeId
-                const assignedNodeIds = new Set((mall.beacons || []).filter(beacon => String(beacon.id) !== String(initialData?.id)).flatMap(beacon => (beacon.nodeConfig || []).filter(item => item.versionId === version.id).map(item => item.nodeId)))
+                const assignedNodeIds = new Set((mall.beacons || []).filter(beacon => String(beacon.id) !== String(initialData?.id)&&!['deactivated','inactive','retired'].includes(beacon.status)).flatMap(beacon => (beacon.nodeConfig || []).filter(item => item.versionId === version.id).map(item => item.nodeId)))
                 const floorNo = nodeFloors[version.id] || ''
                 const selectedFloor = floors.find(floor => String(floor.floorNo) === String(floorNo))
                 const availableNodes = versionNodes.filter(node => String(node.floorId) === String(selectedFloor?.id) && (!assignedNodeIds.has(node.nodeId) || node.nodeId === selectedNodeId))

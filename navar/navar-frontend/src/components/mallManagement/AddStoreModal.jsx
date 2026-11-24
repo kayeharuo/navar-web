@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Pencil, ImageIcon } from 'lucide-react'
 import AuthImage from '../ui/AuthImage'
 import BusyButton from '../ui/BusyButton'
+import ActionResultModal from '../ui/ActionResultModal'
 
 const CATEGORIES = [
   'Fashion & Apparel',
@@ -147,6 +148,7 @@ export default function AddStoreModal({
   requireUnitAssignment = false,
 }) {
   const isOthers = brand?.isOthers
+  const [validationResult,setValidationResult]=useState(null)
 
   const [form, setForm] = useState({
     storeName:     initialData?.storeName     || '',
@@ -244,7 +246,7 @@ export default function AddStoreModal({
 
   function handleSave() {
     const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (Object.keys(errs).length > 0) { setErrors(errs);setValidationResult({success:false,title:'Complete the required fields',message:'Please check the highlighted store fields before saving.'}); return }
     return onSave({
       storeName:     form.storeName.trim(),
       storeType:     form.storeType,
@@ -269,6 +271,7 @@ export default function AddStoreModal({
   return (
     <>
       <div className="add-store-overlay" onClick={onClose} />
+      {validationResult&&<ActionResultModal result={validationResult} onClose={()=>setValidationResult(null)}/>}
       <div className="add-store-modal" role="dialog" aria-modal="true">
         <div className="mall-modal-header">
           <h2 className="mall-modal-title">{isEdit ? 'Edit Store' : 'Add Store'}</h2>

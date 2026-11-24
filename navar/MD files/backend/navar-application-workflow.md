@@ -39,7 +39,7 @@ Verified against `subscription_tier` on 23 November 2026. System Settings and se
 |---|---|---|---|
 | Annual subscription | PHP 25,000 | PHP 33,000 | PHP 47,000 |
 | Grace period | 15 days | 30 days | 45 days |
-| Map update charge per changed floor | PHP 28,000 | PHP 25,000 | PHP 25,000 after included allowance |
+| Map update charge per changed floor | 50% of original onboarding cost per floor | 40% of original onboarding cost per floor | 30% of original onboarding cost per floor after included allowance |
 | Included map updates | None | None | First update per contract year, up to one floor |
 | Additional stall | PHP 1,100 | PHP 1,000 | First 10 per contract year included, then PHP 1,000 |
 
