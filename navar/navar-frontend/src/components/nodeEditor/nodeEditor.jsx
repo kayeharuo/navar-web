@@ -2,6 +2,8 @@ import { prepareDraft } from "./prepareDraft";
 import { apiRequest } from "../../config/api";
 import { EditorBeacons } from './components/EditorBeacons';
 import { MapSnapshots } from './components/MapSnapshots';
+import { ExportFloors } from './components/ExportFloors';
+import { copySelection, pasteSelection } from './mapSelection';
 import { LoaderCircle } from 'lucide-react';
 import { planNodeDeletion, findBeaconAssignmentChanges, getBeaconAssignmentIssues } from './beaconChanges';
 import { notifyMallBeaconsUpdated } from '../../utils/mallDataEvents';
@@ -227,6 +229,10 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
     const [calibPts, setCalibPts] = useState([]);
     const [calibModal, setCalibModal] = useState(false);
     const [showData, setShowData] = useState(false);
+    const [exportOpen,setExportOpen]=useState(false);
+    const [planOpacity,setPlanOpacity]=useState(1);
+    const [planContrast,setPlanContrast]=useState(0);
+    const [showGrid,setShowGrid]=useState(true);
     const [toast, setToast] = useState(null);
     // ── Node mode state ──
     const [selectedId, setSelectedId] = useState(null);
@@ -235,6 +241,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
     const [clipboard, setClipboard] = useState(null);
     const pasteCount = useRef(0);
     const [selectedEdgeId, setSelEdgeId] = useState(null);
+    const [selectedEdgeIds,setSelectedEdgeIds]=useState([]);
     const [calibrationSelected, setCalibrationSelected] = useState(false);
     const [calibrationEdits, setCalibrationEdits] = useState(null);
     const [calibrationEditsDirty, setCalibrationEditsDirty] = useState(false);
@@ -493,7 +500,6 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         await persist(true, confirmed === true);
     };
     // ── Push helpers ──
-    const pushNodes = (n) => push({ nodes: n, edges, calibration });
     const pushEdges = (e) => push({ nodes, edges: e, calibration });
     const pushAll = (n, e, c) => push({ nodes: n, edges: e, calibration: c });
     // ── Undo / Redo ──
@@ -536,6 +542,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         }
         setSelId(null);
         setSelEdgeId(null);
+        setSelectedEdgeIds([]);
         setCalibrationSelected(false);
     };
     // ── Node handlers ──
@@ -552,8 +559,9 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         showToast(`${NODE_TYPES[data.type]?.label} placed.`);
     };
     const handleNodeClick = (node, additive = false) => {
+        if(!additive)setSelectedEdgeIds([]);
         setCalibrationSelected(false);
-        if (edMode === "select" && additive) {
+        if (["select", "box-select"].includes(edMode) && additive) {
             const next = selectedIds.includes(node.id) ? selectedIds.filter(id => id !== node.id) : [...selectedIds, node.id];
             setSelectedIds(next);
             setSelectedId(next.includes(node.id) ? node.id : next.at(-1) || null);
@@ -595,11 +603,20 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             setSelEdgeId(null);
         }
     };
-    const handleEdgeClick = (edgeId) => { if (edMode === "select") {
+    const handleEdgeClick = (edgeId, additive = false) => { if (["select", "box-select"].includes(edMode)) {
         setCalibrationSelected(false);
-        setSelEdgeId(edgeId);
-        setSelId(null);
+        const next=additive?(selectedEdgeIds.includes(edgeId)?selectedEdgeIds.filter(id=>id!==edgeId):[...selectedEdgeIds,edgeId]):[edgeId];
+        setSelEdgeId(next.at(-1)||null);
+        setSelectedEdgeIds(next);
+        if(!additive)setSelId(null);
     } };
+    const selectRectangle = (nodeIds,edgeIds,additive) => {
+        setCalibrationSelected(false);
+        const next=additive?[...new Set([...selectedIds,...nodeIds])]:nodeIds;
+        setSelectedIds(next);setSelectedId(next.at(-1)||null);
+        setSelectedEdgeIds(current=>additive?[...new Set([...current,...edgeIds])]:edgeIds);
+        setSelEdgeId(null);
+    };
     const translatedNodes = (id, x, y, base = nodes) => {
         const source = (base[floor] || []).find(n => n.id === id);
         if (!source) return base;
@@ -679,26 +696,38 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         showToast(`Calibration properties saved. Scale is now ${next.pxPerMeter.toFixed(2)} px/m.`);
     };
     const copyNodes = () => {
-        const copied = canvasFloorNodes.filter(n => selectedIds.includes(n.id)).map(n => ({ ...n }));
-        if (!copied.length) return;
+        const copied = copySelection(canvasFloorNodes,floorEdges,selectedIds,selectedEdgeIds.length?selectedEdgeIds:selectedEdgeId?[selectedEdgeId]:[],floor);
+        if (!copied.nodes.length) {
+            setClipboard(null);
+            showToast('Nothing selected. Select at least one node or edge to copy.', C.orange);
+            return;
+        }
         setClipboard(copied);
         pasteCount.current = 0;
-        showToast(`${copied.length} node(s) copied.`);
+        showToast(`${copied.nodes.length} node(s) and ${copied.edges.length} edge(s) copied. Switch floors to paste there.`);
     };
     const pasteNodes = (point) => {
-        if (isLocked || !clipboard?.length || floorImage.status !== "ready") return;
+        if (isLocked) return;
+        if (!Array.isArray(clipboard?.nodes) || !clipboard.nodes.length) {
+            showToast('Nothing to paste. Copy at least one node or edge first.', C.orange);
+            return;
+        }
+        if (floorImage.status !== "ready") return;
         const offset = ++pasteCount.current * 20;
-        const minX = Math.min(...clipboard.map(n => n.x)), minY = Math.min(...clipboard.map(n => n.y));
-        const maxX = Math.max(...clipboard.map(n => n.x)), maxY = Math.max(...clipboard.map(n => n.y));
-        const dx = Math.max(-minX, Math.min(point ? point.x - minX : offset, floorImage.image.naturalWidth - maxX));
-        const dy = Math.max(-minY, Math.min(point ? point.y - minY : offset, floorImage.image.naturalHeight - maxY));
-        const copies = clipboard.map(n => ({ ...n, id: uid("n"), dbId: null, floor, x: n.x + dx, y: n.y + dy, cross_floor_link: null }));
-        pushNodes({ ...nodes, [floor]: [...floorNodes, ...copies] });
+        let pasted;
+        try{pasted=pasteSelection(clipboard,{floor,width:floorImage.image.naturalWidth,height:floorImage.image.naturalHeight,existingNodes:floorNodes,offset,point,id:uid});}catch(error){showToast(error.message,C.red);return;}
+        const copies=pasted.nodes;
+        if (!copies.length) {
+            showToast('Nothing to paste. Select and copy nodes or edges first.', C.orange);
+            return;
+        }
+        push({...snapshot,nodes:{...nodes,[floor]:[...floorNodes,...copies]},edges:{...edges,[floor]:[...(edges[floor]||[]),...pasted.edges]}});
         setSelectedIds(copies.map(n => n.id));
         setSelectedId(copies[0].id);
         setSelEdgeId(null);
+        setSelectedEdgeIds(pasted.edges.map(e=>e.id));
         setEdMode("select");
-        showToast(`${copies.length} node(s) pasted.`);
+        showToast(`${copies.length} node(s) and ${pasted.edges.length} edge(s) pasted.${pasted.needsStoreLinks?' Reassign copied store/stall links on this floor before saving.':''}`);
     };
     const deleteNode = useCallback(() => {
         if (!selectedId || isLocked || saving) return;
@@ -713,8 +742,8 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             const tag = e.target?.tagName;
             const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
             const ctrl = e.ctrlKey || e.metaKey;
-            if (inInput || e.target?.isContentEditable || placeModal || calibModal || confirmAction || showData || saveProblems || transitionIssues || beaconPanel || snapshotPanel || beaconRemovalWarning || nodeDeleteWarning || matchingSnapshot || saving) return;
-            if (ctrl && e.key.toLowerCase() === "c") { if (selectedIds.length) { e.preventDefault(); copyNodes(); } return; }
+            if (inInput || e.target?.isContentEditable || exportOpen || placeModal || calibModal || confirmAction || showData || saveProblems || transitionIssues || beaconPanel || snapshotPanel || beaconRemovalWarning || nodeDeleteWarning || matchingSnapshot || saving) return;
+            if (ctrl && e.key.toLowerCase() === "c") { if (selectedIds.length||selectedEdgeIds.length||selectedEdgeId) { e.preventDefault(); copyNodes(); } return; }
             if (ctrl && e.key.toLowerCase() === "v") { if (!isLocked && clipboard) { e.preventDefault(); pasteNodes(); } return; }
             if (ctrl) {
                 if (e.key === "z" && !e.shiftKey) {
@@ -745,7 +774,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [handleUndo, handleRedo, handleSaveDraft, isLocked, selectedId, selectedEdgeId, nodes, edges, calibration, floor, push, pushEdges, selectedIds, clipboard, copyNodes, pasteNodes, placeModal, calibModal, confirmAction, showData, saveProblems, transitionIssues, beaconPanel, snapshotPanel, beaconRemovalWarning, nodeDeleteWarning, matchingSnapshot, deleteNode, saving, showToast]);
+    }, [handleUndo, handleRedo, handleSaveDraft, isLocked, selectedId, selectedEdgeId, nodes, edges, calibration, floor, push, pushEdges, selectedIds, selectedEdgeIds.length, clipboard, copyNodes, pasteNodes, placeModal, calibModal, confirmAction, showData, exportOpen, saveProblems, transitionIssues, beaconPanel, snapshotPanel, beaconRemovalWarning, nodeDeleteWarning, matchingSnapshot, deleteNode, saving, showToast]);
     const handleCalibConfirm = (data) => {
         // Keep the two clicked points: they are what makes the scale reproducible and auditable.
         const next = { ...data, refStart: calibPts[0], refEnd: calibPts[1] };
@@ -825,6 +854,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
     };
     const nodeTools = [
         { id: "select", icon: "↖", l: "Select & Move", lockedOk: true },
+        { id: "box-select", icon: "▧", l: "Box Select", lockedOk: true },
         { id: "place", icon: "+", l: "Place Node", lockedOk: false },
         { id: "connect", icon: "↔", l: "Connect Nodes", lockedOk: false },
         { id: "calibrate", icon: "📏", l: "Set Scale", lockedOk: false, warn: !floorCalib },
@@ -884,6 +914,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
 
         {/* Action buttons */}
         <IconBtn onClick={openSnapshots} title="Manage snapshots (Ctrl+S)" disabled={saving || snapshotBusy}>Snapshots</IconBtn>
+        <IconBtn onClick={()=>setExportOpen(true)} disabled={saving || snapshotBusy}>Export floors</IconBtn>
         <IconBtn onClick={() => setBeaconPanel(true)} disabled={saving || snapshotBusy}>Beacons ({snapshot.beacons?.length || 0})</IconBtn>
         <div style={{ display: "flex", alignItems: "center", gap: 6, borderLeft: `1px solid ${C.border}`, paddingLeft: 10 }}>
           {savedAt && <span style={{ fontSize: 9, color: C.muted, fontFamily: M }}>Applied {savedAt.toLocaleTimeString()}</span>}
@@ -995,7 +1026,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
             {FLOORS.map(f => {
             const cal = calibration[f];
             const count = (liveNodes[f] || []).length;
-            return (<button key={f} onClick={() => { setFloor(f); setSelId(null); setSelEdgeId(null); setConnFrom(null); setCalibPts([]); }} style={{ padding: "10px 16px", border: "none", borderBottom: `2.5px solid ${floor === f ? C.blue : "transparent"}`, background: "transparent", fontSize: 12, fontWeight: floor === f ? 700 : 500, color: floor === f ? C.blue : "#64748B", cursor: "pointer", fontFamily: F, display: "flex", alignItems: "center", gap: 6 }}>
+            return (<button key={f} onClick={() => { setFloor(f); setSelId(null); setSelEdgeId(null); setSelectedEdgeIds([]); setConnFrom(null); setCalibPts([]); }} style={{ padding: "10px 16px", border: "none", borderBottom: `2.5px solid ${floor === f ? C.blue : "transparent"}`, background: "transparent", fontSize: 12, fontWeight: floor === f ? 700 : 500, color: floor === f ? C.blue : "#64748B", cursor: "pointer", fontFamily: F, display: "flex", alignItems: "center", gap: 6 }}>
                   {f}
                   <span style={{ fontSize: 10, fontFamily: M, color: floor === f ? C.blue : "#94A3B8", background: floor === f ? C.blueL : "#F1F5F9", padding: "1px 7px", borderRadius: 8 }}>
                     {count}
@@ -1005,9 +1036,18 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
         })}
           </div>
 
+          <div className="ne-map-toolbar">
+            <label>Floor-plan opacity <input aria-label="Floor-plan opacity" type="range" min="0" max="100" value={Math.round(planOpacity*100)} onChange={e=>setPlanOpacity(Number(e.target.value)/100)}/><CoordinateInput aria-label="Floor-plan opacity value" type="number" min="0" max="100" step="1" value={Math.round(planOpacity*100)} onChange={value=>setPlanOpacity(Math.max(0,Math.min(100,Math.round(value)))/100)}/>%</label>
+            <label title="Negative softens the plan; zero is unchanged; positive makes its lines stronger.">Contrast <input aria-label="Floor-plan contrast" type="range" min="-100" max="100" list="ne-contrast-stops" value={planContrast} onChange={e=>setPlanContrast(Number(e.target.value))}/><CoordinateInput aria-label="Floor-plan contrast value" type="number" min="-100" max="100" step="1" value={planContrast} onChange={value=>setPlanContrast(Math.max(-100,Math.min(100,Math.round(value))))}/></label>
+            <datalist id="ne-contrast-stops"><option value="-100" label="-100"/><option value="0" label="0"/><option value="100" label="+100"/></datalist>
+            <label><input aria-label="Show X/Y grid" type="checkbox" checked={showGrid} onChange={e=>setShowGrid(e.target.checked)}/>X/Y grid</label>
+            <button onClick={copyNodes} disabled={!selectedIds.length&&!selectedEdgeIds.length&&!selectedEdgeId}>Copy selection</button>
+            <button onClick={()=>pasteNodes()} disabled={isLocked||!clipboard?.nodes?.length||floorImage.status!=='ready'}>Paste on {floor}</button>
+            <span>{selectedIds.length} nodes · {selectedEdgeIds.length} edges selected{clipboard?` · Copied from ${clipboard.sourceFloor}`:''}</span>
+          </div>
           {/* Canvas */}
           <div style={{ flex: 1, padding: 12, minHeight: 0 }}>
-            <NodeCanvas key={floor} nodes={canvasFloorNodes} edges={floorEdges} selectedIds={selectedIds} onCopy={copyNodes} onPaste={pasteNodes} canPaste={!!clipboard?.length} mode={isLocked && edMode !== "calibrate" ? "select" : edMode} editable={!isLocked} selectedId={selectedId} selectedEdgeId={selectedEdgeId} connectFrom={connectFrom} calibPts={calibPts} savedRef={activeFloorCalib} calibrationSelected={calibrationSelected} image={floorImage.image} imageStatus={floorImage.status} pxPerMeter={activeFloorCalib?.pxPerMeter} onCanvasClick={handleCanvasClick} onNodeClick={handleNodeClick} onNodeDrag={handleNodeDrag} onNodeDragEnd={handleNodeDragEnd} onNodeNudge={handleNodeNudge} onEdgeClick={handleEdgeClick} onCalibrationSelect={handleCalibrationSelect} onCalibrationDrag={handleCalibrationDrag} onCalibrationDragEnd={handleCalibrationDragEnd}/>
+            <NodeCanvas key={floor} nodes={canvasFloorNodes} edges={floorEdges} selectedIds={selectedIds} selectedEdgeIds={selectedEdgeIds} onSelection={selectRectangle} opacity={planOpacity} contrast={planContrast} showGrid={showGrid} floorLabel={`${mallName} · ${floor}`} onCopy={copyNodes} onPaste={pasteNodes} canPaste={!!clipboard?.nodes?.length} mode={isLocked && !["select", "box-select", "calibrate"].includes(edMode) ? "select" : edMode} editable={!isLocked} selectedId={selectedId} selectedEdgeId={selectedEdgeId} connectFrom={connectFrom} calibPts={calibPts} savedRef={activeFloorCalib} calibrationSelected={calibrationSelected} image={floorImage.image} imageStatus={floorImage.status} pxPerMeter={activeFloorCalib?.pxPerMeter} onCanvasClick={handleCanvasClick} onNodeClick={handleNodeClick} onNodeDrag={handleNodeDrag} onNodeDragEnd={handleNodeDragEnd} onNodeNudge={handleNodeNudge} onEdgeClick={handleEdgeClick} onCalibrationSelect={handleCalibrationSelect} onCalibrationDrag={handleCalibrationDrag} onCalibrationDragEnd={handleCalibrationDragEnd}/>
           </div>
 
           {/* Status bar */}
@@ -1239,6 +1279,7 @@ function NodeEditorWorkspace({ projectId, mallName, onBack, initial }) {
       {confirmAction === "change-group" && <ConfirmModal title="Change landing group?" body="Changing this landing's group or type replaces its floor connections with matching landings in the new group. Renaming a group preserves its connections." confirmLabel="Change group" confirmColor={C.red} onConfirm={() => handleSaveNodeEdits(true)} onCancel={() => setConfirmAction(null)} />}
 
       {/* ── SAVE RESULT: errors from the backend, or warnings about a saved map ── */}
+      {exportOpen && <ExportFloors floorMeta={floorMeta} currentFloor={floor} mallName={mallName} opacity={planOpacity} contrast={planContrast} showGrid={showGrid} getSnapshot={()=>prepareDraft({...snapshot,nodes:liveNodes},floorMeta,{floor,selectedId,nodeEdits,nodeEditsDirty,calibrationEdits,calibrationEditsDirty})} onClose={()=>setExportOpen(false)} />}
       {saveProblems && (<SaveProblemsModal problems={saveProblems} onClose={() => setSaveProblems(null)}/>)}
 
       {/* ── TRANSITION VALIDATION WARNING ── */}

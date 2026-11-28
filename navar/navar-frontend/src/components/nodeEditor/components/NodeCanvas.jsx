@@ -1,13 +1,16 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { C, M, F, NODE_TYPES, PATH_TYPE } from "../editorConstants";
+import { drawMapLegend, legendLayout } from '../mapLegend';
+import { rectangleSelection } from '../mapSelection';
+import {planContrastFilter,drawMapGrid,drawInactiveNode} from '../mapAppearance';
 
 // World space = floor-plan IMAGE pixels (origin top-left, y grows down).
 // Nodes keep a constant on-screen size, so zooming in never makes them bigger:
 // it only makes every click land on a more precise pixel of the plan.
 const MIN_K = 0.02;
 const MAX_K = 40;
-const NODE_R = 4.5;
-const HIT_NODE = 10;
+const NODE_R = 8;
+const HIT_NODE = 15;
 const HIT_EDGE = 6;
 const CLICK_SLOP = 4;
 const BAR_METERS = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
@@ -16,7 +19,7 @@ const PLAIN = new Set(["WALKWAY", "JUNCTION"]);
 const FIELDS = ["INPUT", "TEXTAREA", "SELECT"];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedIds = [], onCopy, onPaste, canPaste, selectedEdgeId, connectFrom, calibPts, savedRef, calibrationSelected, image, imageStatus, pxPerMeter, onCanvasClick, onNodeClick, onNodeDrag, onNodeDragEnd, onNodeNudge, onEdgeClick, onCalibrationSelect, onCalibrationDrag, onCalibrationDragEnd, }) {
+export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedIds = [], selectedEdgeIds = [], onSelection, opacity = 1, contrast = 0, showGrid = true, floorLabel, onCopy, onPaste, canPaste, selectedEdgeId, connectFrom, calibPts, savedRef, calibrationSelected, image, imageStatus, pxPerMeter, onCanvasClick, onNodeClick, onNodeDrag, onNodeDragEnd, onNodeNudge, onEdgeClick, onCalibrationSelect, onCalibrationDrag, onCalibrationDragEnd, }) {
     const wrapRef = useRef(null);
     const canvasRef = useRef(null);
     const gesture = useRef(null);
@@ -28,15 +31,19 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
     const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
     const [cursor, setCursor] = useState(null);
     const [showLabels, setShowLabels] = useState(true);
-    const [showIcons, setShowIcons] = useState(false);
+    const [showIcons, setShowIcons] = useState(true);
+    const [selectionBox, setSelectionBox] = useState(null);
+    const [legendVisible,setLegendVisible]=useState(false);
     const W = image?.naturalWidth || 0;
     const H = image?.naturalHeight || 0;
+    const totalHeight = H + (W ? legendLayout(W).height : 0);
     const ready = imageStatus === "ready" && W > 0;
 
     const fit = useCallback(() => {
         if (!ready || !size.w || !size.h)
             return;
         const k = Math.min(size.w / W, size.h / H) * 0.96;
+        setLegendVisible(false);
         setView({ k, tx: (size.w - W * k) / 2, ty: (size.h - H * k) / 2 });
     }, [ready, size.w, size.h, W, H]);
     useEffect(() => {
@@ -123,10 +130,16 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
         if (!ready)
             return;
         ctx.imageSmoothingEnabled = view.k < 2;
+        ctx.fillStyle='#fff';ctx.fillRect(view.tx,view.ty,W*view.k,(legendVisible?totalHeight:H)*view.k);
+        ctx.globalAlpha=opacity;
+        ctx.filter=planContrastFilter(contrast);
         ctx.drawImage(image, view.tx, view.ty, W * view.k, H * view.k);
+        ctx.globalAlpha=1;ctx.filter='none';
+        if(showGrid){ctx.save();ctx.translate(view.tx,view.ty);ctx.scale(view.k,view.k);drawMapGrid(ctx,W,H,view.k);ctx.restore();}
+        if(legendVisible){ctx.save();ctx.translate(view.tx,view.ty);ctx.scale(view.k,view.k);drawMapLegend(ctx,W,H,floorLabel);ctx.restore();}
         ctx.strokeStyle = "#94A3B8";
         ctx.lineWidth = 1;
-        ctx.strokeRect(view.tx - 0.5, view.ty - 0.5, W * view.k + 1, H * view.k + 1);
+        ctx.strokeRect(view.tx - 0.5, view.ty - 0.5, W * view.k + 1, (legendVisible?totalHeight:H) * view.k + 1);
 
         const byId = new Map(nodes.map(n => [n.id, n]));
         ctx.textAlign = "center";
@@ -136,7 +149,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
             if (!a || !b)
                 continue;
             const pt = PATH_TYPE[e.path_type] || PATH_TYPE.normal;
-            const sel = e.id === selectedEdgeId;
+            const sel = e.id === selectedEdgeId || selectedEdgeIds.includes(e.id);
             const [ax, ay] = toScreen(a.x, a.y), [bx, by] = toScreen(b.x, b.y);
             ctx.beginPath();
             ctx.moveTo(ax, ay);
@@ -227,10 +240,11 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
             ctx.strokeStyle = "#FFFFFF";
             ctx.lineWidth = 1.5;
             ctx.stroke();
+            if(n.status==='inactive')drawInactiveNode(ctx,x,y,r);
             if (showIcons && cfg.icon && !NO_ICON.has(cfg.icon) && cfg.icon !== "✛") {
-                ctx.font = "12px serif";
-                ctx.fillStyle = n.status==='inactive'?'#94A3B8':cfg.color;
-                ctx.fillText(cfg.icon, x, y - r - 8);
+                ctx.font = "18px serif";
+                ctx.fillStyle = n.status==='inactive'?'#334155':cfg.color;
+                ctx.fillText(cfg.icon, x, y - r - 12);
             }
             if (cfg.isFloorTransition && n.cross_floor_link) {
                 ctx.font = `bold 10px ${M}`;
@@ -247,6 +261,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
                 ctx.fillText(label, x, y + r + 9);
             }
         }
+        if(selectionBox){ctx.fillStyle='#2563eb18';ctx.strokeStyle='#2563eb';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.fillRect(selectionBox.x,selectionBox.y,selectionBox.w,selectionBox.h);ctx.strokeRect(selectionBox.x,selectionBox.y,selectionBox.w,selectionBox.h);ctx.setLineDash([]);}
         // Crosshair for precise clicking
         if (cursor && (mode === "place" || mode === "calibrate" || (dragging && ["node", "calibration"].includes(gesture.current?.kind)))) {
             ctx.strokeStyle = "rgba(37,99,235,0.55)";
@@ -364,15 +379,17 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
             return;
         if (!g.moved && Math.hypot(sx - g.sx, sy - g.sy) > CLICK_SLOP) {
             g.moved = true;
-            g.kind = g.node && editable && mode === "select" && !g.forcePan ? "node" : g.calibrationHit != null && editable && !g.forcePan ? "calibration" : "pan";
+            g.kind = mode==='box-select'&&!g.forcePan ? 'selection' : g.node && editable && mode === "select" && !g.forcePan ? "node" : g.calibrationHit != null && editable && !g.forcePan ? "calibration" : "pan";
             setDragging(true);
         }
         if (!g.moved)
             return;
         if (g.kind === "pan") {
+            if(sy<g.sy)setLegendVisible(true);
             setView({ ...g.startView, tx: g.startView.tx + (sx - g.sx), ty: g.startView.ty + (sy - g.sy) });
             return;
         }
+        if(g.kind==='selection'){g.endWorld=toWorld(sx,sy);setSelectionBox({x:Math.min(g.sx,sx),y:Math.min(g.sy,sy),w:Math.abs(sx-g.sx),h:Math.abs(sy-g.sy)});return;}
         const [wx, wy] = toWorld(sx, sy);
         g.last = [clamp(wx, 0, W), clamp(wy, 0, H)];
         if (g.kind === "calibration") {
@@ -395,6 +412,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
         const g = gesture.current;
         gesture.current = null;
         setDragging(false);
+        setSelectionBox(null);
         if (!g) return;
         if (cancelled) {
             if (g.kind === "node" && g.last) onNodeDragEnd(g.node.id, ...g.last);
@@ -402,6 +420,7 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
             return;
         }
         if (g.moved) {
+            if(g.kind==='selection'&&g.endWorld){const selection=rectangleSelection(nodes,edges,{x:g.startWorld[0],y:g.startWorld[1]},{x:g.endWorld[0],y:g.endWorld[1]});onSelection?.(selection.nodeIds,selection.edgeIds,g.additive);}
             if (g.kind === "node" && g.last)
                 onNodeDragEnd(g.node.id, g.last[0], g.last[1]);
             if (g.kind === "calibration" && g.lastCalibration)
@@ -413,10 +432,10 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
             return onNodeClick(g.node, g.additive);
         if (g.calibrationHit != null)
             return onCalibrationSelect();
-        if (mode === "select") {
+        if (mode === "select" || mode === "box-select") {
             const edgeId = hitEdge(sx, sy);
             if (edgeId)
-                return onEdgeClick(edgeId);
+                return onEdgeClick(edgeId,g.additive);
         }
         const [wx, wy] = toWorld(sx, sy);
         if (wx < 0 || wy < 0 || wx > W || wy > H)
@@ -425,14 +444,15 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
         onCanvasClick(Math.round(wx * 100) / 100, Math.round(wy * 100) / 100);
     };
 
-    const cursorStyle = dragging ? "grabbing" : spaceHeld ? "grab" : mode === "place" || mode === "calibrate" ? "crosshair" : mode === "connect" ? "cell" : "default";
+    const cursorStyle = dragging ? (selectionBox?'crosshair':'grabbing') : spaceHeld ? "grab" : mode === "place" || mode === "calibrate" || mode === 'box-select' ? "crosshair" : mode === "connect" ? "cell" : "grab";
     const btn = { width: 30, height: 30, border: `1px solid ${C.border}`, background: C.white, borderRadius: 7, cursor: "pointer", fontSize: 15, fontWeight: 700, color: "#334155", fontFamily: F, display: "flex", alignItems: "center", justifyContent: "center" };
     const chip = (on) => ({ padding: "0 9px", height: 26, border: `1px solid ${on ? C.blue : C.border}`, background: on ? C.blueL : C.white, color: on ? C.blue : "#64748B", borderRadius: 7, cursor: "pointer", fontSize: 10, fontWeight: 700, fontFamily: M });
     const hint = mode === "calibrate"
         ? calibPts.length === 0 ? "Click point A at one end of a known distance" : calibPts.length === 1 ? "Click point B at the other end" : "Line drawn — enter the real distance"
         : mode === "place" ? "Click the exact spot to place a node"
             : mode === "connect" ? connectFrom ? "Click another node to connect" : "Click a node to start an edge"
-                : "Click to select · drag a node to move · arrow keys nudge · drag empty space to pan · scroll to zoom";
+                : mode==='box-select' ? "Drag a rectangle to select nodes and edges · Shift adds to selection · Space + drag pans"
+                    : "Drag empty space to pan · drag nodes to move · Box Select selects an area · pan up to see the legend below";
     const message = imageStatus === "loading" ? "Loading floor plan…"
         : imageStatus === "error" ? "The floor plan image could not be loaded. Reload the editor."
             : "No floor plan was submitted for this floor.";
@@ -458,8 +478,8 @@ export function NodeCanvas({ nodes, edges, mode, editable, selectedId, selectedI
           <div style={{ position: "absolute", top: 8, right: 8, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
             <button title="Zoom in" style={btn} onClick={() => zoomAt(size.w / 2, size.h / 2, 1.5)}>+</button>
             <button title="Zoom out" style={btn} onClick={() => zoomAt(size.w / 2, size.h / 2, 1 / 1.5)}>−</button>
-            <button title="Fit the whole floor plan" style={{ ...btn, fontSize: 10, fontFamily: M }} onClick={fit}>Fit</button>
-            <button title="Actual image pixels (1:1)" style={{ ...btn, fontSize: 10, fontFamily: M }} onClick={() => zoomAt(size.w / 2, size.h / 2, 1 / view.k)}>1:1</button>
+            <button title="Fit the floor plan, excluding the legend" style={{ ...btn, fontSize: 10, fontFamily: M }} onClick={fit}>Fit</button>
+            <button title="100% — center the original floor plan" style={{ ...btn, width:40, fontSize: 10, fontFamily: M }} onClick={() => {setLegendVisible(false);setView({k:1,tx:(size.w-W)/2,ty:(size.h-H)/2});}}>100%</button>
             <div style={{ ...overlay, position: "static", fontSize: 10, color: "#475569", padding: "2px 7px", borderRadius: 5 }}>{Math.round(view.k * 100)}%</div>
             <button style={chip(showLabels)} onClick={() => setShowLabels(v => !v)}>Labels</button>
             <button style={chip(showIcons)} onClick={() => setShowIcons(v => !v)}>Icons</button>

@@ -1,5 +1,31 @@
 # Progress
 
+## 27 November 2026 - Direct image downloads, contrast and coordinate grid
+
+Single-floor PNG/JPG exports now download as the image itself; ZIP is used only for multiple image files. PDF remains one document with a page per selected floor. Export names and format labels follow the chosen floor count.
+
+Kept opacity at 0–100% and added a separate Contrast slider from -100 to +100, with zero preserving the original appearance, negative values softening contrast and positive values strengthening lines. Contrast is applied only to the original plan image, not nodes, grid or legend. Added an X/Y grid toggle, enabled initially, with image-pixel coordinate labels and major/minor lines. The shared grid renderer is clipped to the original floor-plan bounds; exports follow the same grid toggle, opacity and contrast settings. View settings do not alter map or calibration records.
+
+Seven focused export/selection tests passed. Isolated browser tests verified direct PNG/JPG downloads, one-page single-floor PDF, two-image ZIPs and a two-page PDF; contrast changed the drawing, and exported grid-on/grid-off pixels differed as expected. No live writes were made. Production build passed; focused lint has no errors, with existing editor hook and bundle-size warnings remaining.
+
+## 27 November 2026 - Empty clipboard paste guards
+
+Hardened graph paste against empty or stale clipboard shapes and guarded the first pasted node before selecting it. Empty copy clears the clipboard and reports no selection; empty paste cannot mutate history or select a nonexistent node. Paste controls tolerate missing clipboard node lists, and copied edges must reference pasted nodes. Five selection/export regression tests passed. Isolated browser checks confirmed empty keyboard paste leaves the editor visible, valid cross-floor paste still works, and all exports remain functional, with no live writes. Production build passed; existing hook and bundle-size warnings remain.
+
+## 27 November 2026 - Restore map panning and focus the drawing
+
+Dragging empty space in Select & Move pans again. Rectangle selection has its own Box Select tool; Space-drag and middle-button drag continue to pan in other tools. Fit uses only original floor-plan dimensions, and 100% centers the original image at actual pixel scale. Both hide the legend from the focused viewport until the user pans upward to reveal the white legend area below the drawing. Exports always include the legend. Browser checks verified drag panning through canvas pixel positions, Fit/100% framing, hidden/revealed legend, rectangle selection, cross-floor graph paste and all three export formats without live map writes. Focused lint has no errors and retains three existing editor hook warnings.
+
+## 26 November 2026 - Map visibility, floor exports and selection copying
+
+Increased placed node markers and icons; icons are visible by default. Added a floor-plan opacity slider that affects only the background image. A shared canvas legend renderer extends every displayed/exported plan with a white footer containing node types, edge types, inactive-node meaning and the mall/floor label. Original image coordinates and calibration bounds remain unchanged.
+
+Export floors opens a floor checklist and PNG/JPG/PDF choices. Images download in one ZIP with a file per selected floor; PDF downloads as one A4 document with one image page per selected floor. Exports include current unsaved editor changes and the selected opacity without saving anything to the database. Rendering bounds image memory, reports failures, and includes the legend in every format. The existing ZIP utility now accepts binary bytes as well as analytics CSV text; CSV behavior is preserved.
+
+Select mode supports dragging a rectangle around nodes and their connecting edges, with Shift adding to selection. Space-drag or middle-button drag pans. Copy selection / Ctrl+C copies nodes plus in-floor connecting edges; switch floors and use Paste / Ctrl+V. New node/edge IDs are generated and edge direction/type retained. Beacon assignments are not duplicated. Cross-floor store/stall links are cleared for reassignment, conflicting landing groups are cleared, and oversized selections are rejected instead of clipping the graph. Pasting remains an unsaved, undoable editor change.
+
+Validation: 32 focused selection/export, analytics ZIP, automatic-floor-connection and snapshot/beacon regression tests passed. Isolated browser checks exercised rectangle selection, cross-floor graph paste, opacity, two-file PNG/JPG ZIP downloads and a two-page PDF; exported PNG and editor legend were visually inspected. No live map writes were made. Production build passed; focused lint has no errors and retains three existing editor hook warnings. Existing bundle-size warning remains.
+
 ## 24 November 2026 - Agreement labels follow the current subscription
 
 Removed hardcoded Setup labels from application lists/details and the AR list's fallback. A shared formatter shows Onboarding before a subscription starts and the current contract's readable status thereafter. Historical application versions also reflect the mall's current subscription. No onboarding contract or payment is created or modified. Five focused tests passed, covering list/detail consistency, inactive historical contracts, pre-subscription state, subscription statuses and latest-AR regression. Existing virtual Draft rows are not proof of payment: Minglanilla's recorded onboarding request is still pending, and Robinsons has no recorded onboarding payment request. Those records were left untouched.

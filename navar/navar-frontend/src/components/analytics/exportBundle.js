@@ -26,7 +26,7 @@ function crc32(bytes){let crc=0xffffffff;for(const byte of bytes){crc^=byte;for(
 export function zipFiles(files){
  const locals=[],central=[];let offset=0,centralSize=0
  for(const file of files){
-  const name=encoder.encode(file.name),data=encoder.encode(file.text),crc=crc32(data)
+  const name=encoder.encode(file.name),data=file.bytes??encoder.encode(file.text),crc=crc32(data)
   const local=new Uint8Array(30+name.length),l=new DataView(local.buffer)
   l.setUint32(0,0x04034b50,true);l.setUint16(4,20,true);l.setUint16(6,0x0800,true);l.setUint16(12,0x0021,true);l.setUint32(14,crc,true);l.setUint32(18,data.length,true);l.setUint32(22,data.length,true);l.setUint16(26,name.length,true);local.set(name,30)
   const entry=new Uint8Array(46+name.length),c=new DataView(entry.buffer)
